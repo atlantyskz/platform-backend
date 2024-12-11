@@ -11,7 +11,7 @@ class CustomRedisSettings(RedisSettings):
     result_key_prefix = 'hr_analyze:'
 
 async def startup(ctx):
-    ctx['redis'] = await create_pool(CustomRedisSettings())
+    ctx['redis'] = await create_pool(CustomRedisSettings(port=6378))
 
 async def analyze_cv_task(ctx, data:dict) -> dict:
     """Task for analyzing one CV"""

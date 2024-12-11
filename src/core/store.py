@@ -1,7 +1,7 @@
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 from fastapi import FastAPI
-from src.core.databases import session_manager,Base
+from src.core.databases import session_manager,Base,insert_roles
 
 
 class StoreManager:
@@ -11,6 +11,9 @@ class StoreManager:
     async def connect(self):
         async with self.postgres.connect() as conn:
             await conn.run_sync(Base.metadata.create_all)
+        
+        async with self.postgres.session() as session:
+            await insert_roles(session)
 
 
     async def disconnect(self):

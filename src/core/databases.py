@@ -1,5 +1,8 @@
 from contextlib import asynccontextmanager
 from typing import Any, AsyncIterator
+
+from sqlalchemy import select
+from src.models.role import Role, RoleEnum
 from src.core.settings import settings
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
@@ -32,7 +35,6 @@ class DatabaseSessionManager:
     async def connect(self) -> AsyncIterator[AsyncSession]:
         if not self._engine:
             raise Exception("DatabaseSessionManager is not initialized")
-
         async with self._engine.begin() as connection:
             try:
                 yield connection
@@ -67,3 +69,14 @@ session_manager =  DatabaseSessionManager(
 async def get_session() -> AsyncIterator[AsyncSession]:
     async with session_manager.session() as session:
         yield session
+
+
+async def insert_roles(session: AsyncSession):
+    roles = await session.execute(select(Role.name))
+    existing_roles = [role[0] for role in roles.fetchall()]
+    for role in RoleEnum:
+        if role.value not in existing_roles:
+            new_role = Role(name=role.value)
+            session.add(new_role)
+    
+    await session.commit()
