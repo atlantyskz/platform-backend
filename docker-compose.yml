@@ -1,6 +1,7 @@
 services:
   web:
     build: .
+    container_name: platform-backend
     ports:
       - "9000:9000"
     env_file:
@@ -9,23 +10,3 @@ services:
       - app_network
     volumes:
       - .:/app
-    depends_on:
-      - db
-      
-  postgres:
-    image: postgres:alpine
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    networks:
-      - app_network
-    environment:
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
-      - POSTGRES_DB=platform-db
-
-networks:
-  app_network:
-    driver: bridge
-
-volumes:
-  postgres_data:
