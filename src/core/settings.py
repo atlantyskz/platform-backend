@@ -21,6 +21,8 @@ class Settings:
         db_password = os.getenv('DB_PASSWORD')
         db_name = os.getenv('DB_NAME')
         print( f"postgresql+asyncpg://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}")
-        return f"postgresql+asyncpg://{db_user}:{db_password}@postgres:{db_port}/{db_name}"
+        return f"postgresql+asyncpg://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
+    
+    
 settings = Settings()
     
