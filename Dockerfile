@@ -1,51 +1,24 @@
-# Stage 1: Builder
+# Используем slim-образ Python для минимального размера
 FROM python:3.10-slim AS builder
 
-# Установка переменных окружения
+# Устанавливаем переменные окружения для Python
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 
 # Устанавливаем рабочую директорию
 WORKDIR /app
 
-# Копируем зависимости
-COPY requirements.txt .
+# Копируем requirements.txt для установки зависимостей
+COPY requirements.txt requirements.txt
 
-# Устанавливаем зависимости с кешированием
+# Устанавливаем зависимости
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Копируем исходный код приложения
+# Копируем все файлы проекта в контейнер
 COPY . .
 
-# Stage 2: Final image
-FROM python:3.10-slim
-
-# Установка переменных окружения
-ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1
-
-# Устанавливаем рабочую директорию
-WORKDIR /app
-
-# Копируем только необходимые файлы из builder
-COPY --from=builder /usr/local/lib/python3.10/site-packages/ /usr/local/lib/python3.10/site-packages/
-COPY --from=builder /app /app
-
-# Убедимся, что start.sh существует и имеет права на выполнение
-COPY start.sh /app/start.sh
-RUN chmod +x /app/start.sh
-
-# Создаем non-root пользователя для безопасности
-RUN adduser --disabled-password --no-create-home appuser && \
-    chown -R appuser:appuser /app
-
-# Переходим на non-root пользователя
-USER appuser
-
-# Открываем порт приложения
+# Открываем порт, на котором будет работать приложение
 EXPOSE 9000
 
-# Проверка здоровья контейнера
-HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:9000/health || exit 1
-
+# Задаем команду по умолчанию для выполнения (например, Alembic миграции и запуск приложения)
+CMD ["sh", "-c", "python -m alembic upgrade head && python -u main.py"]
