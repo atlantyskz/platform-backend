@@ -50,3 +50,4 @@ class OrganizationMemberRepository(BaseRepository):
         )
         result = await self.session.execute(stmt)
         return result.scalars().first()
+

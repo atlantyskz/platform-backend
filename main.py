@@ -1,6 +1,5 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
-from src.routers.handle_files import handle_files_router
 from src.routers.api.v1.auth import auth_router
 from src.routers.api.v1.hr_agent import hr_agent_router
 from src.routers.api.v1.organization import organization_router
@@ -71,7 +70,6 @@ def create_app(create_custom_static_urls: bool = False) -> FastAPI:
             redoc_url=None if create_custom_static_urls else '/api/redoc',
             openapi_url="/api/openapi.json"  
     )
-    app.include_router(handle_files_router)
     app.include_router(auth_router)
     app.include_router(hr_agent_router)
     app.include_router(organization_router)

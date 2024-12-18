@@ -23,12 +23,14 @@ class UserRepository(BaseRepository):
             select(User)
             .where(User.id == user_id)
             .options(
-                joinedload(User.role), 
+                joinedload(User.role),
             )
         )
 
         result = await self.session.execute(stmt)
         return result.scalars().first()
+    
+
     
     async def get_current_user(self, user_id: int):
         stmt = (

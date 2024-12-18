@@ -1,19 +1,19 @@
-import asyncio
-from typing import List, Optional
-import uuid
-from fastapi import APIRouter, Depends, Form, UploadFile,File,WebSocket
-from src.schemas.file_analysis import FileProcessingResponse
-from src.services.extractor import get_text_extractor,ITextExtractor
-from src.services.ai_analyzer import FileHandlerService, get_file_handler_service
-from src.core.worker import CustomRedisSettings
-import time
-from fastapi import APIRouter, File, UploadFile, Depends, HTTPException
-from arq import create_pool
-from typing import List
-from datetime import datetime
-from pydantic import BaseModel
+# import asyncio
+# from typing import List, Optional
+# import uuid
+# from fastapi import APIRouter, Depends, Form, UploadFile,File,WebSocket
+# from src.schemas.file_analysis import FileProcessingResponse
+# from src.services.extractor import get_text_extractor,ITextExtractor
+# from src.services.ai_analyzer import FileHandlerService, get_file_handler_service
+# from src.core.worker import CustomRedisSettings
+# import time
+# from fastapi import APIRouter, File, UploadFile, Depends, HTTPException
+# from arq import create_pool
+# from typing import List
+# from datetime import datetime
+# from pydantic import BaseModel
 
-handle_files_router = APIRouter(prefix='/api',tags=['CV/Vacancy Files Handler'])
+# handle_files_router = APIRouter(prefix='/api',tags=['CV/Vacancy Files Handler'])
 
 # @handle_files_router.post('/handle_files', )
 # async def handle_files(

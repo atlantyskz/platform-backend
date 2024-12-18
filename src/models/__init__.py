@@ -1,6 +1,6 @@
 import os
 from sqlalchemy.orm import declarative_base,mapped_column
-from sqlalchemy import Column, DateTime, func
+from sqlalchemy import DateTime, func
 from sqlalchemy.ext.declarative import declared_attr
 
 
@@ -23,5 +23,9 @@ Base = declarative_base()
 from .permission import Permission,role_permissions
 from .role import Role,role_permissions
 from .organization import Organization
+from .assistant import Assistant
 from .organization_member import OrganizationMember
 from .user import User
+from .hr_assistant_task import HRTask
+from .assistant_session import AssistantSession
+from .assigned_assistant import assigned_assistant

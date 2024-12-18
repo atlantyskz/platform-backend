@@ -22,10 +22,34 @@ services:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=postgres
       - POSTGRES_DB=platform-db
+    ports:
+      - "5432:5432"
+
+  worker:
+    build: .
+    command: python -m dramatiq src.core.dramtiq_worker
+    volumes:
+      - .:/app
+    env_file:
+      - .env
+    networks:
+      - app_network
+    depends_on:
+      - postgres
+      - redis
+
+  redis:
+    image: redis:alpine
+    ports:
+      - "6379:6379"
+    networks:
+      - app_network
+
 
 networks:
   app_network:
-    driver: bridge
+    external: true
+
 
 volumes:
   postgres_data:

@@ -1,13 +1,15 @@
 from typing import Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, EmailStr, Field
 
 class CreateOrganizationRequest(BaseModel):
 
     name:str = Field(...)
+    email:EmailStr = Field(...)
+    phone_number: Optional[str]
     registered_address:str = Field(...)
-    contact_information:str = Field(...)
 
 class UpdateOrganizationRequest(BaseModel):
     name:Optional[str] = Field(None)
+    email:Optional[str] = Field(None)
     registered_address:Optional[str] = Field(None)
-    contact_information:Optional[str] = Field(None)
+    phone_number:Optional[str] = Field(None)

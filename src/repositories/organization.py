@@ -1,6 +1,7 @@
 from typing import Any, List
 from pydantic import EmailStr
 from sqlalchemy import insert, select, update
+from src.models.organization_member import OrganizationMember
 from src.models.user import User
 from src.models.organization import Organization
 from src.repositories import BaseRepository
@@ -30,6 +31,17 @@ class OrganizationRepository(BaseRepository):
         stmt = select(Organization)
         result = await self.session.execute(stmt)
         return result.scalars().all()
+
+    async def get_user_organization(self, user_id: int) -> Organization | None:
+        stmt = (
+            select(Organization)
+            .join(OrganizationMember, Organization.id == OrganizationMember.organization_id)
+            .where(OrganizationMember.user_id == user_id)
+        )
+        result = await self.session.execute(stmt)
+        return result.scalar_one_or_none()
+
+    
 
 
     async def update(self,organization_id,attributes:dict)-> Organization:

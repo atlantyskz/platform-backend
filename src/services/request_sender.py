@@ -1,4 +1,5 @@
 import logging
+from typing import Any, Dict
 import httpx
 from abc import ABC, abstractmethod
 import json as json_converter
@@ -12,22 +13,26 @@ class IRequestSender(ABC):
 
 class RequestSender(IRequestSender):
 
-    LLM_URL = 'http://0.0.0.0:8001/hr/analyze_cv_by_vacancy'
+    LLM_URL = "http://llm_service:8001/hr/analyze_cv_by_vacancy"
 
-    async def _send_request(self, data: dict ,llm_url: str = LLM_URL) -> dict:
+    async def _send_request(self, data: Dict[str, Any], llm_url: str = LLM_URL) -> Dict[str, Any]:
+        headers = {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+        }
         try:
-            headers = {
-                'Accept': 'application/json',
-                'Content-Type': 'application/json'
-            }
-            async with httpx.AsyncClient(timeout=120) as client:
-                response = await client.post(llm_url, json=data,headers=headers)
+            async with httpx.AsyncClient(timeout=httpx.Timeout(120.0, read=120.0)) as client:
+                response = await client.post(llm_url, json=data, headers=headers)
+                response.raise_for_status()  # Проверка на HTTP ошибки (4xx и 5xx)
                 response_data = response.json()
-                logging.info(response_data)
+                logging.info("Response data: %s", response_data)
                 return response_data
-        except httpx.HTTPStatusError as e:
-            logging.error(f"HTTP error occurred: {e.response.status_code} - {e.response.text}")
-            raise Exception(f"HTTP error occurred: {e}")
-        except Exception as e:
-            logging.error(f"Unexpected error occurred: {e}")
-            raise Exception(f"Unexpected error occurred: {e}")
+        except httpx.HTTPStatusError as http_err:
+            logging.error(f"HTTP error occurred: {http_err.response.status_code} - {http_err.response.text}")
+            raise Exception(f"HTTP error: {http_err.response.status_code} - {http_err.response.text}") from http_err
+        except httpx.RequestError as req_err:
+            logging.error(f"Request error occurred: {req_err}")
+            raise Exception(f"Request error: {req_err}") from req_err
+        except Exception as err:
+            logging.error(f"Unexpected error occurred: {err}")
+            raise Exception(f"Unexpected error: {err}") from err

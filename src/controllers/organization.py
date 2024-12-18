@@ -16,7 +16,7 @@ from src.repositories.user import UserRepository
 from src.repositories.organization import OrganizationRepository
 from src.repositories.role import RoleRepository
 from sqlalchemy.ext.asyncio import AsyncSession
-
+from sqlalchemy.exc import SQLAlchemyError
 
 class OrganizationController:
 
@@ -27,7 +27,7 @@ class OrganizationController:
         self.organization_members_repo = OrganizationMemberRepository(self.session)
         self.role_repository = RoleRepository(self.session)
 
-    async def create_organization(self, name:str,contact_information:str,registered_address:str,admin_id:int) -> Organization:
+    async def create_organization(self, name:str,email:str,phone_number:str,registered_address:str,admin_id:int) -> Organization:
         try:
             async with self.session.begin():
                 user = await self.user_repo.get_by_user_id(admin_id)
@@ -38,17 +38,23 @@ class OrganizationController:
                     raise BadRequestException(message='You already created organization')
                 new_org = await self.organization_repo.add({
                     "name":name,
-                    "contact_information":contact_information,
+                    "email":email,
+                    "phone_number":phone_number,
                     "registered_address":registered_address,
                 })
                 await self.session.flush()
+                await self.session.refresh(new_org)
+
                 new_org_member = await self.organization_members_repo.add(
                     organization_id=new_org.id,
                     employee_id=user.id,
                     role_alias=user.role.name
                 )
                 await self.session.flush()
-                return new_org_member
+                org_name = new_org.name
+            return {"success":True}
+        except SQLAlchemyError as e:
+            raise
         except Exception as e:
             raise
 

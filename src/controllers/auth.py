@@ -26,9 +26,9 @@ class AuthController:
     async def create_user(self, email:EmailStr,password:str) -> Token:
         async with self.session.begin(): 
             try:
-                exist_user = await self.get_user_by_email(email)
-                if exist_user is not None:
-                    raise BadRequestException(message='User already exist')
+                user =await self.user_repo.get_by_email(email)
+                if user is not None:
+                    raise BadRequestException("User already Exist")
                 role =  await self.role_repo.get_role_by_name(RoleEnum.ADMIN)
                 password_hash = PasswordHandler.hash(password)
                 user = await self.user_repo.create_user({
@@ -45,9 +45,7 @@ class AuthController:
 
     async def login(self, email: str, password: str) -> Token:
         try:
-            user = await self.get_user_by_email(email)
-            if user is None:
-                raise BadRequestException(message="User not found")
+            user = await self._get_user_by_email(email)
             if not PasswordHandler.verify(user.password,password):
                 raise UnauthorizedException(message='Incorrect Password')
             return Token(
@@ -56,10 +54,27 @@ class AuthController:
                 )
         except Exception:
             raise
-    
-    async def get_user_by_email(self,email: str)-> User:
+
+    async def request_to_reset_password(self, email:str ):
+        try:
+            user = await self._get_user_by_email(email)
+            token = JWTHandler.encode_access_token
+            
+        except Exception as e:
+            raise   
+
+    async def reset_password(self,email: str)->str:
+        try:
+            user = await self._get_user_by_email(email)
+            
+        except Exception as e:
+            raise   
+
+    async def _get_user_by_email(self,email: str)-> User:
         try:
             user = await self.user_repo.get_by_email(email)
+            if user is None:
+                raise BadRequestException(message='User not found')
             return user
         except Exception:
             raise
