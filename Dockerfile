@@ -41,6 +41,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY --from=builder /usr/local/lib/python3.10/site-packages/ /usr/local/lib/python3.10/site-packages/
 COPY --from=builder /app /app
 
+# Set permissions for the start script
+COPY start.sh /app/start.sh
+RUN chmod +x /app/start.sh
+
 # Create non-root user
 RUN adduser --disabled-password --no-create-home appuser && \
     chown -R appuser:appuser /app
@@ -54,10 +58,6 @@ EXPOSE 9000
 # Healthcheck
 HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:9000/health || exit 1
-
-# Start script
-COPY start.sh /app/start.sh
-RUN chmod +x /app/start.sh
 
 # Run the start script
 ENTRYPOINT ["/app/start.sh"]

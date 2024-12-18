@@ -1,8 +1,7 @@
 services:
   web:
-    image: atlantys/platform-backend:latest
+    build: .
     container_name: platform-backend
-    command: "alembic upgrade head "
     ports:
       - "9000:9000"
     env_file:
