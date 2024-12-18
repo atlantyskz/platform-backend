@@ -1,56 +1,57 @@
-services:
-  web:
-    build: .
-    container_name: platform-backend
-    ports:
-      - "9000:9000"
-    env_file:
-      - .env
-    networks:
-      - app_network
-    volumes:
-      - .:/app
-    depends_on:
-      - postgres
-      
-  postgres:
-    image: postgres:alpine
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    networks:
-      - app_network
-    environment:
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
-      - POSTGRES_DB=platform-db
-    ports:
-      - "5432:5432"
+  services:
+    web:
+      image: atlantys/platform-backend:latest
+      container_name: platform-backend
+      ports:
+        - "9000:9000"
+      env_file:
+        - .env
+      networks:
+        - app_network
+      volumes:
+        - .:/app
+      depends_on:
+        - postgres
+        
+    postgres:
+      image: postgres:alpine
+      container_name: platform-db
+      volumes:
+        - postgres_data:/var/lib/postgresql/data
+      networks:
+        - app_network
+      environment:
+        - POSTGRES_USER=postgres
+        - POSTGRES_PASSWORD=postgres
+        - POSTGRES_DB=platform-db
+      ports:
+        - "5432:5432"
 
-  worker:
-    build: .
-    command: python -m dramatiq src.core.dramtiq_worker
-    volumes:
-      - .:/app
-    env_file:
-      - .env
-    networks:
-      - app_network
-    depends_on:
-      - postgres
-      - redis
+    worker:
+      image: atlantys/platform-backend:latest
+      command: python -m dramatiq src.core.dramtiq_worker
+      volumes:
+        - .:/app
+      env_file:
+        - .env
+      networks:
+        - app_network
+      depends_on:
+        - postgres
+        - redis
 
-  redis:
-    image: redis:alpine
-    ports:
-      - "6379:6379"
-    networks:
-      - app_network
+    redis:
+      image: redis:alpine
+      ports:
+        - "6379:6379"
+      networks:
+        - app_network
+
+  
+  networks:
+    app_network:
+      external: true
 
 
-networks:
-  app_network:
-    external: true
-
-
-volumes:
-  postgres_data:
+  volumes:
+    postgres_data:
