@@ -1,7 +1,9 @@
   services:
     web:
-      image: atlantys/platform-backend:latest
+      build: .
       container_name: platform-backend
+      command: >
+        sh -c "python -m alembic upgrade head && python -u main.py"      
       ports:
         - "9000:9000"
       env_file:
@@ -28,7 +30,7 @@
         - "5432:5432"
 
     worker:
-      image: atlantys/platform-backend:latest
+      build: .
       command: python -m dramatiq src.core.dramtiq_worker
       volumes:
         - .:/app
@@ -39,6 +41,7 @@
       depends_on:
         - postgres
         - redis
+        - web
 
     redis:
       image: redis:alpine

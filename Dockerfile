@@ -1,63 +1,53 @@
 # Stage 1: Builder
 FROM python:3.10-slim AS builder
 
-# Set environment variables
+# Установка переменных окружения
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 
-# Set working directory
+# Устанавливаем рабочую директорию
 WORKDIR /app
 
-# Install build dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential curl \
-    && rm -rf /var/lib/apt/lists/*
-
-# Copy requirements first to leverage Docker cache
+# Копируем зависимости
 COPY requirements.txt .
 
-# Install dependencies
+# Устанавливаем зависимости с кешированием
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the rest of the application
+# Копируем исходный код приложения
 COPY . .
 
 # Stage 2: Final image
 FROM python:3.10-slim
 
-# Set environment variables
+# Установка переменных окружения
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 
-# Set working directory
+# Устанавливаем рабочую директорию
 WORKDIR /app
 
-# Install runtime dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl \
-    && rm -rf /var/lib/apt/lists/*
-
-# Copy only necessary files from builder
+# Копируем только необходимые файлы из builder
 COPY --from=builder /usr/local/lib/python3.10/site-packages/ /usr/local/lib/python3.10/site-packages/
 COPY --from=builder /app /app
 
-# Set permissions for the start script
+# Убедимся, что start.sh существует и имеет права на выполнение
 COPY start.sh /app/start.sh
 RUN chmod +x /app/start.sh
 
-# Create non-root user
+# Создаем non-root пользователя для безопасности
 RUN adduser --disabled-password --no-create-home appuser && \
     chown -R appuser:appuser /app
 
-# Switch to non-root user
+# Переходим на non-root пользователя
 USER appuser
 
-# Expose the application port
+# Открываем порт приложения
 EXPOSE 9000
 
-# Healthcheck
+# Проверка здоровья контейнера
 HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:9000/health || exit 1
 
-# Run the start script
-ENTRYPOINT ["start.sh"]
+# Указываем стартовый скрипт как точку входа
+ENTRYPOINT ["/app/start.sh"]
