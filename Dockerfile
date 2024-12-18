@@ -10,7 +10,7 @@ WORKDIR /app
 
 # Install build dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
+    build-essential curl \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first to leverage Docker cache
@@ -32,6 +32,11 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 # Set working directory
 WORKDIR /app
 
+# Install runtime dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
 # Copy only necessary files from builder
 COPY --from=builder /usr/local/lib/python3.10/site-packages/ /usr/local/lib/python3.10/site-packages/
 COPY --from=builder /app /app
@@ -50,6 +55,9 @@ EXPOSE 9000
 HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:9000/health || exit 1
 
-# Run the application
-ENTRYPOINT ["python", "-m", "alembic", "upgrade", "head"]
-CMD ["python", "-u", "main.py"]
+# Start script
+COPY start.sh /app/start.sh
+RUN chmod +x /app/start.sh
+
+# Run the start script
+ENTRYPOINT ["/app/start.sh"]
