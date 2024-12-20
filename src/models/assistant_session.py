@@ -8,12 +8,13 @@ class AssistantSession(Base, TimestampMixin):
     __tablename__ = 'assistant_sessions'
     
     id: so.Mapped[uuid.UUID] = so.mapped_column(
-    sa.UUID(as_uuid=True),
-    primary_key=True,
-    default=uuid.uuid4
+                                                sa.UUID(as_uuid=True),
+                                                primary_key=True,
+                                                default=uuid.uuid4
     )
 
     user_id: so.Mapped[int] = so.mapped_column(sa.ForeignKey('users.id', ondelete="CASCADE"), nullable=False)
+    title: so.Mapped[str] = so.mapped_column(sa.String(50), nullable=True)
     organization_id: so.Mapped[int] = so.mapped_column(sa.ForeignKey('organizations.id', ondelete="CASCADE"), nullable=False)
     assistant_id: so.Mapped[int] = so.mapped_column(sa.ForeignKey('assistants.id', ondelete="CASCADE"), nullable=False)  
     

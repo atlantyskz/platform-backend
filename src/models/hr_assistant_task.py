@@ -17,3 +17,4 @@ class HRTask(Base):
     created_at: so.Mapped[str] = so.mapped_column(sa.DateTime, default=sa.func.now())
     
     session = so.relationship("AssistantSession", back_populates="tasks")
+    favorites = so.relationship("FavoriteResume", back_populates="task", cascade="all, delete-orphan")

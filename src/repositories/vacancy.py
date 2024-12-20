@@ -1,0 +1,37 @@
+from sqlalchemy import select,update
+from sqlalchemy.ext.asyncio import AsyncSession
+from src.models.vacancy import Vacancy
+from src.repositories import BaseRepository
+
+class VacancyRepository(BaseRepository):
+
+    def __init__(self,session:AsyncSession):
+        self.session = session
+
+    async def add(self,attributes:dict):
+        vacancy = Vacancy(**attributes)
+        self.session.add(vacancy)
+        await self.session.commit()
+        return vacancy
+    
+    async def get_by_id(self, id:int)->Vacancy:
+        stmt = select(Vacancy).where(Vacancy.id == id)
+        result = await self.session.execute(stmt)
+        return result.scalars().first()
+    
+    async def get_by_user_id(self,user_id:int)->Vacancy:
+        stmt = select(Vacancy).where(Vacancy.user_id == user_id)
+        result = await self.session.execute(stmt)
+        return result.scalars().all()
+    
+    
+    async def update_by_id(self,id:int,attributes:dict):
+        stmt = (
+            update(Vacancy)
+            .where(Vacancy.id == id)
+            .values(vacancy_text=attributes)
+            .execution_options(synchronize_session="fetch")
+        )        
+        result = await self.session.execute(stmt)
+        return result
+

@@ -11,7 +11,7 @@ from typing import Optional
 from src.core.middlewares.auth_middleware import get_current_user,require_roles
 
 
-organization_router = APIRouter(prefix='/api/v1/organization',tags=['Organization'])
+organization_router = APIRouter(prefix='/api/v1/organization',tags=['ORGANIZATION'])
 
 @organization_router.post("/create/organization")
 @require_roles([RoleEnum.ADMIN.value])

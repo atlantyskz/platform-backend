@@ -1,13 +1,12 @@
-from abc import ABC, abstractmethod
-from typing import Protocol
-from fastapi import Depends, UploadFile, HTTPException
-import pdfplumber
-import docx
 import io
-import logging
-from functools import partial
-from concurrent.futures import ThreadPoolExecutor
+import docx
 import asyncio
+import logging
+import pdfplumber
+from functools import partial
+from abc import ABC, abstractmethod
+from fastapi import Depends, UploadFile
+from concurrent.futures import ThreadPoolExecutor
 
 # Логирование
 logger = logging.getLogger(__name__)

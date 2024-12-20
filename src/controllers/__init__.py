@@ -1,7 +1,6 @@
 from typing import TypeVar, Type
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.repositories import BaseRepository
-from src.core.transaction_manager import TransactionalMixin
 
 T = TypeVar('T', bound=BaseRepository)
 

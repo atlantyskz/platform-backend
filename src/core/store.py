@@ -19,7 +19,6 @@ class StoreManager:
     async def disconnect(self):
         await self.postgres.close()
 
-
 _store: StoreManager | None = None
 
 

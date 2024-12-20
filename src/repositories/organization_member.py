@@ -35,7 +35,7 @@ class OrganizationMemberRepository(BaseRepository):
         result = await self.session.execute(stmt)
         return result.scalars().all()
 
-    async def get_organization_by_user_role(self,user_id:int,role_alias:RoleEnum):
+    async def get_organization_by_user_role(self,user_id:int,role_alias:RoleEnum)->OrganizationMember:
         stmt = select(OrganizationMember).where(OrganizationMember.user_id == user_id,OrganizationMember.role_alias == role_alias.value)
         result = await self.session.execute(stmt)
         return result.scalars().first()

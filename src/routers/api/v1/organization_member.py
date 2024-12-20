@@ -9,7 +9,7 @@ from src.models.role import RoleEnum
 from src.core.middlewares.auth_middleware import get_current_user
 
 
-organization_member_router = APIRouter(prefix='/api/v1/organization_member',tags=['Organization Member'])
+organization_member_router = APIRouter(prefix='/api/v1/organization_member',tags=['ORGANIZATION MEMBER'])
 
 
 @organization_member_router.post('/create_member')

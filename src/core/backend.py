@@ -1,3 +1,4 @@
+from typing import List
 from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.models.hr_assistant_task import HRTask
@@ -27,8 +28,11 @@ class BackgroundTasksBackend:
         
 
 
-    async def get_results_by_session_id(self,session_id: int):
+    async def get_results_by_session_id(self,session_id: int, offset:int = 0, limit:int = 10)->List[HRTask]:
         result = await self.session.execute(
-            select(HRTask).where(HRTask.session_id == session_id)
+            select(HRTask)
+            .where(HRTask.session_id == session_id)
+            .offset(offset)
+            .limit(limit)    
         )
         return result.scalars().all()

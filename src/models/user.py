@@ -20,3 +20,7 @@ class User(Base,TimestampMixin):
     permissions = so.relationship(
         'Permission', secondary=user_permissions, back_populates='users'
     )
+    user_vacancies = so.relationship(
+        "Vacancy",back_populates="user",cascade="all, delete-orphan"
+    )
+    favorite_resumes = so.relationship("FavoriteResume", back_populates="user", cascade="all, delete-orphan")

@@ -1,35 +1,40 @@
 import csv
 import json
 from io import StringIO
-from src.core.settings import settings
-from typing import List, Optional
 from uuid import uuid4
+from typing import List, Optional
 from fastapi import  UploadFile
 from fastapi.responses import StreamingResponse
-from src.core.dramtiq_worker import process_resume
-from src.core.exceptions import BadRequestException
+from src.core.dramatiq_worker import process_resume
+from src.core.exceptions import BadRequestException,NotFoundException
 from src.repositories.assistant_session import AssistantSessionRepository
 from src.repositories.assistant import AssistantRepository
 from src.repositories.organization import OrganizationRepository
+from src.repositories.favorite_resume import FavoriteResumeRepository
+from src.repositories.vacancy import VacancyRepository
 from src.repositories.user import UserRepository
 from src.core.exceptions import BadRequestException
 from src.repositories.user import UserRepository
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.core.backend import BackgroundTasksBackend
 from src.services.extractor import AsyncTextExtractor
+from src.services.request_sender import RequestSender
 
 class HRAgentController:
 
     def __init__(self,session:AsyncSession,text_extractor:AsyncTextExtractor):
         self.session = session
         self.text_extractor = text_extractor
+        self.request_sender = RequestSender()
         self.user_repo = UserRepository(session)
+        self.favorite_repo = FavoriteResumeRepository(session)
+        self.vacancy_repo = VacancyRepository(session)
         self.assistant_session_repo = AssistantSessionRepository(session)
         self.assistant_repo = AssistantRepository(session)
         self.bg_backend = BackgroundTasksBackend(session)
         self.organization_repo = OrganizationRepository(session)
 
-    async def create_vacancy(self, file: Optional[UploadFile], vacancy_text: Optional[str]):
+    async def create_vacancy(self,user_id:int, file: Optional[UploadFile], vacancy_text: Optional[str]):
         if file and file.filename == "":
             file = None
 
@@ -46,41 +51,76 @@ class HRAgentController:
         elif vacancy_text:
             user_message = vacancy_text
 
-        response = await self.request_sender._send_request (
-            llm_url=f'{settings.LLM_SERVICE_URL}/hr/generate_vacancy',
-            json={"user_message": user_message}
+        llm_response = await self.request_sender._send_request(
+            llm_url=f'http://llm_service:8001/hr/generate_vacancy',
+            data={"user_message": user_message}
         )
-        return response
-            
-    def decode_file(self,file_content):
+        vacancy = await self.vacancy_repo.add({
+            'user_id':user_id,
+            'vacancy_text':llm_response
+        })
+
+        return vacancy
+    
+    async def get_generated_vacancy(self,vacancy_id:int,):
         try:
-            return file_content.decode("utf-8")
-        except UnicodeDecodeError:
-            return file_content.decode("ISO-8859-1", errors="ignore")
+            vacancy = await self.vacancy_repo.get_by_id(vacancy_id)
+            if vacancy is None:
+                raise NotFoundException("Vacancy not found")
+            return vacancy
+        except Exception as e:
+            raise
 
 
-    async def cv_analyzer(self, user_id: int, session_id: Optional[str], vacancy_file: UploadFile, resumes: List[UploadFile]):
+    async def update_vacancy(self,user_id,vacancy_id:int, attributes:dict):
+        try:
+            existing_vacancy = await self.get_generated_vacancy(vacancy_id)
+            if existing_vacancy.user_id != user_id:
+                raise BadRequestException("You dont have permissions to update vacancy")
+            updated_vacancy = await self.vacancy_repo.update_by_id(vacancy_id,attributes.get("vacancy_text"))
+            await self.session.commit()
+            return updated_vacancy
+        except Exception:
+            raise
+
+    async def get_user_vacancies(self,user_id:int):
+        try:
+            user_vacancies = await self.vacancy_repo.get_by_user_id(user_id)
+            if user_vacancies is None:
+                raise BadRequestException("Vacancies not found")
+            return user_vacancies
+        except Exception:
+            raise
+
+    async def get_user_sessions(self,user_id:int):
+        try:
+            user_sessions = await self.assistant_session_repo.get_by_user_id(user_id)
+            return user_sessions
+        except Exception:
+            raise
+
+    async def cv_analyzer(self, user_id: int, session_id: Optional[str], vacancy_file: UploadFile, resumes: List[UploadFile], title:Optional[str]):
         user_organization = await self.organization_repo.get_user_organization(user_id)
         if user_organization is None:
             raise BadRequestException("You dont have organization")
-        if len(resumes) == 0:
-            raise BadRequestException("You must upload file")
-        if session_id is None:
+        if len(resumes) == 0 and len(vacancy_file) == 0:
+            raise BadRequestException("You must upload files")
+        if len(resumes) > 100:
+            raise BadRequestException("Too many resume files. Max number of resume files 100")
+        if (session_id is None) and (title is not None):
             session = await self.assistant_session_repo.create_session({
                 'user_id': user_id,
+                'title':title,
                 'organization_id': user_organization.id,
                 'assistant_id': 1
             })  
             session_id = str(session.id)
-
-                    
         vacancy_text = await self.text_extractor.extract_text(vacancy_file)
         task_ids = []
 
         for resume in resumes:
             resume_text =  await self.text_extractor.extract_text(resume)
             task_id = str(uuid4())
-
             await self.bg_backend.create_task({
                 "task_id":task_id,
                 "session_id":session_id,
@@ -195,6 +235,26 @@ class HRAgentController:
         return response
     
 
-    async def get_cv_analyzer_result_by_session_id(self, session_id: str):
-        tasks = await self.bg_backend.get_results_by_session_id(session_id)
-        return {"session_id": session_id, "tasks": tasks}
+    async def get_cv_analyzer_result_by_session_id(self, session_id: str,offset:Optional[int], limit:Optional[int]):
+        results = await self.bg_backend.get_results_by_session_id(session_id,offset,limit)
+        return {
+            "session_id": session_id,
+            "results": [
+                {"id": res.id, "result_data": res.result_data} for res in results
+            ]
+        }
+
+    async def add_resume_to_favorites(self,user_id:int,resume_id:int):
+        favorite_resume = await self.favorite_repo.add({
+            "user_id":user_id,
+            "resume_id":resume_id
+        })
+        await self.session.commit()
+        return favorite_resume
+    
+    async def get_favorite_resumes(self,user_id: int,session_id:str):
+        favorite_resumes = await self.favorite_repo.get_favorite_resumes_by_user_id(user_id, session_id)
+        return favorite_resumes
+
+        
+

@@ -1,8 +1,7 @@
 import logging
-from typing import Any, Dict
 import httpx
+from typing import Any, Dict
 from abc import ABC, abstractmethod
-import json as json_converter
 
 logging.basicConfig(level=logging.INFO)
 
@@ -23,7 +22,7 @@ class RequestSender(IRequestSender):
         try:
             async with httpx.AsyncClient(timeout=httpx.Timeout(120.0, read=120.0)) as client:
                 response = await client.post(llm_url, json=data, headers=headers)
-                response.raise_for_status()  # Проверка на HTTP ошибки (4xx и 5xx)
+                response.raise_for_status()  
                 response_data = response.json()
                 logging.info("Response data: %s", response_data)
                 return response_data
