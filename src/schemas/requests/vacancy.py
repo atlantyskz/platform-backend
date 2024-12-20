@@ -1,20 +1,21 @@
-from pydantic import BaseModel,field_validator
+from typing import List, Optional
+from pydantic import BaseModel, Field,field_validator
 
 class VacancyText(BaseModel):
     job_title: str
-    specialization: str
-    salary_range: str
+    specialization: Optional[str] = Field(None)
+    salary_range: Optional[str] = Field(None)
     company_name: str
-    experience_required: str
-    work_format: str
-    work_schedule: str
-    responsibilities: list[str]
-    requirements: list[str]
-    conditions: list[str]
-    skills: list[str]
-    address: str
-    contacts: str
-    location: str
+    experience_required: Optional[str] = Field(None)
+    work_format: Optional[str] = Field(None)
+    work_schedule: Optional[str] = Field(None)
+    responsibilities: Optional[List[str]] = Field(None)
+    requirements: Optional[List[str]] = Field(None)
+    conditions: Optional[List[str]] = Field(None)
+    skills: Optional[List[str]] = Field(None)
+    address: Optional[str] = Field(None)
+    contacts: Optional[str] = Field(None)
+    location: Optional[str] = Field(None)
 
     @field_validator("job_title","company_name")
     def check_non_empty(cls,v):

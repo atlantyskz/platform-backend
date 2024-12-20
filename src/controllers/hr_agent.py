@@ -3,7 +3,7 @@ import json
 from io import StringIO
 from uuid import uuid4
 from typing import List, Optional
-from fastapi import  UploadFile
+from fastapi import  UploadFile, WebSocket
 from fastapi.responses import StreamingResponse
 from src.core.dramatiq_worker import process_resume
 from src.core.exceptions import BadRequestException,NotFoundException
@@ -60,7 +60,10 @@ class HRAgentController:
             'vacancy_text':llm_response
         })
 
-        return vacancy
+        return {
+                "success":True,
+                "message":"Vacancy created"
+            }
     
     async def get_generated_vacancy(self,vacancy_id:int,):
         try:
@@ -79,7 +82,10 @@ class HRAgentController:
                 raise BadRequestException("You dont have permissions to update vacancy")
             updated_vacancy = await self.vacancy_repo.update_by_id(vacancy_id,attributes.get("vacancy_text"))
             await self.session.commit()
-            return updated_vacancy
+            return {
+                "success":True,
+                "message":"Vacancy updated"
+            }
         except Exception:
             raise
 
@@ -250,11 +256,30 @@ class HRAgentController:
             "resume_id":resume_id
         })
         await self.session.commit()
-        return favorite_resume
+        return {
+                "success":True,
+                "message":"Candidate resume added to favorites"
+            }
     
     async def get_favorite_resumes(self,user_id: int,session_id:str):
         favorite_resumes = await self.favorite_repo.get_favorite_resumes_by_user_id(user_id, session_id)
         return favorite_resumes
 
-        
+    async def ws_update_vacancy_by_ai(self,vacancy_id:int, websocket: WebSocket):
+        try:
+            vacancy = await self.vacancy_repo.get_by_id(vacancy_id)
+            await websocket.accept()
+            await websocket.send_json(vacancy.vacancy_text)
+            while True:
+                user_message = await websocket.receive_json()
+                data = {
+                    'user_message':user_message.get('message'),
+                    'vacancy_to_update':vacancy.vacancy_text
+                }
+                llm_response = await self.request_sender._send_request(data=data,llm_url='http://llm_service:8001/hr/generate_vacancy')
+                await websocket.send_json({
+                    'updated_vacancy':llm_response
+                })
+        except Exception:
+            raise
 

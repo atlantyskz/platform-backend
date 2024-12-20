@@ -1,4 +1,4 @@
-from fastapi import APIRouter,Depends,File, Query,UploadFile,Form
+from fastapi import APIRouter,Depends,File, Query,UploadFile,Form, WebSocket
 from httpx import AsyncClient, Timeout
 from src.core.middlewares.auth_middleware import get_current_user,require_roles
 from src.models.role import RoleEnum
@@ -100,3 +100,13 @@ async def make_request():
         }
         )
         return res.json()
+    
+@hr_agent_router.websocket("/ws/vacancy/ai_update/{vacancy_id}")
+async def vacancy_ai_update(
+    vacancy_id:int, 
+    websocket:WebSocket,
+    hr_agent_controller: HRAgentController = Depends(Factory.get_hr_agent_controller),
+):
+    return await hr_agent_controller.ws_update_vacancy_by_ai(vacancy_id,websocket)
+
+
