@@ -34,7 +34,7 @@ class HRAgentController:
         self.bg_backend = BackgroundTasksBackend(session)
         self.organization_repo = OrganizationRepository(session)
 
-    async def create_vacancy(self,user_id:int, file: Optional[UploadFile], vacancy_text: Optional[str]):
+    async def create_vacancy(self,user_id:int,title:str, file: Optional[UploadFile], vacancy_text: Optional[str]):
         if file and file.filename == "":
             file = None
 
@@ -56,6 +56,7 @@ class HRAgentController:
             data={"user_message": user_message}
         )
         vacancy = await self.vacancy_repo.add({
+            'title':title,
             'user_id':user_id,
             'vacancy_text':llm_response
         })
@@ -79,6 +80,7 @@ class HRAgentController:
                 raise BadRequestException("You dont have permissions to update vacancy")
             updated_vacancy = await self.vacancy_repo.update_by_id(vacancy_id,attributes.get("vacancy_text"))
             await self.session.commit()
+            await self.session.refresh(updated_vacancy)
             return updated_vacancy
         except Exception:
             raise
@@ -244,16 +246,14 @@ class HRAgentController:
             ]
         }
 
-    async def add_resume_to_favorites(self,user_id:int,resume_id:int):
+    async def add_resume_to_favorites(self,user_id:int, resume_id:int):
         favorite_resume = await self.favorite_repo.add({
             "user_id":user_id,
             "resume_id":resume_id
         })
         await self.session.commit()
-        return {
-                "success":True,
-                "message":"Candidate resume added to favorites"
-            }
+        await self.session.refresh(favorite_resume)
+        return favorite_resume
     
     async def get_favorite_resumes(self,user_id: int,session_id:str):
         favorite_resumes = await self.favorite_repo.get_favorite_resumes_by_user_id(user_id, session_id)

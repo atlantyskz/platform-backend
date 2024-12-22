@@ -1,4 +1,4 @@
-from fastapi import APIRouter,Depends,File, Query,UploadFile,Form, WebSocket
+from fastapi import APIRouter, Body,Depends,File, Query,UploadFile,Form, WebSocket
 from httpx import AsyncClient, Timeout
 from src.core.middlewares.auth_middleware import get_current_user,require_roles
 from src.models.role import RoleEnum
@@ -14,12 +14,13 @@ hr_agent_router = APIRouter(prefix='/api/v1/hr_agent',)
 
 @hr_agent_router.post('/vacancy/create',tags=["HR VACANCY"])
 async def create_vacancy(
+    title:str = Form(...),
     vacancy_text:str = Form(None),
     vacancy_file:UploadFile = Form(None),
     hr_agent_controller: HRAgentController = Depends(Factory.get_hr_agent_controller),
     current_user: dict = Depends(get_current_user),
 ):
-    return await hr_agent_controller.create_vacancy(current_user.get('sub'),vacancy_file,vacancy_text)
+    return await hr_agent_controller.create_vacancy(current_user.get('sub'),title, vacancy_file,vacancy_text)
 
 
 @hr_agent_router.put("/vacancy/update/{vacancy_id}",tags=["HR VACANCY"])
@@ -33,14 +34,6 @@ async def update_vacancy(
     attributes = vacancy_text.model_dump()
     return await hr_agent_controller.update_vacancy(current_user.get('sub'), vacancy_id, attributes)
 
-@hr_agent_router.get("/vacancy/generated/{vacancy_id}",tags=["HR VACANCY"])
-async def get_generated_user_vacancy(
-    vacancy_id:int,
-    hr_agent_controller: HRAgentController = Depends(Factory.get_hr_agent_controller),
-    current_user: dict = Depends(get_current_user),
-):
-    return await hr_agent_controller.get_generated_vacancy(vacancy_id)
-
 
 @hr_agent_router.get("/vacancy/generated/user_vacancies", tags=["HR VACANCY"])
 @require_roles([RoleEnum.ADMIN, RoleEnum.EMPLOYER])
@@ -51,14 +44,33 @@ async def get_generated_user_vacancies(
     return await hr_agent_controller.get_user_vacancies(current_user.get('sub'))
 
 
+@hr_agent_router.get("/vacancy/generated/{vacancy_id}",tags=["HR VACANCY"])
+async def get_generated_user_vacancy(
+    vacancy_id:int,
+    hr_agent_controller: HRAgentController = Depends(Factory.get_hr_agent_controller),
+    current_user: dict = Depends(get_current_user),
+):
+    return await hr_agent_controller.get_generated_vacancy(vacancy_id)
+
+
+
+
 @hr_agent_router.get('/resume_analyze/favorites/{session_id}',tags=["HR FAVORITE CANDIDATES"])
 async def get_favorites_candidates_by_session_id(
     session_id:str,
     current_user: dict = Depends(get_current_user),
     hr_agent_controller: HRAgentController = Depends(Factory.get_hr_agent_controller),
-
 ):
     return await hr_agent_controller.get_favorite_resumes(current_user.get('sub'),session_id)
+
+@hr_agent_router.post('/resume_analyze/add_to_favorites/{resume_id}',tags=["HR FAVORITE CANDIDATES"])
+async def get_favorites_candidates_by_session_id(
+    resume_id:int,
+    current_user: dict = Depends(get_current_user),
+    hr_agent_controller: HRAgentController = Depends(Factory.get_hr_agent_controller),
+):
+    return await hr_agent_controller.add_resume_to_favorites(current_user.get('sub'),resume_id)
+
 
 @hr_agent_router.get('/resume_analyze/sessions',tags=["HR RESUME ANALYZER"])
 async def get_user_sessions(

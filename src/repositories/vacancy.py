@@ -12,6 +12,7 @@ class VacancyRepository(BaseRepository):
         vacancy = Vacancy(**attributes)
         self.session.add(vacancy)
         await self.session.commit()
+        await self.session.refresh(vacancy)
         return vacancy
     
     async def get_by_id(self, id:int)->Vacancy:
