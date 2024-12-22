@@ -1,20 +1,20 @@
+def names():
+    all_names = []
+
+    def inner(name):
+        all_names.append(name)
+        return all_names
+        
+    
+    return inner
 
 
-from typing import Callable
+boys = names()
+print(boys("DAIM"))
 
+print(boys("LAIM"))
 
-def repeat(n: int):
+girls = names()
 
-    def decorator(func: Callable):
-        def wrapper(*args, **kwargs):
-            for _ in range(n):
-                res = func(*args, **kwargs)
-                print(res)
-        return wrapper
-    return decorator
-
-@repeat(3)
-def say_hello(string:str):
-    return "Hi " + string
-
-a = say_hello("sads")
+print(girls("BOBA"))
+print(girls("TOMA"))

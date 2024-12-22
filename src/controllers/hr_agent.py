@@ -47,7 +47,10 @@ class HRAgentController:
         user_message = None
         if file:
             content = await file.read()
-            user_message = content.decode('utf-8')
+            try:
+                user_message = content.decode('utf-8')
+            except UnicodeDecodeError:
+                user_message = content.decode('latin1') 
         elif vacancy_text:
             user_message = vacancy_text
 

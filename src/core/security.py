@@ -33,5 +33,7 @@ class JWTHandler:
                 algorithms=[JWTHandler.algorithm],
             )
             return payload
-        except Exception as e:
-            raise e
+        except jwt.ExpiredSignatureError:
+            raise CustomException("Token has expired")
+        except jwt.InvalidTokenError as e:
+            raise CustomException(f"{str(e)}")
