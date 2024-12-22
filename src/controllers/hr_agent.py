@@ -269,6 +269,11 @@ class HRAgentController:
         try:
             vacancy = await self.vacancy_repo.get_by_id(vacancy_id)
             await websocket.accept()
+            if vacancy is None:
+                await websocket.send_json({'error':'Vacancy not found'})
+                await websocket.close()
+                return
+
             await websocket.send_json(vacancy.vacancy_text)
             while True:
                 user_message = await websocket.receive_json()
@@ -276,10 +281,16 @@ class HRAgentController:
                     'user_message':user_message.get('message'),
                     'vacancy_to_update':vacancy.vacancy_text
                 }
-                llm_response = await self.request_sender._send_request(data=data,llm_url='http://llm_service:8001/hr/generate_vacancy')
-                await websocket.send_json({
-                    'updated_vacancy':llm_response
-                })
+                try:
+                    llm_response = await self.request_sender._send_request(data=data,llm_url='http://llm_service:8001/hr/generate_vacancy')
+                    await websocket.send_json({
+                        'updated_vacancy':llm_response
+                    })
+                except Exception:
+                    await websocket.send_json({'error':'Failed to generate updated vacancy'})
+                    break
         except Exception:
-            raise
+            await websocket.send_json({'error': 'An unexpected error occurred'})
+            await websocket.close()
+        
 
