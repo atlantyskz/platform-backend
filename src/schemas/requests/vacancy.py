@@ -26,3 +26,6 @@ class VacancyText(BaseModel):
 
 class VacancyTextUpdate(BaseModel):
     vacancy_text: VacancyText
+
+class VacancyTextCreate(BaseModel):
+    vacancy_text: str

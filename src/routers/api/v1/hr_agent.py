@@ -5,16 +5,26 @@ from src.models.role import RoleEnum
 from src.controllers.hr_agent import HRAgentController
 from src.core.factory import Factory
 from src.schemas.requests.users import *
-from src.schemas.requests.vacancy import VacancyTextUpdate
+from src.schemas.requests.vacancy import VacancyTextUpdate,VacancyTextCreate
 from src.schemas.responses.auth import *
 from typing import List, Optional
 
 
 hr_agent_router = APIRouter(prefix='/api/v1/hr_agent',)
 
+@hr_agent_router.post('/vacancy/create')
+async def create_vacancy(
+    vacancy_text:str = Form(None),
+    vacancy_file:UploadFile = Form(None),
+    hr_agent_controller: HRAgentController = Depends(Factory.get_hr_agent_controller),
+    current_user: dict = Depends(get_current_user),
+):
+    return await hr_agent_controller.create_vacancy(current_user.get('sub'),vacancy_file,vacancy_text)
+
+
 @hr_agent_router.put("/vacancy/update/{vacancy_id}",tags=["HR VACANCY"])
 @require_roles([RoleEnum.ADMIN,RoleEnum.EMPLOYER])
-async def create_vacancy(
+async def update_vacancy(
     vacancy_id:int,
     vacancy_text:VacancyTextUpdate,
     hr_agent_controller: HRAgentController = Depends(Factory.get_hr_agent_controller),
