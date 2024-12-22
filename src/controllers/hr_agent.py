@@ -53,7 +53,7 @@ class HRAgentController:
                 user_message = content.decode('latin1') 
         elif vacancy_text:
             user_message = vacancy_text
-
+        print(user_message)
         llm_response = await self.request_sender._send_request(
             llm_url=f'http://llm_service:8001/hr/generate_vacancy',
             data={"user_message": user_message}
