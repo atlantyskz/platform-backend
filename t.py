@@ -1,11 +1,20 @@
 
 
-def repeat(n:int):
-    def wrapper(func):
-        for rep in range(n):
-            res = func()
-            print(res)
-    return wrapper
+from typing import Callable
 
-def say_hello():
-    return 
+
+def repeat(n: int):
+
+    def decorator(func: Callable):
+        def wrapper(*args, **kwargs):
+            for _ in range(n):
+                res = func(*args, **kwargs)
+                print(res)
+        return wrapper
+    return decorator
+
+@repeat(3)
+def say_hello(string:str):
+    return "Hi " + string
+
+a = say_hello("sads")

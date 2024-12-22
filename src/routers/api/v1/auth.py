@@ -24,6 +24,15 @@ async def login_user(
         email=login_user_request.email, password=login_user_request.password
     )
 
+
+@auth_router.post("/refresh_token")
+async def refresh_token(
+    refresh_token_request: RefreshToken, 
+    auth_controller: AuthController = Depends(Factory.get_auth_controller),
+) -> Token:
+    return await auth_controller.refresh_token(refresh_token_request.refresh_token)
+
+
 @auth_router.get('/current_user')
 async def get_current_user(
     auth_controller: AuthController = Depends(Factory.get_auth_controller),

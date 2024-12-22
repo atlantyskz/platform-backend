@@ -43,6 +43,7 @@ class AuthController:
             except Exception:
                 raise
 
+
     async def login(self, email: str, password: str) -> Token:
         try:
             user = await self._get_user_by_email(email)
@@ -55,6 +56,23 @@ class AuthController:
         except Exception:
             raise
 
+    async def refresh_token(self,refresh_token: str)->Token:
+        try:
+            user_payload = JWTHandler.decode(refresh_token)
+            if user_payload.get('type') != 'refresh':
+                raise BadRequestException('Invalid refresh token')
+            user_id = user_payload.get('sub')
+            user = await self.user_repo.get_by_user_id(user_id)
+            if user is None:
+                raise UnauthorizedException(message="User not found")
+            return Token(
+                access_token=JWTHandler.encode_access_token(payload={"sub": user.id,"role":user.role.name}),
+                refresh_token=JWTHandler.encode_refresh_token(payload={"sub": user.id,"role":user.role.name}),
+                )
+        except Exception:
+            raise
+
+        
     async def request_to_reset_password(self, email:str ):
         try:
             user = await self._get_user_by_email(email)
