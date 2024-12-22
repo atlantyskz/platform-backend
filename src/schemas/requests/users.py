@@ -9,11 +9,6 @@ class RegisterUserRequest(BaseModel):
     email: EmailStr
     password: constr(min_length=8, max_length=64)
 
-    @field_validator("password")
-    def password_must_contain_special_characters(cls, v):
-        if not re.search(r"[^a-zA-Z0-9]", v):
-            raise ValueError("Password must contain special characters")
-        return v
 
     @field_validator("password")
     def password_must_contain_numbers(cls, v):
