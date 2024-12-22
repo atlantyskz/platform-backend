@@ -32,7 +32,8 @@ class VacancyRepository(BaseRepository):
             .where(Vacancy.id == id)
             .values(vacancy_text=attributes)
             .execution_options(synchronize_session="fetch")
+            .returning(Vacancy)
         )        
         result = await self.session.execute(stmt)
-        return result
+        return result.scalars().first()
 
