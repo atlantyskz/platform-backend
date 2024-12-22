@@ -60,10 +60,7 @@ class HRAgentController:
             'vacancy_text':llm_response
         })
 
-        return {
-                "success":True,
-                "message":"Vacancy created"
-            }
+        return vacancy
     
     async def get_generated_vacancy(self,vacancy_id:int,):
         try:
@@ -82,10 +79,7 @@ class HRAgentController:
                 raise BadRequestException("You dont have permissions to update vacancy")
             updated_vacancy = await self.vacancy_repo.update_by_id(vacancy_id,attributes.get("vacancy_text"))
             await self.session.commit()
-            return {
-                "success":True,
-                "message":"Vacancy updated"
-            }
+            return updated_vacancy
         except Exception:
             raise
 

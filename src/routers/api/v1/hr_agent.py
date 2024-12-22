@@ -12,7 +12,7 @@ from typing import List, Optional
 
 hr_agent_router = APIRouter(prefix='/api/v1/hr_agent',)
 
-@hr_agent_router.post('/vacancy/create')
+@hr_agent_router.post('/vacancy/create',tags=["HR VACANCY"])
 async def create_vacancy(
     vacancy_text:str = Form(None),
     vacancy_file:UploadFile = Form(None),
@@ -42,8 +42,8 @@ async def get_generated_user_vacancy(
     return await hr_agent_controller.get_generated_vacancy(vacancy_id)
 
 
-@hr_agent_router.get("/vacancy/generated/user_vacancies",tags=["HR VACANCY"])
-@require_roles([RoleEnum.ADMIN,RoleEnum.EMPLOYER])
+@hr_agent_router.get("/vacancy/generated/user_vacancies", tags=["HR VACANCY"])
+@require_roles([RoleEnum.ADMIN, RoleEnum.EMPLOYER])
 async def get_generated_user_vacancies(
     hr_agent_controller: HRAgentController = Depends(Factory.get_hr_agent_controller),
     current_user: dict = Depends(get_current_user),
