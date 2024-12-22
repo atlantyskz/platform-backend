@@ -1,3 +1,4 @@
+from enum import Enum
 import sqlalchemy as sa
 import sqlalchemy.orm as so
 from src.models import Base,TimestampMixin
@@ -20,3 +21,19 @@ class Assistant(Base,TimestampMixin):
         cascade="all"
     )
     sessions = so.relationship("AssistantSession", back_populates="assistant")
+
+
+class AssistantEnum(Enum):
+    HR_ASSISTANT = ('HR Assistant','Handles HR-related tasks','free')
+
+    @property
+    def name(self):
+        return self.value[0]
+    
+    @property
+    def description(self):
+        return self.value[1]
+
+    @property
+    def type(self):
+        return self.value[2]

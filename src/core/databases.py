@@ -2,6 +2,7 @@ from contextlib import asynccontextmanager
 from typing import Any, AsyncIterator
 
 from sqlalchemy import select
+from src.models.assistant import Assistant,AssistantEnum
 from src.models.role import Role, RoleEnum
 from src.core.settings import settings
 from sqlalchemy.ext.asyncio import (
@@ -79,4 +80,18 @@ async def insert_roles(session: AsyncSession):
             new_role = Role(name=role.value)
             session.add(new_role)
     
+    await session.commit()
+
+async def insert_assistants(session:AsyncSession):
+    assistants = await session.execute(select(Assistant.name))
+    existing_assistants = [assistant[0] for assistant in assistants.fetchall()]
+    for assistant in AssistantEnum:
+        if assistant.name not in existing_assistants:
+            new_assistant = Assistant(
+                name=assistant.name,
+                description=assistant.description,
+                type=assistant.type
+            )
+            session.add(new_assistant)
+
     await session.commit()
