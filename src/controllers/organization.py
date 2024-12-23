@@ -27,6 +27,28 @@ class OrganizationController:
         self.organization_members_repo = OrganizationMemberRepository(self.session)
         self.role_repository = RoleRepository(self.session)
 
+    async def get_organization_info(self, user_id: int):
+        try:
+            user_organization = await self.organization_repo.get_user_organization(user_id)
+            if user_organization is None:
+                raise BadRequestException(message="User is not a member of any organization.")
+            
+            # Получаем всех членов организации
+            members = await self.organization_members_repo.get_organization_employees(user_organization.id)
+            return {
+                "organization": {
+                    "id": user_organization.id,
+                    "name": user_organization.name,
+                    "email": user_organization.email,
+                    "phone_number": user_organization.phone_number,
+                    "registered_address": user_organization.registered_address,
+                },
+               "members":members
+            }
+        except Exception as e:
+            raise
+        
+
     async def create_organization(self, name:str,email:str,phone_number:str,registered_address:str,admin_id:int) -> Organization:
         try:
             async with self.session.begin():

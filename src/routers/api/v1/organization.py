@@ -24,6 +24,16 @@ async def create_organization(
     organization = await organization_controller.create_organization(**data,admin_id=current_user.get('sub'))
     return organization
 
+@organization_router.get("/get/organization_info")
+@require_roles([RoleEnum.ADMIN.value])
+async def get_organization_info(
+    current_user:dict = Depends(get_current_user),
+    organization_controller:OrganizationController = Depends(Factory.get_organization_controller)
+):
+    organization = await organization_controller.get_organization_info(current_user.get('sub'))
+    return organization
+
+
 @organization_router.patch('/update/organization')
 @require_roles([RoleEnum.ADMIN.value])
 async def update_organization(

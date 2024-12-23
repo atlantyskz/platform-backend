@@ -1,3 +1,4 @@
+from typing import List
 from sqlalchemy import select, update
 from src.models.user import User
 from src.repositories import BaseRepository
@@ -51,3 +52,27 @@ class OrganizationMemberRepository(BaseRepository):
         result = await self.session.execute(stmt)
         return result.scalars().first()
 
+    async def get_organization_employees(self, organization_id: int):
+        """Получить сотрудников организации по роли EMPLOYER"""
+        stmt = (
+            select(OrganizationMember)
+            .options(
+                joinedload(OrganizationMember.user).joinedload(User.role)
+            )
+            .where(
+                OrganizationMember.organization_id == organization_id,
+            )
+        )
+        result = await self.session.execute(stmt)
+        members = result.scalars().all()
+
+        return [
+            {
+                "id": member.user.id,
+                "firstname": member.user.firstname,
+                "lastname": member.user.lastname,
+                "email": member.user.email,
+                "role_name": member.user.role.name if member.user.role else None, 
+            }
+            for member in members
+        ]
