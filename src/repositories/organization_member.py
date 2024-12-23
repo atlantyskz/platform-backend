@@ -1,4 +1,3 @@
-from typing import List
 from sqlalchemy import select, update
 from src.models.user import User
 from src.repositories import BaseRepository

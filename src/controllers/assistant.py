@@ -75,3 +75,9 @@ class AssistantController:
         except Exception:
             await self.session.rollback()                                                                                                                           
             raise 
+
+    async def get_all_assistants(self):
+
+        assistants = await self.assistant_repo.get_all_assistants()
+        
+        return assistants

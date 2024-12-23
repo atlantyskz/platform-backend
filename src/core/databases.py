@@ -90,6 +90,7 @@ async def insert_assistants(session:AsyncSession):
             new_assistant = Assistant(
                 name=assistant.name,
                 description=assistant.description,
+                status = assistant.status,
                 type=assistant.type
             )
             session.add(new_assistant)

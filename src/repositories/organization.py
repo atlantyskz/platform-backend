@@ -1,11 +1,11 @@
-from typing import Any, List
-from pydantic import EmailStr
+from typing import  List
 from sqlalchemy import insert, select, update
 from src.models.organization_member import OrganizationMember
-from src.models.user import User
 from src.models.organization import Organization
 from src.repositories import BaseRepository
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import subqueryload,selectinload
+
 
 class OrganizationRepository(BaseRepository):
 
@@ -53,3 +53,14 @@ class OrganizationRepository(BaseRepository):
         result = await self.session.execute(stmt)
         await self.session.commit()
         return result.scalars().first()
+    
+
+    async def get_assistants_by_organization(self, organization_id: int):
+        stmt = select(Organization).options(
+            selectinload(Organization.assistants)  
+        ).where(Organization.id == organization_id)
+
+        result = await self.session.execute(stmt)
+        organization = result.scalar_one_or_none()  #
+        return organization
+

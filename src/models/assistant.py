@@ -11,7 +11,7 @@ class Assistant(Base,TimestampMixin):
     id: so.Mapped[int] = so.mapped_column(sa.Integer,primary_key=True,autoincrement=True,index=True)
     name: so.Mapped[str] = so.mapped_column(sa.String,nullable=False)
     description:so.Mapped[str] = so.mapped_column(sa.String,nullable=False)
-
+    status:so.Mapped[str] = so.mapped_column(sa.String,nullable=True)
     type: so.Mapped[str] = so.mapped_column(sa.String,nullable=True)
 
     organizations = so.relationship(
@@ -24,7 +24,7 @@ class Assistant(Base,TimestampMixin):
 
 
 class AssistantEnum(Enum):
-    HR_ASSISTANT = ('HR Assistant','Handles HR-related tasks','free')
+    HR_ASSISTANT = ('HR Assistant','Handles HR-related tasks','active','my-assistant')
 
     @property
     def name(self):
@@ -35,5 +35,9 @@ class AssistantEnum(Enum):
         return self.value[1]
 
     @property
-    def type(self):
+    def status(self):
         return self.value[2]
+
+    @property
+    def type(self):
+        return self.value[3]

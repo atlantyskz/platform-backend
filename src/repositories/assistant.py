@@ -36,6 +36,13 @@ class AssistantRepository(BaseRepository):
         result = await self.session.execute(stmt)        
         return result.scalars().first()
     
+    async def get_org_assistants(self, organization_id:int):
+        stmt = select(assigned_assistant).where(
+            (assigned_assistant.c.organization_id == organization_id)         )
+        result = await self.session.execute(stmt)        
+        return result.scalars().first()
+
+
     async def delete_assigned_assistant(self, organization_id: int, assistant_id: int) -> None:
         stmt = delete(assigned_assistant).where(
             assigned_assistant.c.organization_id == organization_id,
@@ -44,3 +51,8 @@ class AssistantRepository(BaseRepository):
         result = await self.session.execute(stmt)
         return result.rowcount        
         
+    async def get_all_assistants(self):
+        stmt = select(Assistant)
+        result = await self.session.execute(stmt)
+        assistants = result.scalars().all()
+        return assistants

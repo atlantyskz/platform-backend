@@ -32,6 +32,8 @@ class OrganizationController:
             user_organization = await self.organization_repo.get_user_organization(user_id)
             if user_organization is None:
                 raise BadRequestException(message="User is not a member of any organization.")
+
+            organization_assistants = await self.organization_repo.get_assistants_by_organization(user_organization.id)
             
             # Получаем всех членов организации
             members = await self.organization_members_repo.get_organization_employees(user_organization.id)
@@ -43,7 +45,17 @@ class OrganizationController:
                     "phone_number": user_organization.phone_number,
                     "registered_address": user_organization.registered_address,
                 },
-               "members":members
+                "members": members,
+                "organization_assistants": [
+                    {
+                        "id": assistant.id,
+                        "name": assistant.name,
+                        "description": assistant.description,
+                        "status": assistant.status,
+                        "type": assistant.type,
+                    }
+                    for assistant in organization_assistants.assistants  
+                ]
             }
         except Exception as e:
             raise
