@@ -53,8 +53,6 @@ async def get_generated_user_vacancy(
     return await hr_agent_controller.get_generated_vacancy(vacancy_id)
 
 
-
-
 @hr_agent_router.get('/resume_analyze/favorites/{session_id}',tags=["HR FAVORITE CANDIDATES"])
 async def get_favorites_candidates_by_session_id(
     session_id:str,

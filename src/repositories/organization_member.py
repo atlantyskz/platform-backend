@@ -52,7 +52,6 @@ class OrganizationMemberRepository(BaseRepository):
         return result.scalars().first()
 
     async def get_organization_employees(self, organization_id: int):
-        """Получить сотрудников организации по роли EMPLOYER"""
         stmt = (
             select(OrganizationMember)
             .options(
@@ -71,6 +70,7 @@ class OrganizationMemberRepository(BaseRepository):
                 "firstname": member.user.firstname,
                 "lastname": member.user.lastname,
                 "email": member.user.email,
+                'role_alias':member.role_alias,
                 "role_name": member.user.role.name if member.user.role else None, 
             }
             for member in members

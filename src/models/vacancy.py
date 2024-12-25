@@ -15,4 +15,4 @@ class Vacancy(Base,TimestampMixin):
     user = so.relationship(
         "User",back_populates='user_vacancies',
     )
-    
+        

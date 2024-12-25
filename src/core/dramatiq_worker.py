@@ -1,6 +1,4 @@
 import dramatiq
-from fastapi import Depends
-
 from dramatiq.brokers.redis import RedisBroker
 from dramatiq.middleware import retries
 from dramatiq.middleware import time_limit
