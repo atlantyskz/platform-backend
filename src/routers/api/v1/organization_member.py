@@ -1,5 +1,5 @@
-from fastapi import APIRouter,Depends,File, Request,UploadFile,Form
-from src.core.middlewares.auth_middleware import JWTBearer, require_roles
+from fastapi import APIRouter,Depends
+from src.core.middlewares.auth_middleware import require_roles
 from src.controllers.organization_member import OrganizationMemberController
 from src.schemas.requests.organization_member import CreateOrganizationMemberRequest,UpdateOrganizationMemberRequest
 from src.core.factory import Factory
@@ -8,7 +8,7 @@ from src.schemas.responses.auth import *
 from src.models.role import RoleEnum
 from src.core.middlewares.auth_middleware import get_current_user
 
-
+    
 organization_member_router = APIRouter(prefix='/api/v1/organization_member',tags=['ORGANIZATION MEMBER'])
 
 
