@@ -25,6 +25,7 @@ services:
       
   postgres:
     image: postgres:alpine
+    container_name: postgres
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
