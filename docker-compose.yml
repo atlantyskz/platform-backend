@@ -1,99 +1,98 @@
-  services:
-    web:
-      build: .
-      container_name: platform-backend
-      command: python -u main.py
-      ports:
-        - "9000:9000"
-      environment:
-        - SECRET_KEY=${SECRET_KEY}
-        - DB_HOST=${DB_HOST}
-        - DB_PORT=${DB_PORT}
-        - DB_USER=${DB_USER}
-        - DB_PASSWORD=${DB_PASSWORD}
-        - DB_NAME=${DB_NAME}
-        - JWT_ALGORITHM=${JWT_ALGORITHM}
-        - JWT_ACCESS_EXPIRE_MINUTES=${JWT_ACCESS_EXPIRE_MINUTES}
-        - JWT_REFRESH_EXPIRE_MINUTES=${JWT_REFRESH_EXPIRE_MINUTES}
-        - LLM_SERVICE_URL=${LLM_SERVICE_URL}
-      networks:
-        - app_network
-      volumes:
-        - .:/app
-      depends_on:
-        - postgres
-        
-    postgres:
-      image: postgres:alpine
-      container_name: platform-db
-      volumes:
-        - postgres_data:/var/lib/postgresql/data
-      networks:
-        - app_network
-      environment:
-        - POSTGRES_USER=postgres
-        - POSTGRES_PASSWORD=postgres
-        - POSTGRES_DB=platform-db
-      ports:
-        - "5432:5432"
+services:
+  web:
+    build: .
+    container_name: platform-backend
+    command: python -u main.py
+    ports:
+      - "9000:9000"
+    environment:
+      - SECRET_KEY=${SECRET_KEY}
+      - DB_HOST=${DB_HOST}
+      - DB_PORT=${DB_PORT}
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_NAME=${DB_NAME}
+      - JWT_ALGORITHM=${JWT_ALGORITHM}
+      - JWT_ACCESS_EXPIRE_MINUTES=${JWT_ACCESS_EXPIRE_MINUTES}
+      - JWT_REFRESH_EXPIRE_MINUTES=${JWT_REFRESH_EXPIRE_MINUTES}
+      - LLM_SERVICE_URL=${LLM_SERVICE_URL}
+    networks:
+      - app_network
+    volumes:
+      - .:/app
+    depends_on:
+      - postgres
+      
+  postgres:
+    image: postgres:alpine
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - app_network
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=platform-db
+    ports:
+      - "5432:5432"
 
-    worker:
-      build: .
-      command: python -m dramatiq src.core.dramatiq_worker
-      volumes:
-        - .:/app
-      environment:
-        - SECRET_KEY=${SECRET_KEY}
-        - DB_HOST=${DB_HOST}
-        - DB_PORT=${DB_PORT}
-        - DB_USER=${DB_USER}
-        - DB_PASSWORD=${DB_PASSWORD}
-        - DB_NAME=${DB_NAME}
-        - JWT_ALGORITHM=${JWT_ALGORITHM}
-        - JWT_ACCESS_EXPIRE_MINUTES=${JWT_ACCESS_EXPIRE_MINUTES}
-        - JWT_REFRESH_EXPIRE_MINUTES=${JWT_REFRESH_EXPIRE_MINUTES}
-        - LLM_SERVICE_URL=${LLM_SERVICE_URL}
-      networks:
-        - app_network
-      depends_on:
-        - postgres
-        - redis
-        - web
+  worker:
+    build: .
+    command: python -m dramatiq src.core.dramatiq_worker
+    volumes:
+      - .:/app
+    environment:
+      - SECRET_KEY=${SECRET_KEY}
+      - DB_HOST=${DB_HOST}
+      - DB_PORT=${DB_PORT}
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_NAME=${DB_NAME}
+      - JWT_ALGORITHM=${JWT_ALGORITHM}
+      - JWT_ACCESS_EXPIRE_MINUTES=${JWT_ACCESS_EXPIRE_MINUTES}
+      - JWT_REFRESH_EXPIRE_MINUTES=${JWT_REFRESH_EXPIRE_MINUTES}
+      - LLM_SERVICE_URL=${LLM_SERVICE_URL}
+    networks:
+      - app_network
+    depends_on:
+      - postgres
+      - redis
+      - web
 
-    migrations:
-      build: .
-      command: python -m alembic upgrade head
-      environment:
-        - SECRET_KEY=${SECRET_KEY}
-        - DB_HOST=${DB_HOST}
-        - DB_PORT=${DB_PORT}
-        - DB_USER=${DB_USER}
-        - DB_PASSWORD=${DB_PASSWORD}
-        - DB_NAME=${DB_NAME}
-        - JWT_ALGORITHM=${JWT_ALGORITHM}
-        - JWT_ACCESS_EXPIRE_MINUTES=${JWT_ACCESS_EXPIRE_MINUTES}
-        - JWT_REFRESH_EXPIRE_MINUTES=${JWT_REFRESH_EXPIRE_MINUTES}
-        - LLM_SERVICE_URL=${LLM_SERVICE_URL}
-      env_file:
-        - .env
-      networks:
-        - app_network
-      depends_on:
-        - postgres
-
-
-    redis:
-      image: redis:alpine
-      ports:
-        - "6380:6379"
-      networks:
-        - app_network
+  migrations:
+    build: .
+    command: python -m alembic upgrade head
+    environment:
+      - SECRET_KEY=${SECRET_KEY}
+      - DB_HOST=${DB_HOST}
+      - DB_PORT=${DB_PORT}
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_NAME=${DB_NAME}
+      - JWT_ALGORITHM=${JWT_ALGORITHM}
+      - JWT_ACCESS_EXPIRE_MINUTES=${JWT_ACCESS_EXPIRE_MINUTES}
+      - JWT_REFRESH_EXPIRE_MINUTES=${JWT_REFRESH_EXPIRE_MINUTES}
+      - LLM_SERVICE_URL=${LLM_SERVICE_URL}
+    env_file:
+      - .env
+    networks:
+      - app_network
+    depends_on:
+      - postgres
 
 
-  networks:
-    app_network:
-      external: true
+  redis:
+    image: redis:alpine
+    ports:
+      - "6380:6379"
+    networks:
+      - app_network
 
 
-  volumes:
-    postgres_data:
+networks:
+  app_network:
+    external: true
+
+
+volumes:
+  postgres_data:
