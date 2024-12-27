@@ -13,6 +13,7 @@ class HRTask(Base):
     task_id: so.Mapped[str] = so.mapped_column(sa.String)
     task_status: so.Mapped[str] = so.mapped_column(sa.String, nullable=False)
     result_data: so.Mapped[dict] = so.mapped_column(sa.JSON, nullable=True)
+    tokens_spent: so.Mapped[int] = so.mapped_column(sa.Integer,nullable=True)
     task_type: so.Mapped[str] = so.mapped_column(sa.String, nullable=False)
     created_at: so.Mapped[str] = so.mapped_column(sa.DateTime, default=sa.func.now())
     

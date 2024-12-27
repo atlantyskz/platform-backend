@@ -130,3 +130,11 @@ async def vacancy_ai_update(
     return await hr_agent_controller.ws_update_vacancy_by_ai(vacancy_id,websocket)
 
 
+@hr_agent_router.websocket('/ws/resume_analyze/{session_id}')
+async def resume_analyzer_chat(
+    session_id:str,
+    websocket:WebSocket,
+    hr_agent_controller: HRAgentController = Depends(Factory.get_hr_agent_controller),
+    current_user: dict = Depends(get_current_user),
+):
+    return await hr_agent_controller.ws_review_results_by_ai(session_id,websocket)

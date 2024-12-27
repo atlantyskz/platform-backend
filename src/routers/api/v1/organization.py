@@ -25,7 +25,7 @@ async def create_organization(
     return organization
 
 @organization_router.get("/get/organization_info")
-@require_roles([RoleEnum.ADMIN.value, RoleEnum.EMPLOYER.value])
+@require_roles([RoleEnum.SUPER_ADMIN.value,RoleEnum.ADMIN.value, RoleEnum.EMPLOYER.value])
 async def get_organization_info(
     current_user:dict = Depends(get_current_user),
     organization_controller:OrganizationController = Depends(Factory.get_organization_controller)

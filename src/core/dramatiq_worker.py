@@ -7,10 +7,9 @@ from dramatiq.brokers.redis import RedisBroker
 
 redis_broker = RedisBroker(host="redis", port=6379)
 
-# Add necessary middleware
-redis_broker.add_middleware(AsyncIO())  # Handles asyncio event loops
-redis_broker.add_middleware(retries.Retries())    # Handles retries
-redis_broker.add_middleware(time_limit.TimeLimit())  # Optional: sets execution time limit
+redis_broker.add_middleware(AsyncIO())  
+redis_broker.add_middleware(retries.Retries())    
+redis_broker.add_middleware(time_limit.TimeLimit())
 
 dramatiq.set_broker(redis_broker)
 
@@ -34,13 +33,15 @@ async def process_resume(task_id: str, vacancy_text: str, resume_text: str):
             })
             await bg_session.update_task_result(
                 task_id=task_id,
-                result_data=response,
-                status="completed"
+                result_data=response.get('llm_response'),
+                tokens_spent=response.get('tokens_spent'),
+                status="completed", 
             )
         except Exception as e:
             print(f'Connection failed - {str(e)}')
             await bg_session.update_task_result(
                 task_id=task_id,
                 result_data={"error": str(e)},
+                tokens_spent={"error": str(e)},
                 status="failed"
             )

@@ -22,15 +22,7 @@ jobs:
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
-      
-      - name: Cache Docker layers for Gateway Service
-        uses: actions/cache@v2
-        with:
-          path: ~/.docker/buildx-cache
-          key: ${{ runner.os }}-platform-backend-${{ github.sha }}
-          restore-keys: |
-            ${{ runner.os }}-platform-backend
-          
+                
       - name: Build and Push platform-backend Service
         uses: docker/build-push-action@v3
         with:

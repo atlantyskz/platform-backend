@@ -289,3 +289,33 @@ class HRAgentController:
             await websocket.close()
         
 
+    async def ws_review_results_by_ai(self,session_id:str, websocket: WebSocket):
+        try:
+            session_results = await self.bg_backend.get_results_by_session_id(session_id)
+            await websocket.accept()
+            await websocket.send_json({"session_id":session_id,"results":[
+                {'id': session_result.id, 'result_data': session_result.result_data}
+                for session_result in session_results
+            ]})
+            while True:
+                user_message = await websocket.receive_json()
+                data = {
+                    'user_message':user_message.get('message'),
+                    'resumes':{"session_id":session_id,"results":[
+                {'id': session_result.id, 'result_data': session_result.result_data}
+                for session_result in session_results
+            ]}}
+                
+                try:
+                    llm_response = await self.request_sender._send_request(data=data,llm_url='http://llm_service:8001/hr/review_cv_results')
+                    await websocket.send_json({
+                        'review_results':llm_response
+                    })
+                except Exception as e:
+                    await websocket.send_json({'error':str(e)})
+                    break
+        except Exception as e:
+            await websocket.send_json({'error': str(e)})
+            await websocket.close()
+        
+
