@@ -1,7 +1,7 @@
 import csv
 import json
 from io import StringIO
-from uuid import uuid4
+from uuid import UUID, uuid4
 from typing import List, Optional
 from fastapi import  UploadFile, WebSocket
 from fastapi.responses import StreamingResponse
@@ -89,6 +89,22 @@ class HRAgentController:
             raise
 
 
+    async def add_vacancy_to_archive(self,user_id:int,vacancy_id:UUID):
+        try:
+            vacancy = await self.vacancy_repo.get_by_id(vacancy_id)
+            if vacancy is None:
+                raise NotFoundException("Vacancy not found")
+            if user_id != vacancy.user_id:
+                raise BadRequestException('You dont have permission')
+            await self.vacancy_repo.update_to_archive(vacancy_id,{'is_archived':True})
+            await self.session.commit()
+            return {
+                'success':True
+            }
+        except Exception as e:
+            raise
+
+
     async def get_generated_vacancy(self,vacancy_id:str,):
         try:
             vacancy = await self.vacancy_repo.get_by_id(vacancy_id)
@@ -111,9 +127,9 @@ class HRAgentController:
         except Exception:
             raise
 
-    async def get_user_vacancies(self,user_id:int):
+    async def get_user_vacancies(self,user_id:int,is_archived: bool = False):
         try:
-            user_vacancies = await self.vacancy_repo.get_by_user_id(user_id)
+            user_vacancies = await self.vacancy_repo.get_by_user_id(user_id,is_archived)
             if user_vacancies is None:
                 raise BadRequestException("Vacancies not found")
             return user_vacancies

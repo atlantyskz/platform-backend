@@ -20,8 +20,8 @@ class VacancyRepository(BaseRepository):
         result = await self.session.execute(stmt)
         return result.scalars().first()
     
-    async def get_by_user_id(self,user_id:int)->Vacancy:
-        stmt = select(Vacancy).where(Vacancy.user_id == user_id)
+    async def get_by_user_id(self,user_id:int,is_archived: bool)->Vacancy:
+        stmt = select(Vacancy).where(Vacancy.user_id == user_id,Vacancy.is_archived == is_archived)
         result = await self.session.execute(stmt)
         return result.scalars().all()
     
@@ -31,6 +31,17 @@ class VacancyRepository(BaseRepository):
             update(Vacancy)
             .where(Vacancy.id == id)
             .values(vacancy_text=attributes)
+            .execution_options(synchronize_session="fetch")
+            .returning(Vacancy)
+        )        
+        result = await self.session.execute(stmt)
+        return result.scalars().first()
+    
+    async def update_to_archive(self,id:str,attributes:dict):
+        stmt = (
+            update(Vacancy)
+            .where(Vacancy.id == id)
+            .values(**attributes)
             .execution_options(synchronize_session="fetch")
             .returning(Vacancy)
         )        

@@ -1,3 +1,4 @@
+from uuid import UUID
 from fastapi import APIRouter, Body,Depends,File, Query,UploadFile,Form, WebSocket
 from httpx import AsyncClient, Timeout
 from src.core.middlewares.auth_middleware import get_current_user, get_current_user_ws,require_roles
@@ -24,7 +25,7 @@ async def create_vacancy(
 
 @hr_agent_router.delete('/vacancy/delete/{vacancy_id}',tags=["HR VACANCY"])
 async def delete_vacancy(
-    vacancy_id:str,    
+    vacancy_id:UUID,    
     hr_agent_controller: HRAgentController = Depends(Factory.get_hr_agent_controller),
     current_user: dict = Depends(get_current_user),
 ):
@@ -34,7 +35,7 @@ async def delete_vacancy(
 @hr_agent_router.put("/vacancy/update/{vacancy_id}",tags=["HR VACANCY"])
 @require_roles([RoleEnum.ADMIN,RoleEnum.EMPLOYER])
 async def update_vacancy(
-    vacancy_id:str,
+    vacancy_id:UUID,
     vacancy_text:VacancyTextUpdate,
     hr_agent_controller: HRAgentController = Depends(Factory.get_hr_agent_controller),
     current_user: dict = Depends(get_current_user),
@@ -43,18 +44,28 @@ async def update_vacancy(
     return await hr_agent_controller.update_vacancy(current_user.get('sub'), vacancy_id, attributes)
 
 
+@hr_agent_router.patch('/vacancy/add_to_archive/{vacancy_id}',tags=["HR VACANCY"])
+async def add_vacancy_to_archive(
+    vacancy_id:UUID,
+    current_user: dict = Depends(get_current_user),
+    hr_agent_controller: HRAgentController = Depends(Factory.get_hr_agent_controller),
+):
+    return await hr_agent_controller.add_vacancy_to_archive(current_user.get('sub'),vacancy_id)
+
+
 @hr_agent_router.get("/vacancy/generated/user_vacancies", tags=["HR VACANCY"])
 @require_roles([RoleEnum.ADMIN, RoleEnum.EMPLOYER])
 async def get_generated_user_vacancies(
+    is_archived: bool = Query(False, description="Filter by archived status"),
     hr_agent_controller: HRAgentController = Depends(Factory.get_hr_agent_controller),
     current_user: dict = Depends(get_current_user),
 ):
-    return await hr_agent_controller.get_user_vacancies(current_user.get('sub'))
+    return await hr_agent_controller.get_user_vacancies(current_user.get('sub'),is_archived)
 
 
 @hr_agent_router.get("/vacancy/generated/{vacancy_id}",tags=["HR VACANCY"])
 async def get_generated_user_vacancy(
-    vacancy_id:str,
+    vacancy_id: UUID,
     hr_agent_controller: HRAgentController = Depends(Factory.get_hr_agent_controller),
     current_user: dict = Depends(get_current_user),
 ):
@@ -70,7 +81,7 @@ async def get_favorites_candidates_by_session_id(
     return await hr_agent_controller.get_favorite_resumes(current_user.get('sub'),session_id)
 
 @hr_agent_router.post('/resume_analyze/add_to_favorites/{resume_id}',tags=["HR FAVORITE CANDIDATES"])
-async def get_favorites_candidates_by_session_id(
+async def add_resume_to_favorites(
     resume_id:int,
     current_user: dict = Depends(get_current_user),
     hr_agent_controller: HRAgentController = Depends(Factory.get_hr_agent_controller),
