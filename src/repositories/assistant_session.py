@@ -12,11 +12,13 @@ class AssistantSessionRepository(BaseRepository):
         self.session = session
 
     async def create_session(self,attributes:dict)->AssistantSession:
-        stmt = (insert(AssistantSession).values(**attributes).returning(AssistantSession))
-        result = await self.session.execute(stmt)
+        assistant_session = AssistantSession(**attributes)
+        self.session.add(assistant_session)
         await self.session.commit()
-        return result.scalars().first()
+        await self.session.refresh(assistant_session)
+        return assistant_session    
     
+
     async def get_by_user_id(self,user_id:int)-> List[AssistantSession]:
         stmt = (
                 select(AssistantSession, Assistant.name) 
