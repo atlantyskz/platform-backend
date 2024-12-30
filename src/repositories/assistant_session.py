@@ -1,5 +1,5 @@
-from typing import List
-from sqlalchemy import insert, select
+from typing import List, Optional
+from sqlalchemy import delete, insert, select
 from src.repositories import BaseRepository
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.models.assistant_session import AssistantSession
@@ -14,7 +14,7 @@ class AssistantSessionRepository(BaseRepository):
     async def create_session(self,attributes:dict)->AssistantSession:
         stmt = (insert(AssistantSession).values(**attributes).returning(AssistantSession))
         result = await self.session.execute(stmt)
-        self.session.commit()
+        await self.session.commit()
         return result.scalars().first()
     
     async def get_by_user_id(self,user_id:int)-> List[AssistantSession]:
@@ -34,3 +34,18 @@ class AssistantSessionRepository(BaseRepository):
             for session, assistant_name in result.fetchall()
         ]
         return sessions_with_names
+    
+    async def get_by_session_id(self, session_id: str) -> Optional[AssistantSession]:
+        stmt = (
+            select(AssistantSession)
+            .where(AssistantSession.id == session_id)
+        )
+        result = await self.session.execute(stmt)
+        return result.scalars().first()     
+    
+    async def delete_session(self,session_id:str):
+        stmt = (
+            delete(AssistantSession).where(AssistantSession.id == session_id)
+        )
+        await self.session.execute(stmt)
+        await self.session.commit()

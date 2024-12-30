@@ -14,7 +14,7 @@ class VacancyText(BaseModel):
     conditions: Optional[List[str]] = Field(None)
     skills: Optional[List[str]] = Field(None)
     address: Optional[str] = Field(None)
-    contacts: Optional[str] = Field(None)
+    contacts: Optional[dict] = Field(None)
     location: Optional[str] = Field(None)
 
     @field_validator("job_title","company_name")

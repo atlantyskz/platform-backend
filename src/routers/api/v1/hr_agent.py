@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Body,Depends,File, Query,UploadFile,Form, WebSocket
 from httpx import AsyncClient, Timeout
-from src.core.middlewares.auth_middleware import get_current_user,require_roles
+from src.core.middlewares.auth_middleware import get_current_user, get_current_user_ws,require_roles
 from src.models.role import RoleEnum
 from src.controllers.hr_agent import HRAgentController
 from src.core.factory import Factory
@@ -22,11 +22,19 @@ async def create_vacancy(
 ):
     return await hr_agent_controller.create_vacancy(current_user.get('sub'),title, vacancy_file,vacancy_text)
 
+@hr_agent_router.delete('/vacancy/delete/{vacancy_id}',tags=["HR VACANCY"])
+async def delete_vacancy(
+    vacancy_id:str,    
+    hr_agent_controller: HRAgentController = Depends(Factory.get_hr_agent_controller),
+    current_user: dict = Depends(get_current_user),
+):
+    return await hr_agent_controller.delete_vacancy_by_vacancy_id(vacancy_id,current_user.get('sub'))
+
 
 @hr_agent_router.put("/vacancy/update/{vacancy_id}",tags=["HR VACANCY"])
 @require_roles([RoleEnum.ADMIN,RoleEnum.EMPLOYER])
 async def update_vacancy(
-    vacancy_id:int,
+    vacancy_id:str,
     vacancy_text:VacancyTextUpdate,
     hr_agent_controller: HRAgentController = Depends(Factory.get_hr_agent_controller),
     current_user: dict = Depends(get_current_user),
@@ -46,7 +54,7 @@ async def get_generated_user_vacancies(
 
 @hr_agent_router.get("/vacancy/generated/{vacancy_id}",tags=["HR VACANCY"])
 async def get_generated_user_vacancy(
-    vacancy_id:int,
+    vacancy_id:str,
     hr_agent_controller: HRAgentController = Depends(Factory.get_hr_agent_controller),
     current_user: dict = Depends(get_current_user),
 ):
@@ -91,6 +99,15 @@ async def cv_analyzer(
         session_id = None
     return await hr_agent_controller.cv_analyzer(current_user.get('sub'), session_id, vacancy_requirement, cv_files, title)
 
+@hr_agent_router.delete('/resume_analyze/{session_id}',tags=["HR RESUME ANALYZER"])
+async def delete_resume(
+    session_id: str,
+    current_user: dict = Depends(get_current_user),
+    hr_agent_controller: HRAgentController = Depends(Factory.get_hr_agent_controller)
+):
+    return await hr_agent_controller.delete_resume_by_session_id(current_user.get('sub'), session_id)
+
+
 @hr_agent_router.get('/resume_analyze/results/{session_id}',tags=["HR RESUME ANALYZER"])
 async def get_session_results(
     session_id:str,
@@ -123,18 +140,19 @@ async def make_request():
     
 @hr_agent_router.websocket("/ws/vacancy/ai_update/{vacancy_id}")
 async def vacancy_ai_update(
-    vacancy_id:int, 
+    vacancy_id:str, 
     websocket:WebSocket,
     hr_agent_controller: HRAgentController = Depends(Factory.get_hr_agent_controller),
 ):
     return await hr_agent_controller.ws_update_vacancy_by_ai(vacancy_id,websocket)
 
 
+
 @hr_agent_router.websocket('/ws/resume_analyze/{session_id}')
 async def resume_analyzer_chat(
-    session_id:str,
-    websocket:WebSocket,
+    session_id: str,
+    websocket: WebSocket,
     hr_agent_controller: HRAgentController = Depends(Factory.get_hr_agent_controller),
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(get_current_user_ws),
 ):
-    return await hr_agent_controller.ws_review_results_by_ai(session_id,websocket)
+    return await hr_agent_controller.ws_review_results_by_ai(session_id,websocket,current_user)

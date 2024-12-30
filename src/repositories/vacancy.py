@@ -1,4 +1,4 @@
-from sqlalchemy import select,update
+from sqlalchemy import select,update,delete
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.models.vacancy import Vacancy
 from src.repositories import BaseRepository
@@ -15,7 +15,7 @@ class VacancyRepository(BaseRepository):
         await self.session.refresh(vacancy)
         return vacancy
     
-    async def get_by_id(self, id:int)->Vacancy:
+    async def get_by_id(self, id:str)->Vacancy:
         stmt = select(Vacancy).where(Vacancy.id == id)
         result = await self.session.execute(stmt)
         return result.scalars().first()
@@ -26,7 +26,7 @@ class VacancyRepository(BaseRepository):
         return result.scalars().all()
     
     
-    async def update_by_id(self,id:int,attributes:dict):
+    async def update_by_id(self,id:str,attributes:dict):
         stmt = (
             update(Vacancy)
             .where(Vacancy.id == id)
@@ -36,4 +36,11 @@ class VacancyRepository(BaseRepository):
         )        
         result = await self.session.execute(stmt)
         return result.scalars().first()
+
+    async def delete_vacancy(self,id:str):
+        stmt = (
+            delete(Vacancy).where(Vacancy.id==id)
+        )
+        await self.session.execute(stmt)
+        await self.session.commit()
 

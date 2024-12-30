@@ -35,6 +35,15 @@ class HRAgentController:
         self.organization_repo = OrganizationRepository(session)
 
     async def create_vacancy(self,user_id:int,title:str, file: Optional[UploadFile], vacancy_text: Optional[str]):
+        user_organization = await self.organization_repo.get_user_organization(user_id)
+        if user_organization is None:
+            raise BadRequestException('You dont have organization')
+        user_organization_info  = {
+            'company_name':user_organization.name,
+            'company_registered_address':user_organization.registered_address,
+            'company_phone':user_organization.phone_number,
+            'company_email':user_organization.email
+        }
         if file and file.filename == "":
             file = None
 
@@ -51,10 +60,9 @@ class HRAgentController:
             user_message = content
         elif vacancy_text:
             user_message = vacancy_text
-        print(user_message)
         llm_response = await self.request_sender._send_request(
             llm_url=f'http://llm_service:8001/hr/generate_vacancy',
-            data={"user_message": user_message}
+            data={"user_message": user_message + f'user info:{user_organization_info}'}
         )
         vacancy = await self.vacancy_repo.add({
             'title':title,
@@ -64,7 +72,24 @@ class HRAgentController:
 
         return vacancy
     
-    async def get_generated_vacancy(self,vacancy_id:int,):
+
+    async def delete_vacancy_by_vacancy_id(self,vacancy_id:str,user_id:int):
+        try:
+            
+            vacancy = await self.vacancy_repo.get_by_id(vacancy_id)
+            if vacancy is None:
+                raise NotFoundException("Vacancy not found")
+            if user_id != vacancy.user_id:
+                raise BadRequestException('You dont have permission')
+            await self.vacancy_repo.delete_vacancy(vacancy_id)
+            return {
+                'success':True
+            }
+        except Exception as e:
+            raise
+
+
+    async def get_generated_vacancy(self,vacancy_id:str,):
         try:
             vacancy = await self.vacancy_repo.get_by_id(vacancy_id)
             if vacancy is None:
@@ -74,7 +99,7 @@ class HRAgentController:
             raise
 
 
-    async def update_vacancy(self,user_id,vacancy_id:int, attributes:dict):
+    async def update_vacancy(self,user_id,vacancy_id:str, attributes:dict):
         try:
             existing_vacancy = await self.get_generated_vacancy(vacancy_id)
             if existing_vacancy.user_id != user_id:
@@ -137,6 +162,20 @@ class HRAgentController:
         
         return {"session_id": session_id, "tasks": task_ids}
 
+    async def delete_resume_by_session_id(self,user_id:int, session_id:str):
+        try:
+            
+            assistant_session = await self.assistant_session_repo.get_by_session_id(session_id)
+            if assistant_session is None:
+                raise NotFoundException("Assistant session not found")
+            if user_id != assistant_session.user_id:
+                raise BadRequestException('You dont have permission')
+            await self.assistant_session_repo.delete_session(session_id)
+            return {
+                'success':True
+            }
+        except Exception as e:
+            raise e
 
     async def export_to_csv(self, session_id: str):
         results = await self.bg_backend.get_results_by_session_id(session_id)
@@ -260,12 +299,12 @@ class HRAgentController:
         favorite_resumes = await self.favorite_repo.get_favorite_resumes_by_user_id(user_id, session_id)
         return favorite_resumes
 
-    async def ws_update_vacancy_by_ai(self,vacancy_id:int, websocket: WebSocket):
+    async def ws_update_vacancy_by_ai(self,vacancy_id:int ,websocket: WebSocket):
         try:
             vacancy = await self.vacancy_repo.get_by_id(vacancy_id)
             await websocket.accept()
-            if vacancy is None:
-                await websocket.send_json({'error':'Vacancy not found'})
+            if vacancy is None :
+                await websocket.send_json({'error':'Vacancy not found or Organization not found'})
                 await websocket.close()
                 return
 
@@ -289,7 +328,7 @@ class HRAgentController:
             await websocket.close()
         
 
-    async def ws_review_results_by_ai(self,session_id:str, websocket: WebSocket):
+    async def ws_review_results_by_ai(self,session_id:str, websocket: WebSocket,current_user:dict):
         try:
             session_results = await self.bg_backend.get_results_by_session_id(session_id)
             await websocket.accept()
@@ -297,6 +336,7 @@ class HRAgentController:
                 {'id': session_result.id, 'result_data': session_result.result_data}
                 for session_result in session_results
             ]})
+            await websocket.send_json(current_user)
             while True:
                 user_message = await websocket.receive_json()
                 data = {

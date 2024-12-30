@@ -1,8 +1,12 @@
 from functools import wraps
-from typing import List
-from fastapi import Depends, Request, HTTPException
+import logging
+from typing import Dict, List, Optional
+from urllib.parse import parse_qs, urlparse
+from fastapi import Depends, Request, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+import jwt
 
+from src.core.settings import settings
 from src.core.exceptions import ForbiddenException,NotFoundException,UnauthorizedException
 from src.models.role import RoleEnum
 from src.core.security import JWTHandler
@@ -79,3 +83,50 @@ def require_roles(allowed_roles: List[str]):
             return await func(*args, **kwargs)
         return wrapper
     return decorator
+
+
+
+
+logger = logging.getLogger(__name__)
+
+
+class JWTBearerWebSocket:
+    def __init__(self, auto_error: bool = True):
+        self.auto_error = auto_error
+
+    async def __call__(self, websocket: WebSocket) -> Optional[str]:
+        try:
+            token = websocket.headers.get("Authorization")
+            if not token or not token.startswith("Bearer "):
+                raise HTTPException(status_code=403, detail="Authorization token required")
+            
+            token = token[7:]  # Убираем "Bearer " из токена
+            # Верификация токена
+            if not self.verify_jwt(token):
+                raise HTTPException(status_code=403, detail="Invalid or expired token")
+            
+            return token  # Возвращаем сам токен или payload для дальнейшего использования
+        except Exception as e:
+            logger.error(f"Error in JWT bearer authentication: {str(e)}")
+            raise HTTPException(status_code=403, detail="Authorization token required")
+
+    def verify_jwt(self, jwtoken: str) -> bool:
+        try:
+            payload = JWTHandler.decode(jwtoken)
+            return payload is not None
+        except Exception as e:
+            logger.error(f"JWT verification error: {str(e)}")
+            return False
+        
+
+async def get_current_user_ws(websocket: WebSocket, token: str = Depends(JWTBearerWebSocket())) -> Dict:
+    try:
+        # Декодируем токен, чтобы получить payload
+        user_payload = JWTHandler.decode(token)
+        if user_payload:
+            return user_payload  # Возвращаем payload пользователя
+        else:
+            raise HTTPException(status_code=403, detail="Invalid or expired token")
+    except Exception as e:
+        logger.error(f"Error decoding token: {str(e)}")
+        raise HTTPException(status_code=403, detail="Invalid or expired token")
