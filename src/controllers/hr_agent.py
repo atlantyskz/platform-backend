@@ -41,7 +41,7 @@ class HRAgentController:
         pdfmetrics.registerFont(TTFont('DejaVu', 'dejavu-sans-ttf-2.37/ttf/DejaVuSans.ttf'))
 
 
-    async def create_vacancy(self,user_id:int,title:str, file: Optional[UploadFile], vacancy_text: Optional[str]):
+    async def create_vacancy(self,user_id:int, file: Optional[UploadFile], vacancy_text: Optional[str]):
         user_organization = await self.organization_repo.get_user_organization(user_id)
         if user_organization is None:
             raise BadRequestException('You dont have organization')
@@ -71,7 +71,7 @@ class HRAgentController:
             data={"user_message": user_message + f'user info:{user_organization_info}'}
         )
         vacancy = await self.vacancy_repo.add({
-            'title':title,
+            'title':llm_response.get('llm_response').get("job_title"),
             'user_id':user_id,
             'vacancy_text':llm_response
         })
