@@ -29,7 +29,6 @@ class BackgroundTasksBackend:
             await self.session.commit()
         
     async def get_results_by_session_id(self, session_id: str, user_id: int, offset: int = 0, limit: int = 10) -> List[HRTask]:
-        # Подзапрос для избранного
         favorite_subquery = (
             select(FavoriteResume.resume_id)
             .where(FavoriteResume.user_id == user_id)
@@ -46,12 +45,20 @@ class BackgroundTasksBackend:
             .where(HRTask.session_id == session_id)
         )
 
-        # Пагинация
         if offset:
             query = query.offset(offset)
         if limit:
             query = query.limit(limit)
 
-        # Выполнение запроса
         result = await self.session.execute(query)
         return result.all()
+    
+
+    async def get_results_by_session_id_ws(self,session_id:int)-> List[HRTask]:
+
+        query = (
+            select(HRTask,)
+            .where(HRTask.session_id == session_id)
+        )
+        result = await self.session.execute(query)
+        return result.scalars().all()

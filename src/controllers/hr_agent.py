@@ -179,7 +179,7 @@ class HRAgentController:
             vacancy_text = await self.text_extractor.extract_text(vacancy_file)
         elif vacancy_text:
             vacancy_text = vacancy_text.strip() 
-            
+
         task_ids = []
         for resume in resumes:
             resume_text =  await self.text_extractor.extract_text(resume)
@@ -381,7 +381,7 @@ class HRAgentController:
 
     async def ws_review_results_by_ai(self,session_id:str, websocket: WebSocket,user_id:int):
         try:
-            session_results = await self.bg_backend.get_results_by_session_id(session_id,user_id)
+            session_results = await self.bg_backend.get_results_by_session_id_ws(session_id)
 
             await websocket.accept()
             
@@ -390,8 +390,8 @@ class HRAgentController:
                 "session_id": session_id,
                 "results": [
                 {
-                    "id": res[0].id, 
-                    "result_data": res[0].result_data,
+                    "id": res.id, 
+                    "result_data": res.result_data
                 }
                 for res in session_results
                 ]
@@ -430,8 +430,9 @@ class HRAgentController:
         except Exception as e:
             await websocket.send_json({"error": str(e)})
         finally:
-            await websocket.close()        
+            pass
 
+        
     async def generate_pdf(self, vacancy_id: str):
         vacancy = await self.vacancy_repo.get_by_id(vacancy_id)
         buffer = BytesIO()
