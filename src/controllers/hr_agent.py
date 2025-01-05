@@ -149,10 +149,20 @@ class HRAgentController:
         except Exception:
             raise
 
-    async def cv_analyzer(self, user_id: int, session_id: Optional[str], vacancy_file: UploadFile, resumes: List[UploadFile], title:Optional[str]):
+    async def cv_analyzer(
+        self, 
+        user_id: int, 
+        session_id: Optional[str], 
+        vacancy_file: Optional[UploadFile], 
+        vacancy_text: Optional[str],  # Add an optional text parameter
+        resumes: List[UploadFile], 
+        title: Optional[str]
+    ):        
         user_organization = await self.organization_repo.get_user_organization(user_id)
         if user_organization is None:
             raise BadRequestException("You dont have organization")
+        if not vacancy_file and not vacancy_text:
+            raise BadRequestException("You must upload file or write text")
         if len(resumes) == 0 and len(vacancy_file) == 0:
             raise BadRequestException("You must upload files")
         if len(resumes) > 100:
@@ -165,9 +175,12 @@ class HRAgentController:
                 'assistant_id': 1
             })  
             session_id = str(session.id)
-        vacancy_text = await self.text_extractor.extract_text(vacancy_file)
+        if vacancy_file:
+            vacancy_text = await self.text_extractor.extract_text(vacancy_file)
+        elif vacancy_text:
+            vacancy_text = vacancy_text.strip() 
+            
         task_ids = []
-
         for resume in resumes:
             resume_text =  await self.text_extractor.extract_text(resume)
             task_id = str(uuid4())

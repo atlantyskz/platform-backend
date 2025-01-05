@@ -109,13 +109,14 @@ async def cv_analyzer(
     current_user: dict = Depends(get_current_user),
     session_id: Optional[str] = Form(None),
     title: Optional[str] = Form(None),
-    vacancy_requirement: UploadFile = File(...),
+    vacancy_requirement: UploadFile= File(None),  
+    vacancy_requirement_text: Optional[str] = Form(None),    
     cv_files: List[UploadFile] = File(...),
     hr_agent_controller: HRAgentController = Depends(Factory.get_hr_agent_controller)
 ):
     if not session_id:
         session_id = None
-    return await hr_agent_controller.cv_analyzer(current_user.get('sub'), session_id, vacancy_requirement, cv_files, title)
+    return await hr_agent_controller.cv_analyzer(current_user.get('sub'), session_id, vacancy_requirement,vacancy_requirement_text, cv_files, title)
 
 @hr_agent_router.delete('/resume_analyze/{session_id}',tags=["HR RESUME ANALYZER"])
 async def delete_resume(
