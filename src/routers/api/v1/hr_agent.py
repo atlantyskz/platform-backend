@@ -1,3 +1,4 @@
+from io import BytesIO
 from uuid import UUID
 from fastapi import APIRouter, Body,Depends,File, Query,UploadFile,Form, WebSocket
 from httpx import AsyncClient, Timeout
@@ -13,15 +14,15 @@ from typing import List, Optional
 
 hr_agent_router = APIRouter(prefix='/api/v1/hr_agent',)
 
-@hr_agent_router.post('/vacancy/create',tags=["HR VACANCY"])
+@hr_agent_router.post('/vacancy/create', tags=["HR VACANCY"])
 async def create_vacancy(
-    title:str = Form(...),
-    vacancy_text:str = Form(None),
-    vacancy_file:UploadFile = Form(None),
+    title: str = Form(...),
+    vacancy_text: str = Form(None),
+    vacancy_file: UploadFile = Form(None),
     hr_agent_controller: HRAgentController = Depends(Factory.get_hr_agent_controller),
     current_user: dict = Depends(get_current_user),
 ):
-    return await hr_agent_controller.create_vacancy(current_user.get('sub'),title, vacancy_file,vacancy_text)
+    return await hr_agent_controller.create_vacancy(current_user.get('sub'), title, vacancy_file, vacancy_text)
 
 @hr_agent_router.delete('/vacancy/delete/{vacancy_id}',tags=["HR VACANCY"])
 async def delete_vacancy(
@@ -167,3 +168,11 @@ async def resume_analyzer_chat(
     current_user: dict = Depends(get_current_user_ws),
 ):
     return await hr_agent_controller.ws_review_results_by_ai(session_id,websocket,current_user)
+
+
+@hr_agent_router.post("/generate-pdf/{vacancy_id}",tags=["VACANCY PDF GENERATOR"])
+async def generate_pdf(
+    vacancy_id: UUID,
+    hr_agent_controller: HRAgentController = Depends(Factory.get_hr_agent_controller),
+):
+    return await hr_agent_controller.generate_pdf(vacancy_id)

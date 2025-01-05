@@ -1,9 +1,9 @@
 import csv
 import json
-from io import StringIO
+from io import BytesIO, StringIO
 from uuid import UUID, uuid4
 from typing import List, Optional
-from fastapi import  UploadFile, WebSocket
+from fastapi import  HTTPException, UploadFile, WebSocket
 from fastapi.responses import StreamingResponse
 from src.core.dramatiq_worker import process_resume
 from src.core.exceptions import BadRequestException,NotFoundException
@@ -19,6 +19,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.core.backend import BackgroundTasksBackend
 from src.services.extractor import AsyncTextExtractor
 from src.services.request_sender import RequestSender
+from reportlab.lib.pagesizes import letter
+from reportlab.pdfgen import canvas
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
 
 class HRAgentController:
 
@@ -33,6 +37,8 @@ class HRAgentController:
         self.assistant_repo = AssistantRepository(session)
         self.bg_backend = BackgroundTasksBackend(session)
         self.organization_repo = OrganizationRepository(session)
+        pdfmetrics.registerFont(TTFont('DejaVu', 'dejavu-sans-ttf-2.37/ttf/DejaVuSans.ttf'))
+
 
     async def create_vacancy(self,user_id:int,title:str, file: Optional[UploadFile], vacancy_text: Optional[str]):
         user_organization = await self.organization_repo.get_user_organization(user_id)
@@ -51,8 +57,7 @@ class HRAgentController:
             raise BadRequestException("Only one of 'file' or 'vacancy_text' should be provided")
         
         if not file and not vacancy_text:
-            raise BadRequestException("Either 'file' or 'vacancy_text' must be provided")
-        
+            raise BadRequestException("Either 'file' or 'vacancy_text' must be provided")        
         user_message = None
         if file:
             content = await self.text_extractor.extract_text(file)
@@ -87,7 +92,7 @@ class HRAgentController:
             }
         except Exception as e:
             raise
-
+    
 
     async def add_vacancy_to_archive(self,user_id:int,vacancy_id:UUID):
         try:
@@ -375,3 +380,109 @@ class HRAgentController:
             await websocket.close()
         
 
+    async def generate_pdf(self, vacancy_id: str):
+        vacancy = await self.vacancy_repo.get_by_id(vacancy_id)
+        buffer = BytesIO()
+
+        # Получаем данные как байты или словарь
+        vacancy_text = vacancy.vacancy_text
+        if not vacancy_text:
+            raise HTTPException(status_code=400, detail="vacancy_text отсутствует или пустой.")
+
+        # Определяем тип данных и получаем vacancy_data
+        if isinstance(vacancy_text, bytes):
+            try:
+                vacancy_text_str = vacancy_text.decode('utf-8')
+                vacancy_data = json.loads(vacancy_text_str)
+            except Exception as e:
+                raise HTTPException(status_code=400, detail=f"Ошибка декодирования vacancy_text: {e}")
+        elif isinstance(vacancy_text, str):
+            try:
+                vacancy_data = json.loads(vacancy_text)
+            except json.JSONDecodeError as e:
+                raise HTTPException(status_code=400, detail=f"Некорректный JSON: {e}")
+        elif isinstance(vacancy_text, dict):
+            vacancy_data = vacancy_text
+        else:
+            raise HTTPException(status_code=400, detail="Неподдерживаемый тип данных для vacancy_text.")
+
+        # Извлекаем данные из JSON с безопасным доступом
+        llm_response = vacancy_data.get('llm_response', {})
+        job_title = llm_response.get('job_title', 'Не указано')
+        specialization = llm_response.get('specialization', 'Не указано')
+        salary_range = llm_response.get('salary_range', 'Не указано')
+        company_name = llm_response.get('company_name', 'Не указано')
+        experience_required = llm_response.get('experience_required', 'Не указано')
+        work_format = llm_response.get('work_format', 'Не указано')
+        work_schedule = llm_response.get('work_schedule', 'Не указано')
+        responsibilities = llm_response.get('responsibilities', [])
+        requirements = llm_response.get('requirements', [])
+        conditions = llm_response.get('conditions', [])
+        skills = llm_response.get('skills', [])
+        address = llm_response.get('address', 'Не указано')
+        contacts = llm_response.get('contacts', {})
+        location = llm_response.get('location', 'Не указано')
+
+        # Создаем PDF с помощью reportlab
+        c = canvas.Canvas(buffer, pagesize=letter)
+
+        # Настраиваем шрифт
+        c.setFont("DejaVu", 12)
+
+        # Функция для добавления текста и обновления позиции
+        def add_text(x, y, text, offset=20):
+            nonlocal y_position
+            if y_position < 50:
+                c.showPage()
+                c.setFont("DejaVu", 12)
+                y_position = 750
+            c.drawString(x, y_position, text)
+            y_position -= offset
+
+        # Начальная позиция по Y
+        y_position = 750
+
+        # Добавляем основные поля
+        add_text(100, y_position, f"Job Title: {job_title}")
+        add_text(100, y_position, f"Specialization: {specialization}")
+        add_text(100, y_position, f"Salary Range: {salary_range}")
+        add_text(100, y_position, f"Company Name: {company_name}")
+        add_text(100, y_position, f"Experience Required: {experience_required}")
+        add_text(100, y_position, f"Work Format: {work_format}")
+        add_text(100, y_position, f"Work Schedule: {work_schedule}")
+        add_text(100, y_position, f"Location: {location}")
+
+        # Добавляем разделы с заголовками и списками
+        sections = [
+            ("Responsibilities:", responsibilities),
+            ("Requirements:", requirements),
+            ("Conditions:", conditions),
+            ("Skills:", skills)
+        ]
+
+        for title, items in sections:
+            y_position -= 20
+            add_text(100, y_position, title)
+            for item in items:
+                add_text(120, y_position, f"- {item}", offset=15)
+
+        # Добавляем контактную информацию
+        y_position -= 20
+        add_text(100, y_position, "Contact Information:")
+        if contacts:
+            phone = contacts.get('phone', 'Не указано')
+            email = contacts.get('email', 'Не указано')
+            add_text(120, y_position, f"Phone: {phone}", offset=15)
+            add_text(120, y_position, f"Email: {email}", offset=15)
+
+        # Сохраняем PDF
+        c.showPage()
+        c.save()
+
+        # Возвращаем PDF как StreamingResponse
+        buffer.seek(0)  # Возвращаемся к началу буфера перед отправкой
+        return StreamingResponse(
+            buffer,
+            media_type="application/pdf",
+            headers={"Content-Disposition": "attachment; filename=vacancy.pdf"}
+        )
