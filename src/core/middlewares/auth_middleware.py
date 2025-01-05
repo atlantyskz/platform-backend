@@ -96,16 +96,19 @@ class JWTBearerWebSocket:
 
     async def __call__(self, websocket: WebSocket) -> Optional[str]:
         try:
-            token = websocket.headers.get("Authorization")
-            if not token or not token.startswith("Bearer "):
-                raise HTTPException(status_code=403, detail="Authorization token required")
+            query_params = websocket.query_params
+            token = query_params.get("token")
             
-            token = token[7:]  # Убираем "Bearer " из токена
-            # Верификация токена
+            if not token:
+                logger.info("Not token")
+                raise HTTPException(status_code=403, detail="Token is required in query parameters")
+
+            # Проверка токена
             if not self.verify_jwt(token):
+                logger.info("Invalid or expired token")
                 raise HTTPException(status_code=403, detail="Invalid or expired token")
             
-            return token  # Возвращаем сам токен или payload для дальнейшего использования
+            return token
         except Exception as e:
             logger.error(f"Error in JWT bearer authentication: {str(e)}")
             raise HTTPException(status_code=403, detail="Authorization token required")
@@ -119,12 +122,11 @@ class JWTBearerWebSocket:
             return False
         
 
-async def get_current_user_ws(websocket: WebSocket, token: str = Depends(JWTBearerWebSocket())) -> Dict:
+async def get_current_user_ws(token: str = Depends(JWTBearerWebSocket())) -> Dict:
     try:
-        # Декодируем токен, чтобы получить payload
         user_payload = JWTHandler.decode(token)
         if user_payload:
-            return user_payload  # Возвращаем payload пользователя
+            return user_payload  
         else:
             raise HTTPException(status_code=403, detail="Invalid or expired token")
     except Exception as e:

@@ -1,6 +1,7 @@
 from typing import List
 from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
+from src.models.favorite_resume import FavoriteResume
 from src.models.hr_assistant_task import HRTask
 from sqlalchemy import insert,select
 from src.core.databases import get_session
@@ -27,12 +28,30 @@ class BackgroundTasksBackend:
             task.tokens_spent = tokens_spent
             await self.session.commit()
         
-    async def get_results_by_session_id(self,session_id: str, offset:int = 0, limit:int = 10)->List[HRTask]:
-        query = (select(HRTask).where(HRTask.session_id == session_id))
+    async def get_results_by_session_id(self, session_id: str, user_id: int, offset: int = 0, limit: int = 10) -> List[HRTask]:
+        # Подзапрос для избранного
+        favorite_subquery = (
+            select(FavoriteResume.resume_id)
+            .where(FavoriteResume.user_id == user_id)
+            .subquery()
+        )
+
+        # Основной запрос с LEFT JOIN
+        query = (
+            select(HRTask, favorite_subquery.c.resume_id.isnot(None).label("is_favorite"))
+            .outerjoin(
+                favorite_subquery,  
+                HRTask.id == favorite_subquery.c.resume_id  
+            )
+            .where(HRTask.session_id == session_id)
+        )
+
+        # Пагинация
         if offset:
             query = query.offset(offset)
         if limit:
             query = query.limit(limit)
 
+        # Выполнение запроса
         result = await self.session.execute(query)
-        return result.scalars().all()
+        return result.all()

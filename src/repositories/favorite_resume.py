@@ -1,4 +1,4 @@
-from sqlalchemy import select
+from sqlalchemy import select, delete
 from src.repositories import BaseRepository
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.models.favorite_resume import FavoriteResume
@@ -15,6 +15,22 @@ class FavoriteResumeRepository(BaseRepository):
         self.session.add(favorite_resume)
         return favorite_resume
     
+
+    async def delete_by_resume_id(self, user_id: int,resume_id:int):
+        print(resume_id)
+        stmt = select(FavoriteResume).where(FavoriteResume.resume_id == resume_id,FavoriteResume.user_id == user_id)
+
+        result = await self.session.execute(stmt)
+
+        resume = result.scalars().first()  
+        print(resume)
+        if resume:
+            await self.session.delete(resume)
+            await self.session.commit()
+        else:
+            None
+        
+
     async def get_favorite_resumes_by_user_id(self,user_id:int,session_id:str)->FavoriteResume:
         stmt = select(HRTask).join(FavoriteResume,HRTask.id == FavoriteResume.resume_id).where(FavoriteResume.user_id == user_id,HRTask.session_id == session_id)
         result = await self.session.execute(stmt)

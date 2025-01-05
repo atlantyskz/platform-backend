@@ -3,8 +3,9 @@ import json
 from io import BytesIO, StringIO
 from uuid import UUID, uuid4
 from typing import List, Optional
-from fastapi import  HTTPException, UploadFile, WebSocket
+from fastapi import  HTTPException, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.responses import StreamingResponse
+from src.models.favorite_resume import FavoriteResume
 from src.core.dramatiq_worker import process_resume
 from src.core.exceptions import BadRequestException,NotFoundException
 from src.repositories.assistant_session import AssistantSessionRepository
@@ -298,16 +299,20 @@ class HRAgentController:
         return response
     
 
-    async def get_cv_analyzer_result_by_session_id(self, session_id: str,offset:Optional[int], limit:Optional[int]):
-        results = await self.bg_backend.get_results_by_session_id(session_id,offset,limit)
+    async def get_cv_analyzer_result_by_session_id(self, session_id: str, user_id: int, offset: Optional[int], limit: Optional[int]):
+        results = await self.bg_backend.get_results_by_session_id(session_id, user_id, offset, limit)
         return {
             "session_id": session_id,
             "results": [
-                {"id": res.id, "result_data": res.result_data} for res in results
+                {
+                    "id": res[0].id, 
+                    "result_data": res[0].result_data,
+                    "is_favorite": res[1] 
+                }
+                for res in results
             ]
         }
-
-    async def add_resume_to_favorites(self,user_id:int, resume_id:int):
+    async def add_resume_to_favorites(self,user_id: int, resume_id: int):
         favorite_resume = await self.favorite_repo.add({
             "user_id":user_id,
             "resume_id":resume_id
@@ -316,9 +321,21 @@ class HRAgentController:
         await self.session.refresh(favorite_resume)
         return favorite_resume
     
+    
+    async def delete_from_favorites(self, user_id: int,resume_id: int):
+        deleted = await self.favorite_repo.delete_by_resume_id(user_id,resume_id)
+        if deleted:
+            return {
+                'success':True
+            }
+        else:
+            raise BadRequestException("Bad request")
+
+
     async def get_favorite_resumes(self,user_id: int,session_id:str):
         favorite_resumes = await self.favorite_repo.get_favorite_resumes_by_user_id(user_id, session_id)
         return favorite_resumes
+
 
     async def ws_update_vacancy_by_ai(self,vacancy_id:int ,websocket: WebSocket):
         try:
@@ -349,36 +366,58 @@ class HRAgentController:
             await websocket.close()
         
 
-    async def ws_review_results_by_ai(self,session_id:str, websocket: WebSocket,current_user:dict):
+    async def ws_review_results_by_ai(self,session_id:str, websocket: WebSocket,user_id:int):
         try:
-            session_results = await self.bg_backend.get_results_by_session_id(session_id)
+            session_results = await self.bg_backend.get_results_by_session_id(session_id,user_id)
+
             await websocket.accept()
-            await websocket.send_json({"session_id":session_id,"results":[
-                {'id': session_result.id, 'result_data': session_result.result_data}
-                for session_result in session_results
-            ]})
-            await websocket.send_json(current_user)
+            
+
+            await websocket.send_json({
+                "session_id": session_id,
+                "results": [
+                {
+                    "id": res[0].id, 
+                    "result_data": res[0].result_data,
+                }
+                for res in session_results
+                ]
+            })
+
+            await websocket.send_json(user_id)
             while True:
-                user_message = await websocket.receive_json()
-                data = {
-                    'user_message':user_message.get('message'),
-                    'resumes':{"session_id":session_id,"results":[
-                {'id': session_result.id, 'result_data': session_result.result_data}
-                for session_result in session_results
-            ]}}
-                
                 try:
-                    llm_response = await self.request_sender._send_request(data=data,llm_url='http://llm_service:8001/hr/review_cv_results')
-                    await websocket.send_json({
-                        'review_results':llm_response
-                    })
-                except Exception as e:
-                    await websocket.send_json({'error':str(e)})
+                    user_message = await websocket.receive_json()
+                    data = {
+                        "user_message": user_message.get("message"),
+                        "resumes": {
+                            "session_id": session_id,
+                            "results": [
+                                {"id": session_result.id, "result_data": session_result.result_data}
+                                for session_result in session_results
+                            ]
+                        }
+                    }
+
+                    # Запрос к LLM
+                    llm_response = await self.request_sender._send_request(
+                        data=data,
+                        llm_url="http://llm_service:8001/hr/review_cv_results"
+                    )
+
+                    # Отправляем результаты клиенту
+                    await websocket.send_json({"review_results": llm_response})
+                except WebSocketDisconnect:
                     break
+                except Exception as e:
+                    try:
+                        await websocket.send_json({"error": str(e)})
+                    except RuntimeError:
+                        break
         except Exception as e:
-            await websocket.send_json({'error': str(e)})
-            await websocket.close()
-        
+            await websocket.send_json({"error": str(e)})
+        finally:
+            await websocket.close()        
 
     async def generate_pdf(self, vacancy_id: str):
         vacancy = await self.vacancy_repo.get_by_id(vacancy_id)
@@ -406,7 +445,6 @@ class HRAgentController:
         else:
             raise HTTPException(status_code=400, detail="Неподдерживаемый тип данных для vacancy_text.")
 
-        # Извлекаем данные из JSON с безопасным доступом
         llm_response = vacancy_data.get('llm_response', {})
         job_title = llm_response.get('job_title', 'Не указано')
         specialization = llm_response.get('specialization', 'Не указано')

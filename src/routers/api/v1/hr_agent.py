@@ -89,6 +89,13 @@ async def add_resume_to_favorites(
 ):
     return await hr_agent_controller.add_resume_to_favorites(current_user.get('sub'),resume_id)
 
+@hr_agent_router.delete('/resume_analyze/delete_from_favorites/{resume_id}',tags=["HR FAVORITE CANDIDATES"])
+async def delete_from_favorites(
+    resume_id:int,
+    current_user: dict = Depends(get_current_user),
+    hr_agent_controller: HRAgentController = Depends(Factory.get_hr_agent_controller),
+):
+    return await hr_agent_controller.delete_from_favorites(current_user.get('sub'),resume_id)
 
 @hr_agent_router.get('/resume_analyze/sessions',tags=["HR RESUME ANALYZER"])
 async def get_user_sessions(
@@ -126,8 +133,9 @@ async def get_session_results(
     offset: int = Query(0, ge=0, description="Offset for pagination"),
     limit: int = Query(10, gt=0, le=100, description="Limit for pagination (max 100)"),
     hr_agent_controller: HRAgentController = Depends(Factory.get_hr_agent_controller),
+    current_user: dict = Depends(get_current_user),
 ):
-    return await hr_agent_controller.get_cv_analyzer_result_by_session_id(session_id,offset,limit)
+    return await hr_agent_controller.get_cv_analyzer_result_by_session_id(session_id,current_user.get('sub'),offset,limit)
 
 @hr_agent_router.get('/resume_analyze/export_to_csv/{session_id}',tags=["HR RESUME ANALYZER"])
 async def export_session_results(
@@ -167,7 +175,7 @@ async def resume_analyzer_chat(
     hr_agent_controller: HRAgentController = Depends(Factory.get_hr_agent_controller),
     current_user: dict = Depends(get_current_user_ws),
 ):
-    return await hr_agent_controller.ws_review_results_by_ai(session_id,websocket,current_user)
+    return await hr_agent_controller.ws_review_results_by_ai(session_id,websocket,current_user.get('sub'))
 
 
 @hr_agent_router.post("/generate-pdf/{vacancy_id}",tags=["VACANCY PDF GENERATOR"])
