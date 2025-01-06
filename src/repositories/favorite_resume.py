@@ -23,13 +23,7 @@ class FavoriteResumeRepository(BaseRepository):
         result = await self.session.execute(stmt)
 
         resume = result.scalars().first()  
-        print(resume)
-        if resume:
-            await self.session.delete(resume)
-            await self.session.commit()
-        else:
-            None
-        
+        return resume        
 
     async def get_favorite_resumes_by_user_id(self,user_id:int,session_id:str)->FavoriteResume:
         stmt = select(HRTask).join(FavoriteResume,HRTask.id == FavoriteResume.resume_id).where(FavoriteResume.user_id == user_id,HRTask.session_id == session_id)

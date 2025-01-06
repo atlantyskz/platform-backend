@@ -336,13 +336,18 @@ class HRAgentController:
     
     
     async def delete_from_favorites(self, user_id: int,resume_id: int):
-        deleted = await self.favorite_repo.delete_by_resume_id(user_id,resume_id)
-        if deleted:
+        try:
+            resume = await self.favorite_repo.delete_by_resume_id(user_id=user_id,resume_id=resume_id)
+            if resume is None:
+                raise BadRequestException('Invalid request or resume id')
+            await self.session.delete(resume)
+            await self.session.commit()
             return {
                 'success':True
             }
-        else:
-            raise BadRequestException("Bad request")
+        except Exception:
+            raise
+      
 
 
     async def get_favorite_resumes(self,user_id: int,session_id:str):
