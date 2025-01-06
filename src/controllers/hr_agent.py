@@ -326,13 +326,19 @@ class HRAgentController:
             ]
         }
     async def add_resume_to_favorites(self,user_id: int, resume_id: int):
-        favorite_resume = await self.favorite_repo.add({
-            "user_id":user_id,
-            "resume_id":resume_id
-        })
-        await self.session.commit()
-        await self.session.refresh(favorite_resume)
-        return favorite_resume
+        try:
+            exist_resume = await self.favorite_repo.get_favorite_resumes_by_resume_id(resume_id)
+            if exist_resume:
+                raise BadRequestException('Already exist')
+            favorite_resume = await self.favorite_repo.add({
+                "user_id":user_id,
+                "resume_id":resume_id
+            })
+            await self.session.commit()
+            await self.session.refresh(favorite_resume)
+            return favorite_resume
+        except Exception:
+            raise
     
     
     async def delete_from_favorites(self, user_id: int,resume_id: int):

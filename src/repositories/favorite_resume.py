@@ -29,3 +29,9 @@ class FavoriteResumeRepository(BaseRepository):
         stmt = select(HRTask).join(FavoriteResume,HRTask.id == FavoriteResume.resume_id).where(FavoriteResume.user_id == user_id,HRTask.session_id == session_id)
         result = await self.session.execute(stmt)
         return result.scalars().all()
+    
+    async def get_favorite_resumes_by_resume_id(self,resume_id:int)->FavoriteResume|None:
+        stmt = select(HRTask).where(FavoriteResume.resume_id == resume_id)
+        result = await self.session.execute(stmt)
+        return result.scalars().first()
+    
