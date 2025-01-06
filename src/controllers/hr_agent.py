@@ -330,6 +330,8 @@ class HRAgentController:
             exist_resume = await self.favorite_repo.get_favorite_resumes_by_resume_id(resume_id)
             if exist_resume:
                 raise BadRequestException('Already exist')
+            if await self.favorite_repo.get_resume(resume_id) is None:
+                raise BadRequestException('Not Found')
             favorite_resume = await self.favorite_repo.add({
                 "user_id":user_id,
                 "resume_id":resume_id

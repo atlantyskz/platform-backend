@@ -1,9 +1,9 @@
 from typing import Optional
 from pydantic import BaseModel, EmailStr, Field
-
+from typing_extensions import Annotated
 class CreateOrganizationRequest(BaseModel):
 
-    name:str = Field(...)
+    name:Annotated[str,Field(strict=True)]
     email:EmailStr = Field(...)
     phone_number: Optional[str]
     registered_address:str = Field(...)
