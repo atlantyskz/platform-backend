@@ -213,7 +213,7 @@ class HRAgentController:
             raise e
 
     async def export_to_csv(self, session_id: str):
-        results = await self.bg_backend.get_results_by_session_id(session_id)
+        results = await self.bg_backend.get_session_results_to_export(session_id)
         
         csv_output = StringIO()
         fieldnames = [

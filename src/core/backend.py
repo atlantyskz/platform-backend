@@ -62,3 +62,8 @@ class BackgroundTasksBackend:
         )
         result = await self.session.execute(query)
         return result.scalars().all()
+    
+    async def get_session_results_to_export(self,session_id:str)-> List[HRTask]:
+        stmt = select(HRTask).where(HRTask.session_id == session_id)
+        result = await self.session.execute(stmt)
+        return result.scalars().all()    
