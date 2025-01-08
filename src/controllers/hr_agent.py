@@ -6,7 +6,7 @@ from typing import List, Optional
 from fastapi import  HTTPException, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.responses import StreamingResponse
 from src.models.favorite_resume import FavoriteResume
-from src.core.dramatiq_worker import process_resumes_batch
+from src.core.dramatiq_worker import process_resume
 from src.core.exceptions import BadRequestException,NotFoundException
 from src.repositories.assistant_session import AssistantSessionRepository
 from src.repositories.assistant import AssistantRepository
@@ -181,8 +181,8 @@ class HRAgentController:
             vacancy_text = vacancy_text.strip() 
 
         task_ids = []
-        extracted_resume_texts = await self.text_extractor.extract_multiple_files(resumes)
-        for _ in extracted_resume_texts:
+        for resume in resumes:
+            resume_text =  await self.text_extractor.extract_text(resume)
             task_id = str(uuid4())
             await self.bg_backend.create_task({
                 "task_id":task_id,
@@ -190,12 +190,10 @@ class HRAgentController:
                 "task_type":"hr cv analyze",
                 "task_status":"pending"
             })
+            
+            process_resume.send( task_id, vacancy_text, resume_text)
+            
             task_ids.append(task_id)
-
-
-            
-            process_resumes_batch.send( task_ids, vacancy_text, extracted_resume_texts)
-            
         
         return {"session_id": session_id, "tasks": task_ids}
 
