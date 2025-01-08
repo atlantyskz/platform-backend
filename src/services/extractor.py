@@ -1,4 +1,6 @@
 import io
+import os
+from typing import List
 import docx
 import asyncio
 import logging
@@ -53,6 +55,11 @@ class AsyncTextExtractor:
             logger.error(f"Failed to extract text from {file.filename}: {str(e)}")
             raise TextExtractionError(f"Failed to extract text from {file.filename}")
 
+    async def extract_multiple_files(self,files: List[UploadFile],):
+        tasks = [self.extract_text(file) for file in files]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        return results
+        
     async def _read_file(self, file: UploadFile) -> bytes:
         try:
             return await file.read()
@@ -92,7 +99,8 @@ class AsyncTextExtractor:
 
 async def get_thread_pool() -> ThreadPoolExecutor:
     """Создать пул потоков для операций, которые могут быть сериализованы"""
-    return ThreadPoolExecutor()
+    from multiprocessing import cpu_count
+    return ThreadPoolExecutor(max_workers=cpu_count() * 2)
 
 async def get_text_extractor(
     thread_pool: ThreadPoolExecutor = Depends(get_thread_pool)

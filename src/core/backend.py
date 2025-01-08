@@ -13,11 +13,19 @@ class BackgroundTasksBackend:
         self.session = session
 
     
-    async def create_task(self,attributes:dict)->HRTask:
-        stmt = (insert(HRTask).values(**attributes).returning(HRTask))
-        result = await self.session.execute(stmt)
+
+    async def create_task(self, attributes: dict) -> HRTask:
+        # Создаем объект HRTask с аттрибутами
+        task = HRTask(**attributes)
+        
+        # Добавляем объект в сессию
+        self.session.add(task)
+        
+        # Делаем commit, чтобы сохранить объект в базе данных
         await self.session.commit()
-        return result.scalars().first()
+        
+        # Возвращаем сохраненный объект
+        return task
 
     async def update_task_result(self,task_id:str,result_data:dict,tokens_spent:int,status:str = 'completed'):
         stmt = await self.session.execute(select(HRTask).where(HRTask.task_id == task_id))

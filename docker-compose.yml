@@ -30,7 +30,7 @@
 
     worker:
       build: .
-      command: python -m dramatiq src.core.dramatiq_worker
+      command: python -m dramatiq src.core.dramatiq_worker --processes 4 --threads 2
       volumes:
         - .:/app
       env_file:
