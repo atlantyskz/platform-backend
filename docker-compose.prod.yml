@@ -1,0 +1,69 @@
+services:
+  web:
+    build: .
+    container_name: platform-backend
+    command: python -u main.py
+    ports:
+      - "9000:9000"
+    env_file:
+      - .env
+    networks:
+      - app_network
+    volumes:
+      - .:/app
+    depends_on:
+      - postgres
+
+  postgres:
+    image: postgres:15
+    container_name: postgres_container
+    environment:
+      POSTGRES_USER: atlantys
+      POSTGRES_PASSWORD: atlantysatlantys
+      POSTGRES_DB: platform_db
+    ports:
+      - "5432:5432"
+    networks:
+      - app_network
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "atlantys"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  worker:
+    build: .
+    container_name: worker
+    command: python -m dramatiq src.core.dramatiq_worker
+    env_file:
+      - .env
+    networks:
+      - app_network
+    volumes:
+      - .:/app
+    depends_on:
+      - redis
+      - postgres
+
+  redis:
+    image: redis:alpine
+    container_name: redis_container
+    ports:
+      - "6380:6379"
+    networks:
+      - app_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+networks:
+  app_network:
+    external: true
+
+volumes:
+  postgres_data:
+

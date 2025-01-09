@@ -53,16 +53,6 @@ class BackgroundTasksBackend:
                 HRTask.id == favorite_subquery.c.resume_id
             )
             .where(HRTask.session_id == session_id)
-            .order_by(
-                case(
-                    [
-                        (HRTask.result_data['analysis'].has_key('matching_percentage') &
-                        HRTask.result_data['analysis']['matching_percentage'].isnot(None),
-                        HRTask.result_data['analysis']['matching_percentage'].cast(float))
-                    ],
-                    else_=0.0  # Default to 0.0 if matching_percentage is NULL
-                )
-            )
         )
 
 
