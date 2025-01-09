@@ -3,7 +3,7 @@ from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.models.favorite_resume import FavoriteResume
 from src.models.hr_assistant_task import HRTask
-from sqlalchemy import insert,select
+from sqlalchemy import case, func, insert,select
 from src.core.databases import get_session
 
 
@@ -43,15 +43,28 @@ class BackgroundTasksBackend:
             .subquery()
         )
 
-        # Основной запрос с LEFT JOIN
         query = (
-            select(HRTask, favorite_subquery.c.resume_id.isnot(None).label("is_favorite"))
+            select(
+                HRTask,
+                favorite_subquery.c.resume_id.isnot(None).label("is_favorite")
+            )
             .outerjoin(
-                favorite_subquery,  
-                HRTask.id == favorite_subquery.c.resume_id  
+                favorite_subquery,
+                HRTask.id == favorite_subquery.c.resume_id
             )
             .where(HRTask.session_id == session_id)
+            .order_by(
+                case(
+                    [
+                        (HRTask.result_data['analysis'].has_key('matching_percentage') &
+                        HRTask.result_data['analysis']['matching_percentage'].isnot(None),
+                        HRTask.result_data['analysis']['matching_percentage'].cast(float))
+                    ],
+                    else_=0.0  # Default to 0.0 if matching_percentage is NULL
+                )
+            )
         )
+
 
         if offset:
             query = query.offset(offset)

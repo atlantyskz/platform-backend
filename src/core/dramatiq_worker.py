@@ -37,6 +37,7 @@ async def process_resume(task_id: str, vacancy_text: str, resume_text: str):
                 tokens_spent=response.get('tokens_spent'),
                 status="completed", 
             )
+            # await bg_session.session_repo.update( hacurrentndled tasks +=1)
         except Exception as e:
             print(f'Connection failed - {str(e)}')
             await bg_session.update_task_result(

@@ -12,7 +12,7 @@ class AssistantSession(Base, TimestampMixin):
                                                 primary_key=True,
                                                 default=uuid.uuid4
     )
-
+    
     user_id: so.Mapped[int] = so.mapped_column(sa.ForeignKey('users.id', ondelete="CASCADE"), nullable=False)
     title: so.Mapped[str] = so.mapped_column(sa.String(50), nullable=True)
     is_archived: so.Mapped[bool] = so.mapped_column(sa.Boolean,default=False,nullable=True)

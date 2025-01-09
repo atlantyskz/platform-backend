@@ -1,10 +1,14 @@
+import asyncio
 import csv
 import json
 from io import BytesIO, StringIO
+import math
 from uuid import UUID, uuid4
 from typing import List, Optional
+import uuid
 from fastapi import  HTTPException, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.responses import StreamingResponse
+from src.services.websocket import manager
 from src.models.favorite_resume import FavoriteResume
 from src.core.dramatiq_worker import process_resume
 from src.core.exceptions import BadRequestException,NotFoundException
@@ -38,6 +42,7 @@ class HRAgentController:
         self.assistant_repo = AssistantRepository(session)
         self.bg_backend = BackgroundTasksBackend(session)
         self.organization_repo = OrganizationRepository(session)
+        self.manager = manager
         pdfmetrics.registerFont(TTFont('DejaVu', 'dejavu-sans-ttf-2.37/ttf/DejaVuSans.ttf'))
 
 
@@ -154,7 +159,7 @@ class HRAgentController:
         user_id: int, 
         session_id: Optional[str], 
         vacancy_file: Optional[UploadFile], 
-        vacancy_text: Optional[str],  # Add an optional text parameter
+        vacancy_text: Optional[str],  
         resumes: List[UploadFile], 
         title: Optional[str]
     ):        
@@ -179,23 +184,54 @@ class HRAgentController:
             vacancy_text = await self.text_extractor.extract_text(vacancy_file)
         elif vacancy_text:
             vacancy_text = vacancy_text.strip() 
-
-        task_ids = []
-        for resume in resumes:
-            resume_text =  await self.text_extractor.extract_text(resume)
-            task_id = str(uuid4())
-            await self.bg_backend.create_task({
-                "task_id":task_id,
-                "session_id":session_id,
-                "task_type":"hr cv analyze",
-                "task_status":"pending"
-            })
-            
-            process_resume.send( task_id, vacancy_text, resume_text)
-            
-            task_ids.append(task_id)
         
-        return {"session_id": session_id, "tasks": task_ids}
+        batch_texts = await asyncio.gather(*[self.text_extractor.extract_text(resume) for resume in resumes])
+        total_files = len(resumes)
+        processed_count = 0
+        all_task_ids = []
+        for resume_text in batch_texts:
+            task_id = str(uuid.uuid4())
+            await self.bg_backend.create_task({
+                "task_id": task_id,
+                "session_id": session_id,
+                "task_type": "hr cv analyze",
+                "task_status": "pending"
+            })
+            process_resume.send(task_id, vacancy_text, resume_text) 
+            processed_count+=1
+            await self.send_progress(user_id, processed_count=processed_count, total_files=total_files)
+            all_task_ids.append(task_id)
+
+        return {"session_id": session_id, "tasks": all_task_ids, "tasks_count":len(all_task_ids)}
+    
+
+
+    async def send_progress(self, user_id: int, processed_count: int, total_files: int):
+        """Отправляет прогресс пользователю через WebSocket"""
+        progress_data = {
+            "user_id": str(user_id),
+            "processed_count": processed_count,
+            "total_files": total_files,
+            "progress_percent": round((processed_count / total_files) * 100, 2),
+        }
+        await self.manager.send_json(user_id, progress_data)
+
+    async def ws_progress(self, websocket: WebSocket, user_id: int):
+        await self.manager.connect(user_id, websocket)
+
+        print("12312321")
+        await self.manager.send_json(1,{"hi":"user"})
+        try:
+            while True:
+                await self.manager.send_json(123123,{"hi":"user"})
+                await websocket.receive_text()
+        except Exception as e:
+            print(f"WebSocket connection error: {e}")
+        finally:
+            await self.manager.disconnect(user_id)
+
+
+        
 
     async def delete_resume_by_session_id(self,user_id:int, session_id:str):
         try:
@@ -471,7 +507,7 @@ class HRAgentController:
         else:
             raise HTTPException(status_code=400, detail="Неподдерживаемый тип данных для vacancy_text.")
 
-        llm_response = vacancy_data.get('llm_response', {})
+        llm_response = vacancy_data.get('llm_response', vacancy_data)
         job_title = llm_response.get('job_title', 'Не указано')
         specialization = llm_response.get('specialization', 'Не указано')
         salary_range = llm_response.get('salary_range', 'Не указано')

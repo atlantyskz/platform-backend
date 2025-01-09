@@ -1,6 +1,6 @@
 from io import BytesIO
 from uuid import UUID
-from fastapi import APIRouter, Body,Depends,File, Query,UploadFile,Form, WebSocket
+from fastapi import APIRouter, Body,Depends,File, Query,UploadFile,Form, WebSocket, WebSocketDisconnect
 from httpx import AsyncClient, Timeout
 from src.core.middlewares.auth_middleware import get_current_user, get_current_user_ws,require_roles
 from src.models.role import RoleEnum
@@ -184,3 +184,11 @@ async def generate_pdf(
     hr_agent_controller: HRAgentController = Depends(Factory.get_hr_agent_controller),
 ):
     return await hr_agent_controller.generate_pdf(vacancy_id)
+
+@hr_agent_router.websocket("/ws/progress/{user_id}")
+async def websocket_endpoint(
+    websocket: WebSocket,
+    user_id: int,
+    hr_agent_controller: HRAgentController = Depends(Factory.get_hr_agent_controller),
+):
+    await hr_agent_controller.ws_progress(websocket, user_id)
