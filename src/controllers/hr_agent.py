@@ -1,5 +1,6 @@
 import asyncio
 import csv
+import hashlib
 import json
 from io import BytesIO, StringIO
 import math
@@ -154,6 +155,9 @@ class HRAgentController:
         except Exception:
             raise
 
+    def get_text_hash(self,text: str) -> str:
+        return hashlib.sha256(text.encode('utf-8')).hexdigest()
+    
     async def cv_analyzer(
         self, 
         user_id: int, 
@@ -163,33 +167,57 @@ class HRAgentController:
         resumes: List[UploadFile], 
         title: Optional[str]
     ):        
+        # Проверка наличия организации
         user_organization = await self.organization_repo.get_user_organization(user_id)
         if user_organization is None:
-            raise BadRequestException("You dont have organization")
+            raise BadRequestException("You don't have an organization")
+        
+        # Проверка входных данных
         if not vacancy_file and not vacancy_text:
-            raise BadRequestException("You must upload file or write text")
-        if len(resumes) == 0 and len(vacancy_file) == 0:
-            raise BadRequestException("You must upload files")
+            raise BadRequestException("You must upload a file or provide text")
+        if len(resumes) == 0:
+            raise BadRequestException("You must upload resume files")
         if len(resumes) > 100:
-            raise BadRequestException("Too many resume files. Max number of resume files 100")
-        if (session_id is None) and (title is not None):
+            raise BadRequestException("Too many resume files. Max number of resume files is 100")
+        
+        # Создание новой сессии при необходимости
+        if session_id is None and title is not None:
             session = await self.assistant_session_repo.create_session({
                 'user_id': user_id,
-                'title':title,
+                'title': title,
                 'organization_id': user_organization.id,
                 'assistant_id': 1
             })  
             session_id = str(session.id)
+        
+        # Извлечение текста вакансии
         if vacancy_file:
             vacancy_text = await self.text_extractor.extract_text(vacancy_file)
         elif vacancy_text:
-            vacancy_text = vacancy_text.strip() 
+            vacancy_text = vacancy_text.strip()
         
+        # Извлечение текста резюме
         batch_texts = await asyncio.gather(*[self.text_extractor.extract_text(resume) for resume in resumes])
-        total_files = len(resumes)
+        
+        # Удаление дубликатов с использованием хэшей
+        unique_hashes = set()
+        unique_batch_texts = []
+        for resume_text in batch_texts:
+            cleaned_text = resume_text.strip()
+            text_hash = self.get_text_hash(cleaned_text)
+            if text_hash not in unique_hashes:
+                unique_hashes.add(text_hash)
+                unique_batch_texts.append(cleaned_text)
+        
+        # Если нет уникальных резюме, выбрасываем ошибку
+        if not unique_batch_texts:
+            raise BadRequestException("No unique resumes found")
+        
+        # Обработка уникальных резюме
+        total_files = len(unique_batch_texts)
         processed_count = 0
         all_task_ids = []
-        for resume_text in batch_texts:
+        for resume_text in unique_batch_texts:
             task_id = str(uuid.uuid4())
             await self.bg_backend.create_task({
                 "task_id": task_id,
@@ -197,13 +225,14 @@ class HRAgentController:
                 "task_type": "hr cv analyze",
                 "task_status": "pending"
             })
-            process_resume.send(task_id, vacancy_text, resume_text) 
-            processed_count+=1
+            process_resume.send(task_id, vacancy_text, resume_text)
+            processed_count += 1
             await self.send_progress(user_id, processed_count=processed_count, total_files=total_files)
             all_task_ids.append(task_id)
+        
+        return {"session_id": session_id, "tasks": all_task_ids, "tasks_count": len(all_task_ids)}
 
-        return {"session_id": session_id, "tasks": all_task_ids, "tasks_count":len(all_task_ids)}
-    
+
 
 
     async def send_progress(self, user_id: int, processed_count: int, total_files: int):
