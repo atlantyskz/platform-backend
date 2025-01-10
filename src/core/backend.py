@@ -3,9 +3,10 @@ from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.models.favorite_resume import FavoriteResume
 from src.models.hr_assistant_task import HRTask
-from sqlalchemy import case, func, insert,select
+from sqlalchemy import Integer, case, cast, func, insert,select
 from src.core.databases import get_session
-
+from sqlalchemy import desc, case, cast, Integer
+from sqlalchemy.dialects.postgresql import JSONB
 
 class BackgroundTasksBackend:
 
@@ -35,7 +36,7 @@ class BackgroundTasksBackend:
             task.task_status = status
             task.tokens_spent = tokens_spent
             await self.session.commit()
-        
+            
     async def get_results_by_session_id(self, session_id: str, user_id: int, offset: int = 0, limit: int = 10) -> List[HRTask]:
         favorite_subquery = (
             select(FavoriteResume.resume_id)
@@ -55,14 +56,22 @@ class BackgroundTasksBackend:
             .where(HRTask.session_id == session_id)
         )
 
-
-        if offset:
-            query = query.offset(offset)
-        if limit:
-            query = query.limit(limit)
-
         result = await self.session.execute(query)
-        return result.all()
+        tasks = result.all()
+
+        # Сортировка на стороне Python
+        sorted_tasks = sorted(
+            tasks,
+            key=lambda task: (
+                task[0].task_status == "completed",  # True для completed
+            int(task[0].result_data.get("analysis", {}).get("matching_percentage", 0)) if task[0].result_data else 0            ),
+            reverse=True
+        )
+
+        # Пагинация
+        paginated_tasks = sorted_tasks[offset:offset + limit]
+
+        return paginated_tasks
     
 
     async def get_results_by_session_id_ws(self,session_id:int)-> List[HRTask]:
