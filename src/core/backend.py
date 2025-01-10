@@ -59,16 +59,14 @@ class BackgroundTasksBackend:
         result = await self.session.execute(query)
         tasks = result.all()
 
-        # Сортировка на стороне Python
         sorted_tasks = sorted(
             tasks,
             key=lambda task: (
-                task[0].task_status == "completed",  # True для completed
+                task[0].task_status == "completed",                 
             int(task[0].result_data.get("analysis", {}).get("matching_percentage", 0)) if task[0].result_data else 0            ),
             reverse=True
         )
 
-        # Пагинация
         paginated_tasks = sorted_tasks[offset:offset + limit]
 
         return paginated_tasks

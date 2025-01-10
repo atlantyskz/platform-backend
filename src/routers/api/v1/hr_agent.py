@@ -1,6 +1,8 @@
+import asyncio
 from io import BytesIO
 from uuid import UUID
 from fastapi import APIRouter, Body,Depends,File, Query,UploadFile,Form, WebSocket, WebSocketDisconnect
+from fastapi.responses import StreamingResponse
 from httpx import AsyncClient, Timeout
 from src.core.middlewares.auth_middleware import get_current_user, get_current_user_ws,require_roles
 from src.models.role import RoleEnum
@@ -9,7 +11,7 @@ from src.core.factory import Factory
 from src.schemas.requests.users import *
 from src.schemas.requests.vacancy import VacancyTextUpdate,VacancyTextCreate
 from src.schemas.responses.auth import *
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 
 hr_agent_router = APIRouter(prefix='/api/v1/hr_agent',)
@@ -102,21 +104,69 @@ async def get_user_sessions(
     hr_agent_controller: HRAgentController = Depends(Factory.get_hr_agent_controller)
 ):
     return await hr_agent_controller.get_user_sessions(current_user.get('sub'))
+connections = {}
+
+@hr_agent_router.websocket("/ws/progress-handling-files/{user_id}")
+async def websocket_progress(websocket: WebSocket, user_id: int):
+    await websocket.accept()
+    connections[user_id] = websocket  # Сохраняем соединение для пользователя
+    try:
+        while True:
+            await asyncio.sleep(5)  # Просто удерживаем соединение открытым
+    except WebSocketDisconnect:
+        connections.pop(user_id, None)  # Удаляем соединение при отключении клиента
 
 
-@hr_agent_router.post('/resume_analyze',tags=["HR RESUME ANALYZER"])
+@hr_agent_router.post('/resume_analyze', tags=["HR RESUME ANALYZER"])
 async def cv_analyzer(
     current_user: dict = Depends(get_current_user),
     session_id: Optional[str] = Form(None),
     title: Optional[str] = Form(None),
-    vacancy_requirement: UploadFile= File(None),  
+    vacancy_requirement: UploadFile = File(None),  
     vacancy_requirement_text: Optional[str] = Form(None),    
     cv_files: List[UploadFile] = File(...),
     hr_agent_controller: HRAgentController = Depends(Factory.get_hr_agent_controller)
 ):
     if not session_id:
         session_id = None
-    return await hr_agent_controller.cv_analyzer(current_user.get('sub'), session_id, vacancy_requirement,vacancy_requirement_text, cv_files, title)
+    
+    user_id = current_user.get('sub')
+    total_files = len(cv_files)
+    websocket = connections.get(user_id)  # Извлекаем соединение, если оно есть
+
+    # Отправляем начальное сообщение о старте загрузки
+    if websocket:
+        await websocket.send_json({
+            "type": "start",
+            "total_files": total_files,
+            "message": "Начинаю обработку файлов"
+        })
+
+    for index, file in enumerate(cv_files, start=1):
+        # Обрабатываем файл (например, сохраняем или выполняем какие-то операции)
+        
+        # Отправляем обновление прогресса
+        if websocket:
+            await websocket.send_json({
+                "type": "progress",
+                "processed_files": index,
+                "total_files": total_files,
+                "message": f"Принял {index}/{total_files} файлов"
+            })
+
+    # Завершаем прогресс-обновления
+    if websocket:
+        await websocket.send_json({
+            "type": "complete",
+            "message": "Все файлы успешно обработаны"
+        })
+
+    # Передаем обработку контроллеру
+    return await hr_agent_controller.cv_analyzer(
+        user_id, session_id, vacancy_requirement, vacancy_requirement_text, cv_files, title
+    )
+
+ # return await hr_agent_controller.cv_analyzer(current_user.get('sub'), session_id, vacancy_requirement,vacancy_requirement_text, cv_files, title)
 
 @hr_agent_router.delete('/resume_analyze/{session_id}',tags=["HR RESUME ANALYZER"])
 async def delete_resume(
@@ -192,3 +242,17 @@ async def websocket_endpoint(
     hr_agent_controller: HRAgentController = Depends(Factory.get_hr_agent_controller),
 ):
     await hr_agent_controller.ws_progress(websocket, user_id)
+
+
+@hr_agent_router.websocket("/ws/upload_progress/{user_id}")
+async def upload_progress_websocket(
+    websocket: WebSocket, user_id: int, hr_agent_controller: HRAgentController = Depends(Factory.get_hr_agent_controller)
+):
+    await websocket.accept()
+    try:
+        while True:
+            # Здесь сервер может отправлять обновления прогресса загрузки
+            progress_data = hr_agent_controller.get_upload_progress(user_id)
+            await websocket.send_json(progress_data)
+    except WebSocketDisconnect:
+        print(f"User {user_id} disconnected from upload progress tracking")

@@ -44,6 +44,7 @@ class HRAgentController:
         self.bg_backend = BackgroundTasksBackend(session)
         self.organization_repo = OrganizationRepository(session)
         self.manager = manager
+        self.upload_progress = {}
         pdfmetrics.registerFont(TTFont('DejaVu', 'dejavu-sans-ttf-2.37/ttf/DejaVuSans.ttf'))
 
 
@@ -615,3 +616,10 @@ class HRAgentController:
             media_type="application/pdf",
             headers={"Content-Disposition": "attachment; filename=vacancy.pdf"}
         )
+    
+
+    def update_upload_progress(self, user_id: int, uploaded: int, total: int):
+        self.upload_progress[user_id] = {"uploaded": uploaded, "total": total}
+
+    def get_upload_progress(self, user_id: int):
+        return self.upload_progress.get(user_id, {"uploaded": 0, "total": 0})
