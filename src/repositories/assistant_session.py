@@ -14,8 +14,7 @@ class AssistantSessionRepository(BaseRepository):
     async def create_session(self,attributes:dict)->AssistantSession:
         assistant_session = AssistantSession(**attributes)
         self.session.add(assistant_session)
-        await self.session.commit()
-        await self.session.refresh(assistant_session)
+        await self.session.flush()
         return assistant_session    
     
 

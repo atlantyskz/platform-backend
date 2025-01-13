@@ -11,12 +11,11 @@ class VacancyRepository(BaseRepository):
     async def add(self,attributes:dict):
         vacancy = Vacancy(**attributes)
         self.session.add(vacancy)
-        await self.session.commit()
-        await self.session.refresh(vacancy)
+        await self.session.flush()
         return vacancy
     
-    async def get_by_id(self, id:str)->Vacancy:
-        stmt = select(Vacancy).where(Vacancy.id == id)
+    async def get_by_session_id(self, session_id:str)->Vacancy:
+        stmt = select(Vacancy).where(Vacancy.session_id == session_id)
         result = await self.session.execute(stmt)
         return result.scalars().first()
     
@@ -26,10 +25,10 @@ class VacancyRepository(BaseRepository):
         return result.scalars().all()
     
     
-    async def update_by_id(self,id:str,attributes:dict):
+    async def update_by_session_id(self,session_id:str,attributes:dict):
         stmt = (
             update(Vacancy)
-            .where(Vacancy.id == id)
+            .where(Vacancy.session_id == session_id)
             .values(vacancy_text=attributes)
             .execution_options(synchronize_session="fetch")
             .returning(Vacancy)
@@ -37,10 +36,10 @@ class VacancyRepository(BaseRepository):
         result = await self.session.execute(stmt)
         return result.scalars().first()
     
-    async def update_to_archive(self,id:str,attributes:dict):
+    async def update_to_archive(self,session_id:str,attributes:dict):
         stmt = (
             update(Vacancy)
-            .where(Vacancy.id == id)
+            .where(Vacancy.session_id == session_id)
             .values(**attributes)
             .execution_options(synchronize_session="fetch")
             .returning(Vacancy)
@@ -48,9 +47,9 @@ class VacancyRepository(BaseRepository):
         result = await self.session.execute(stmt)
         return result.scalars().first()
 
-    async def delete_vacancy(self,id:str):
+    async def delete_vacancy(self,session_id:str):
         stmt = (
-            delete(Vacancy).where(Vacancy.id==id)
+            delete(Vacancy).where(Vacancy.session_id==session_id)
         )
         await self.session.execute(stmt)
         await self.session.commit()

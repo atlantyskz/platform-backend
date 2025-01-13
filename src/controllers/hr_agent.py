@@ -49,52 +49,71 @@ class HRAgentController:
 
 
     async def create_vacancy(self,user_id:int, file: Optional[UploadFile], vacancy_text: Optional[str]):
-        user_organization = await self.organization_repo.get_user_organization(user_id)
-        if user_organization is None:
-            raise BadRequestException('You dont have organization')
-        user_organization_info  = {
-            'company_name':user_organization.name,
-            'company_registered_address':user_organization.registered_address,
-            'company_phone':user_organization.phone_number,
-            'company_email':user_organization.email
-        }
-        if file and file.filename == "":
-            file = None
+        async with self.session.begin() as session:
+            try:
+                user_organization = await self.organization_repo.get_user_organization(user_id)
+                if user_organization is None:
+                    raise BadRequestException('You dont have organization')
+                user_organization_info  = {
+                    'company_name':user_organization.name,
+                    'company_registered_address':user_organization.registered_address,
+                    'company_phone':user_organization.phone_number,
+                    'company_email':user_organization.email
+                }
+                if file and file.filename == "":
+                    file = None
 
-        if file and vacancy_text:
-            raise BadRequestException("Only one of 'file' or 'vacancy_text' should be provided")
-        
-        if not file and not vacancy_text:
-            raise BadRequestException("Either 'file' or 'vacancy_text' must be provided")        
-        user_message = None
-        if file:
-            content = await self.text_extractor.extract_text(file)
-            print(content)
-            user_message = content
-        elif vacancy_text:
-            user_message = vacancy_text
-        llm_response = await self.request_sender._send_request(
-            llm_url=f'http://llm_service:8001/hr/generate_vacancy',
-            data={"user_message": user_message + f'user info:{user_organization_info}'}
-        )
-        vacancy = await self.vacancy_repo.add({
-            'title':llm_response.get('llm_response').get("job_title"),
-            'user_id':user_id,
-            'vacancy_text':llm_response
-        })
+                if file and vacancy_text:
+                    raise BadRequestException("Only one of 'file' or 'vacancy_text' should be provided")
+                
+                if not file and not vacancy_text:
+                    raise BadRequestException("Either 'file' or 'vacancy_text' must be provided")        
+                user_message = None
+                if file:
+                    content = await self.text_extractor.extract_text(file)
+                    user_message = content
+                elif vacancy_text:
+                    user_message = vacancy_text
+                llm_response = await self.request_sender._send_request(
+                    llm_url=f'http://llm_service:8001/hr/generate_vacancy',
+                    data={"user_message": user_message + f'user info:{user_organization_info}'}
+                )
+                llm_title = llm_response.get('llm_response').get("job_title")
+                assist_session = await self.assistant_session_repo.create_session({
+                                'user_id': user_id,
+                                'title': llm_title,
+                                'organization_id': user_organization.id,
+                                'assistant_id': 1
+                            })  
+                session_id = str(assist_session.id)
+                vacancy = await self.vacancy_repo.add({
+                    'title':llm_title,
+                    'session_id':session_id,
+                    'user_id':user_id,
+                    'vacancy_text':llm_response
+                })
 
-        return vacancy
+                return {
+                    'session_id':vacancy.session_id,
+                    'title':vacancy.title,
+                    'vacancy_text':vacancy.vacancy_text.get('llm_response')
+
+                }
+            except Exception as e:
+                await session.rollback()
+                raise e
+            
     
 
-    async def delete_vacancy_by_vacancy_id(self,vacancy_id:str,user_id:int):
+    async def delete_vacancy_by_session_id(self,session_id:str,user_id:int):
         try:
             
-            vacancy = await self.vacancy_repo.get_by_id(vacancy_id)
+            vacancy = await self.vacancy_repo.get_by_session_id(session_id)
             if vacancy is None:
                 raise NotFoundException("Vacancy not found")
             if user_id != vacancy.user_id:
                 raise BadRequestException('You dont have permission')
-            await self.vacancy_repo.delete_vacancy(vacancy_id)
+            await self.vacancy_repo.delete_vacancy(session_id)
             return {
                 'success':True
             }
@@ -102,14 +121,14 @@ class HRAgentController:
             raise
     
 
-    async def add_vacancy_to_archive(self,user_id:int,vacancy_id:UUID):
+    async def add_vacancy_to_archive(self,user_id:int,session_id:UUID):
         try:
-            vacancy = await self.vacancy_repo.get_by_id(vacancy_id)
+            vacancy = await self.vacancy_repo.get_by_session_id(session_id)
             if vacancy is None:
                 raise NotFoundException("Vacancy not found")
             if user_id != vacancy.user_id:
                 raise BadRequestException('You dont have permission')
-            await self.vacancy_repo.update_to_archive(vacancy_id,{'is_archived':True})
+            await self.vacancy_repo.update_to_archive(session_id,{'is_archived':True})
             await self.session.commit()
             return {
                 'success':True
@@ -118,9 +137,9 @@ class HRAgentController:
             raise
 
 
-    async def get_generated_vacancy(self,vacancy_id:str,):
+    async def get_generated_vacancy(self,session_id:str,):
         try:
-            vacancy = await self.vacancy_repo.get_by_id(vacancy_id)
+            vacancy = await self.vacancy_repo.get_by_session_id(session_id)
             if vacancy is None:
                 raise NotFoundException("Vacancy not found")
             return vacancy
@@ -128,12 +147,12 @@ class HRAgentController:
             raise
 
 
-    async def update_vacancy(self,user_id,vacancy_id:str, attributes:dict):
+    async def update_vacancy(self,user_id,session_id:str, attributes:dict):
         try:
-            existing_vacancy = await self.get_generated_vacancy(vacancy_id)
+            existing_vacancy = await self.get_generated_vacancy(session_id)
             if existing_vacancy.user_id != user_id:
                 raise BadRequestException("You dont have permissions to update vacancy")
-            updated_vacancy = await self.vacancy_repo.update_by_id(vacancy_id,attributes.get("vacancy_text"))
+            updated_vacancy = await self.vacancy_repo.update_by_session_id(session_id,attributes.get("vacancy_text"))
             await self.session.commit()
             await self.session.refresh(updated_vacancy)
             return updated_vacancy
@@ -159,6 +178,28 @@ class HRAgentController:
     def get_text_hash(self,text: str) -> str:
         return hashlib.sha256(text.encode('utf-8')).hexdigest()
     
+    async def session_creator(self, user_id: int, title: str):
+        async with self.session.begin() as session:
+            try:
+                user_organization = await self.organization_repo.get_user_organization(user_id)
+
+                assist_session = await self.assistant_session_repo.create_session({
+                    'user_id': user_id,
+                    'title': title,
+                    'organization_id': user_organization.id,
+                    'assistant_id': 1
+                })
+                await self.vacancy_repo.add({
+                    'title':title,
+                    'session_id':assist_session.id,
+                    'user_id':user_id
+                })
+                return {
+                    'session_id': str(assist_session.id),
+                }
+            except Exception as e:
+                raise e
+
     async def cv_analyzer(
         self, 
         user_id: int, 
@@ -166,14 +207,11 @@ class HRAgentController:
         vacancy_file: Optional[UploadFile], 
         vacancy_text: Optional[str],  
         resumes: List[UploadFile], 
-        title: Optional[str]
     ):        
-        # Проверка наличия организации
         user_organization = await self.organization_repo.get_user_organization(user_id)
         if user_organization is None:
             raise BadRequestException("You don't have an organization")
         
-        # Проверка входных данных
         if not vacancy_file and not vacancy_text:
             raise BadRequestException("You must upload a file or provide text")
         if len(resumes) == 0:
@@ -181,26 +219,15 @@ class HRAgentController:
         if len(resumes) > 100:
             raise BadRequestException("Too many resume files. Max number of resume files is 100")
         
-        # Создание новой сессии при необходимости
-        if session_id is None and title is not None:
-            session = await self.assistant_session_repo.create_session({
-                'user_id': user_id,
-                'title': title,
-                'organization_id': user_organization.id,
-                'assistant_id': 1
-            })  
-            session_id = str(session.id)
+   
         
-        # Извлечение текста вакансии
         if vacancy_file:
             vacancy_text = await self.text_extractor.extract_text(vacancy_file)
         elif vacancy_text:
             vacancy_text = vacancy_text.strip()
         
-        # Извлечение текста резюме
         batch_texts = await asyncio.gather(*[self.text_extractor.extract_text(resume) for resume in resumes])
         
-        # Удаление дубликатов с использованием хэшей
         unique_hashes = set()
         unique_batch_texts = []
         for resume_text in batch_texts:
@@ -210,11 +237,9 @@ class HRAgentController:
                 unique_hashes.add(text_hash)
                 unique_batch_texts.append(cleaned_text)
         
-        # Если нет уникальных резюме, выбрасываем ошибку
         if not unique_batch_texts:
             raise BadRequestException("No unique resumes found")
         
-        # Обработка уникальных резюме
         total_files = len(unique_batch_texts)
         processed_count = 0
         all_task_ids = []

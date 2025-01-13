@@ -12,6 +12,7 @@ from src.schemas.requests.users import *
 from src.schemas.requests.vacancy import VacancyTextUpdate,VacancyTextCreate
 from src.schemas.responses.auth import *
 from typing import Dict, List, Optional
+from src.services.websocket import manager as ws_manager
 
 
 hr_agent_router = APIRouter(prefix='/api/v1/hr_agent',)
@@ -25,34 +26,34 @@ async def create_vacancy(
 ):
     return await hr_agent_controller.create_vacancy(current_user.get('sub'), vacancy_file, vacancy_text)
 
-@hr_agent_router.delete('/vacancy/delete/{vacancy_id}',tags=["HR VACANCY"])
+@hr_agent_router.delete('/vacancy/delete/{session_id}',tags=["HR VACANCY"])
 async def delete_vacancy(
-    vacancy_id:UUID,    
+    session_id:UUID,    
     hr_agent_controller: HRAgentController = Depends(Factory.get_hr_agent_controller),
     current_user: dict = Depends(get_current_user),
 ):
-    return await hr_agent_controller.delete_vacancy_by_vacancy_id(vacancy_id,current_user.get('sub'))
+    return await hr_agent_controller.delete_vacancy_by_session_id(session_id,current_user.get('sub'))
 
 
-@hr_agent_router.put("/vacancy/update/{vacancy_id}",tags=["HR VACANCY"])
+@hr_agent_router.put("/vacancy/update/{session_id}",tags=["HR VACANCY"])
 @require_roles([RoleEnum.ADMIN,RoleEnum.EMPLOYER])
 async def update_vacancy(
-    vacancy_id:UUID,
+    session_id:UUID,
     vacancy_text:VacancyTextUpdate,
     hr_agent_controller: HRAgentController = Depends(Factory.get_hr_agent_controller),
     current_user: dict = Depends(get_current_user),
 ):
     attributes = vacancy_text.model_dump()
-    return await hr_agent_controller.update_vacancy(current_user.get('sub'), vacancy_id, attributes)
+    return await hr_agent_controller.update_vacancy(current_user.get('sub'), session_id, attributes)
 
 
-@hr_agent_router.patch('/vacancy/add_to_archive/{vacancy_id}',tags=["HR VACANCY"])
+@hr_agent_router.patch('/vacancy/add_to_archive/{session_id}',tags=["HR VACANCY"])
 async def add_vacancy_to_archive(
-    vacancy_id:UUID,
+    session_id:UUID,
     current_user: dict = Depends(get_current_user),
     hr_agent_controller: HRAgentController = Depends(Factory.get_hr_agent_controller),
 ):
-    return await hr_agent_controller.add_vacancy_to_archive(current_user.get('sub'),vacancy_id)
+    return await hr_agent_controller.add_vacancy_to_archive(current_user.get('sub'),session_id)
 
 
 @hr_agent_router.get("/vacancy/generated/user_vacancies", tags=["HR VACANCY"])
@@ -65,13 +66,13 @@ async def get_generated_user_vacancies(
     return await hr_agent_controller.get_user_vacancies(current_user.get('sub'),is_archived)
 
 
-@hr_agent_router.get("/vacancy/generated/{vacancy_id}",tags=["HR VACANCY"])
+@hr_agent_router.get("/vacancy/generated/{session_id}",tags=["HR VACANCY"])
 async def get_generated_user_vacancy(
-    vacancy_id: UUID,
+    session_id: UUID,
     hr_agent_controller: HRAgentController = Depends(Factory.get_hr_agent_controller),
     current_user: dict = Depends(get_current_user),
 ):
-    return await hr_agent_controller.get_generated_vacancy(vacancy_id)
+    return await hr_agent_controller.get_generated_vacancy(session_id)
 
 
 @hr_agent_router.get('/resume_analyze/favorites/{session_id}',tags=["HR FAVORITE CANDIDATES"])
@@ -116,12 +117,20 @@ async def websocket_progress(websocket: WebSocket, user_id: int):
     except WebSocketDisconnect:
         connections.pop(user_id, None)  # Удаляем соединение при отключении клиента
 
+@hr_agent_router.post('/resume_analyzer/session_creator',tags=["HR RESUME ANALYZER"])
+async def session_creator(
+    current_user: dict = Depends(get_current_user),
+    title: str = Form(...),
+    hr_agent_controller: HRAgentController = Depends(Factory.get_hr_agent_controller)
+
+):
+    return await hr_agent_controller.session_creator(current_user.get('sub'),title)
+
 
 @hr_agent_router.post('/resume_analyze', tags=["HR RESUME ANALYZER"])
 async def cv_analyzer(
     current_user: dict = Depends(get_current_user),
-    session_id: Optional[str] = Form(None),
-    title: Optional[str] = Form(None),
+    session_id: str = Form(...),
     vacancy_requirement: UploadFile = File(None),  
     vacancy_requirement_text: Optional[str] = Form(None),    
     cv_files: List[UploadFile] = File(...),
@@ -132,39 +141,32 @@ async def cv_analyzer(
     
     user_id = current_user.get('sub')
     total_files = len(cv_files)
-    websocket = connections.get(user_id)  # Извлекаем соединение, если оно есть
+    manager = ws_manager 
 
     # Отправляем начальное сообщение о старте загрузки
-    if websocket:
-        await websocket.send_json({
+    if manager:
+        await manager.send_json(user_id,{
             "type": "start",
             "total_files": total_files,
             "message": "Начинаю обработку файлов"
         })
 
-    for index, file in enumerate(cv_files, start=1):
-        # Обрабатываем файл (например, сохраняем или выполняем какие-то операции)
-        
-        # Отправляем обновление прогресса
-        if websocket:
-            await websocket.send_json({
+    for index, file in enumerate(cv_files, start=1):        
+        if manager:
+            await manager.send_json(user_id,{
                 "type": "progress",
                 "processed_files": index,
                 "total_files": total_files,
                 "message": f"Принял {index}/{total_files} файлов"
             })
 
-    # Завершаем прогресс-обновления
-    if websocket:
-        await websocket.send_json({
+    if manager:
+        await manager.send_json(user_id,{
             "type": "complete",
             "message": "Все файлы успешно обработаны"
         })
 
-    # Передаем обработку контроллеру
-    return await hr_agent_controller.cv_analyzer(
-        user_id, session_id, vacancy_requirement, vacancy_requirement_text, cv_files, title
-    )
+    return await hr_agent_controller.cv_analyzer(current_user.get('sub'), session_id, vacancy_requirement,vacancy_requirement_text, cv_files)
 
  # return await hr_agent_controller.cv_analyzer(current_user.get('sub'), session_id, vacancy_requirement,vacancy_requirement_text, cv_files, title)
 
