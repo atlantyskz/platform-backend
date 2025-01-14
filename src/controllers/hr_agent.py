@@ -25,6 +25,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.core.backend import BackgroundTasksBackend
 from src.services.extractor import AsyncTextExtractor
 from src.services.request_sender import RequestSender
+from src.repositories.vacancy_requirement import VacancyRequirementRepository
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
 from reportlab.pdfbase import pdfmetrics
@@ -43,6 +44,7 @@ class HRAgentController:
         self.assistant_repo = AssistantRepository(session)
         self.bg_backend = BackgroundTasksBackend(session)
         self.organization_repo = OrganizationRepository(session)
+        self.requirement_repo = VacancyRequirementRepository(session)
         self.manager = manager
         self.upload_progress = {}
         pdfmetrics.registerFont(TTFont('DejaVu', 'dejavu-sans-ttf-2.37/ttf/DejaVuSans.ttf'))
@@ -219,17 +221,30 @@ class HRAgentController:
         if len(resumes) > 100:
             raise BadRequestException("Too many resume files. Max number of resume files is 100")
         
-   
         
         if vacancy_file:
             vacancy_text = await self.text_extractor.extract_text(vacancy_file)
         elif vacancy_text:
             vacancy_text = vacancy_text.strip()
-        
+        vacancy_hash = self.get_text_hash(vacancy_text)
+
+        existing_vacancy = await self.requirement_repo.get_text_by_hash(vacancy_hash)
+        if existing_vacancy:
+            vacancy_text = existing_vacancy.requirement_text
+        else:
+            # Сохраняем новое требование в базе
+            await self.requirement_repo.create({
+                "user_id": user_id,
+                "session_id": session_id,
+                "text_hash": vacancy_hash,
+                "requirement_text": vacancy_text
+            })
+
         batch_texts = await asyncio.gather(*[self.text_extractor.extract_text(resume) for resume in resumes])
-        
+
         unique_hashes = set()
         unique_batch_texts = []
+
         for resume_text in batch_texts:
             cleaned_text = resume_text.strip()
             text_hash = self.get_text_hash(cleaned_text)

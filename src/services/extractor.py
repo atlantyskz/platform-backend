@@ -32,6 +32,7 @@ class AsyncTextExtractor:
         self.supported_formats = {
             'application/pdf': self._extract_from_pdf,
             'application/vnd.openxmlformats-officedocument.wordprocessingml.document': self._extract_from_docx,
+            'application/msword':self._extract_from_docx,
             'text/plain': self._extract_from_txt,
         }
 

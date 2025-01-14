@@ -1,4 +1,3 @@
-
 import uuid
 import sqlalchemy as sa
 import sqlalchemy.orm as so
@@ -12,6 +11,7 @@ class HRTask(Base):
     session_id: so.Mapped[uuid.UUID] = so.mapped_column(sa.ForeignKey('assistant_sessions.id', ondelete="CASCADE"), nullable=False)
     task_id: so.Mapped[str] = so.mapped_column(sa.String)
     task_status: so.Mapped[str] = so.mapped_column(sa.String, nullable=False)
+    text_hash: so.Mapped[str] = so.mapped_column(sa.String, nullable=True,index=True)
     result_data: so.Mapped[dict] = so.mapped_column(sa.JSON, nullable=True)
     tokens_spent: so.Mapped[int] = so.mapped_column(sa.Integer,nullable=True)
     task_type: so.Mapped[str] = so.mapped_column(sa.String, nullable=False)

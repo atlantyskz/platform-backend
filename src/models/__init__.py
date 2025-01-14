@@ -31,3 +31,4 @@ from .assistant_session import AssistantSession
 from .assigned_assistant import assigned_assistant
 from .vacancy import Vacancy
 from .favorite_resume import FavoriteResume
+from .vacancy_requirement import VacancyRequirement

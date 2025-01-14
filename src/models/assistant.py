@@ -25,71 +25,54 @@ class Assistant(Base,TimestampMixin):
 
 class AssistantEnum(Enum):
     HR_ASSISTANT = (
-        'HR Assistant',
-        'Handles HR-related tasks',
+        'ИИ Рекрутер',
+        'Помогает автоматизировать подбор сотрудников: создает вакансии, анализирует резюме и проводит первичный отбор.',
         'active',
         'ai-assistant'
     )
-    PRODUCT_MANAGER_ASSISTANT = (
-        'Product Manager Assistant',
-        'Helps product managers analyze user feedback and prioritize feature improvements effectively.',
-        'active',
-        'ai-assistant'
-    )
-    SALES_AUTOMATION_BOT = (
-        'Sales Automation Bot',
-        'Automates sales outreach and follow-up tasks while generating insightful performance analytics.',
-        'dev',
-        'ai-solution'
-    )
-    MARKETING_INTELLIGENCE_ADVISOR = (
-        'Marketing Intelligence Advisor',
-        'Provides real-time market insights, competitor analysis, and strategic campaign optimization tips.',
-        'fix',
-        'ai-assistant'
-    )
-    CUSTOMER_INSIGHTS_ASSISTANT = (
-        'Customer Insights Assistant',
-        'Collects customer feedback from multiple channels and identifies key satisfaction metrics quickly.',
-        'active',
-        'ai-assistant'
-    )
-    SOFTWARE_DEVELOPMENT_COACH = (
-        'Software Development Coach',
-        'Guides engineering teams with best practices, code reviews, and automated testing suggestions.',
-        'fix',
-        'ai-solution'
-    )
-    FINANCIAL_PLANNING_COMPANION = (
-        'Financial Planning Companion',
-        'Offers budget tracking, expense forecasting, and proactive investment recommendations for teams.',
+    ACCOUNTING_ASSISTANT = (
+        'ИИ Бухгалтер',
+        'Упрощает финансовые задачи: расчет зарплат, создание отчетов и управление бюджетом.',
         'dev',
         'ai-assistant'
     )
-    DATA_ANALYTICS_FACILITATOR = (
-        'Data Analytics Facilitator',
-        'Aggregates various datasets into structured reports and highlights significant performance trends.',
-        'active',
-        'ai-solution'
-    )
-    PROJECT_COORDINATION_HELPER = (
-        'Project Coordination Helper',
-        'Coordinates tasks, deadlines, and resources across multiple teams to ensure timely project delivery.',
-        'fix',
+    MANAGER_ASSISTANT = (
+        'ИИ Менеджер',
+        'Обеспечивает взаимодействие с клиентами: отвечает на запросы, консультирует и помогает улучшить сервис.',
+        'dev',
         'ai-assistant'
     )
-    CHATBOT_EXPERIENCE_DESIGNER = (
-        'Chatbot Experience Designer',
-        'Suggests conversational flows, user engagement strategies, and natural language enhancements.',
+    MARKETING_ASSISTANT = (
+        'ИИ Маркетолог',
+        'Оптимизирует маркетинг: анализирует рынок, разрабатывает стратегии и помогает запускать успешные кампании.',
+        'dev',
+        'ai-assistant'
+    )
+    CLONE_AI = (
+        'ИИ Клон',
+        'Создайте своего виртуального клона: аватар, который выглядит и говорит, как вы. Идеальное решение для презентаций, обучения или общения.',
         'dev',
         'ai-solution'
     )
-    TECHNICAL_SUPPORT_ORCHESTRATOR = (
-        'Technical Support Orchestrator',
-        'Streamlines troubleshooting processes by categorizing user issues and providing relevant solutions.',
-        'active',
-        'ai-assistant'
+    AVATAR_AI = (
+        'ИИ Аватар',
+        'Используйте готовые виртуальные аватары для создания контента: рекламы, видео или взаимодействия с аудиторией. Простое и удобное решение для любых задач.',
+        'dev',
+        'ai-solution'
     )
+    PODCAST_AI = (
+        'ИИ Подкаст',
+        'Создавайте подкасты с реалистичными голосами или добавляйте свой голос для уникального звучания. Делитесь идеями и обсуждениями в удобном аудиоформате.',
+        'dev',
+        'ai-solution'
+    )
+    CHATBOT_AI = (
+        'ИИ Бот',
+        'Умный чат-бот для автоматизации общения с клиентами: отвечает на вопросы, обрабатывает запросы и помогает с задачами.',
+        'dev',
+        'ai-solution'
+    )
+
     
     @property
     def display_name(self):
