@@ -88,7 +88,7 @@ async def insert_assistants(session:AsyncSession):
     for assistant in AssistantEnum:
         if assistant.name not in existing_assistants:
             new_assistant = Assistant(
-                name=assistant.name,
+                name=assistant.display_name,
                 description=assistant.description,
                 status = assistant.status,
                 type=assistant.type
