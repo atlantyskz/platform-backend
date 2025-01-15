@@ -200,7 +200,7 @@ class HRAgentController:
                 })
                 return {
                     'session_id': str(assist_session.id),
-                    "title":assist_session.title.
+                    "title":assist_session.title,
                 }
             except Exception as e:
                 raise e
