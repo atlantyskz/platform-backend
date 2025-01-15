@@ -184,6 +184,8 @@ class HRAgentController:
         async with self.session.begin() as session:
             try:
                 user_organization = await self.organization_repo.get_user_organization(user_id)
+                if user_organization is None:
+                    raise BadRequestException("You dont have organization")
 
                 assist_session = await self.assistant_session_repo.create_session({
                     'user_id': user_id,
@@ -198,6 +200,7 @@ class HRAgentController:
                 })
                 return {
                     'session_id': str(assist_session.id),
+                    "title":assist_session.title.
                 }
             except Exception as e:
                 raise e
