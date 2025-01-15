@@ -99,7 +99,7 @@ async def delete_from_favorites(
 ):
     return await hr_agent_controller.delete_from_favorites(current_user.get('sub'),resume_id)
 
-@hr_agent_router.get('/resume_analyze/sessions',tags=["HR RESUME ANALYZER"])
+@hr_agent_router.get('/resume_analyze/sessions',tags=["HR SESSIONS"])
 async def get_user_sessions(
     current_user: dict = Depends(get_current_user),
     hr_agent_controller: HRAgentController = Depends(Factory.get_hr_agent_controller)
@@ -117,7 +117,7 @@ async def websocket_progress(websocket: WebSocket, user_id: int):
     except WebSocketDisconnect:
         connections.pop(user_id, None)  # Удаляем соединение при отключении клиента
 
-@hr_agent_router.post('/resume_analyzer/session_creator',tags=["HR RESUME ANALYZER"])
+@hr_agent_router.post('/resume_analyzer/session_creator',tags=["HR SESSIONS"])
 async def session_creator(
     current_user: dict = Depends(get_current_user),
     title: str = Form(...),

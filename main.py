@@ -98,76 +98,9 @@ def create_app(create_custom_static_urls: bool = False) -> FastAPI:
 
 app = create_app(create_custom_static_urls=True)
 
-@app.exception_handler(Exception)
-async def global_exception_handler(request: Request, exc: Exception):
-    # Логируем ошибку
-    print(f"Unexpected error: {exc}")
-
-    # Стандартный ответ для всех ошибок
-    return JSONResponse(
-        status_code=500,  # Стандартный статус-код для неизвестных ошибок
-        content={"error": str(exc)},  # Используем описание ошибки
-    )
-
-@app.exception_handler(HTTPException)
-async def http_exception_handler(request: Request, exc: HTTPException):
-    return JSONResponse(
-        status_code=exc.status_code,
-        content={"error": exc.detail} 
-    )
-
-from typing import Dict, List
-from pydantic import BaseModel
-import re
-
-def clean_error_message(error_msg: str) -> str:
-    # Список всех технических префиксов, которые нужно удалить
-    prefixes_to_remove = [
-        "value is not a valid",
-        "Value error",
-        "value error",
-        "validation error",
-        "Validation error",
-        "string does not match regex",
-    ]
-    
-    # Удаляем все технические префиксы
-    message = error_msg
-    for prefix in prefixes_to_remove:
-        message = message.replace(prefix, "")
-    
-    # Удаляем лишние пробелы, запятые и двоеточия в начале
-    message = message.strip(" ,:.")
-    
-    # Если в сообщении осталось несколько частей, разделённых знаками препинания,
-    # берём последнюю (обычно это самое информативное сообщение)
-    parts = re.split('[,:;]', message)
-    message = parts[-1].strip()
-    
-    return message
-
-class ValidationErrorResponse(BaseModel):
-    errors: Dict[str, List[str]]
-
-async def validation_exception_handler(request: Request, exc: RequestValidationError):
-    error_response = ValidationErrorResponse(errors={})
-    
-    for error in exc.errors():
-        field = error["loc"][-1] if error["loc"] else "general"
-        message = clean_error_message(error["msg"])
-        
-        if field not in error_response.errors:
-            error_response.errors[field] = []
-        error_response.errors[field].append(message)
-    
-    return JSONResponse(
-        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-        content=error_response.model_dump()
-    )
-app.add_exception_handler(RequestValidationError, validation_exception_handler)
-
 
 from sqlalchemy.exc import IntegrityError,DBAPIError,SQLAlchemyError
+
 
 
 # Глобальный обработчик IntegrityError

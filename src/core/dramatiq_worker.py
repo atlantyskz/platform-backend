@@ -14,7 +14,7 @@ redis_broker.add_middleware(time_limit.TimeLimit())
 dramatiq.set_broker(redis_broker)
 
 
-@dramatiq.actor
+@dramatiq.actor(max_retries=3)
 async def process_resume(task_id: str, vacancy_text: str, resume_text: str):
     from src.core.backend import BackgroundTasksBackend
     from src.services.request_sender import RequestSender
@@ -37,12 +37,12 @@ async def process_resume(task_id: str, vacancy_text: str, resume_text: str):
                 tokens_spent=response.get('tokens_spent'),
                 status="completed", 
             )
-            # await bg_session.session_repo.update( hacurrentndled tasks +=1)
+                        # await bg_session.session_repo.update( hacurrentndled tasks +=1)
         except Exception as e:
             print(f'Connection failed - {str(e)}')
             await bg_session.update_task_result(
                 task_id=task_id,
                 result_data={"error": str(e)},
-                tokens_spent={"error": str(e)},
+                tokens_spent=0,
                 status="failed"
             )

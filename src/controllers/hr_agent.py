@@ -232,11 +232,15 @@ class HRAgentController:
         if existing_vacancy:
             vacancy_text = existing_vacancy.requirement_text
         else:
-            # Сохраняем новое требование в базе
+            # assist_session = await self.assistant_session_repo.create_session({
+            #     'user_id': user_id,
+            #     'title': title,
+            #     'organization_id': user_organization.id,
+            #     'assistant_id': 1
+            # })
             await self.requirement_repo.create({
-                "user_id": user_id,
                 "session_id": session_id,
-                "text_hash": vacancy_hash,
+                "requirement_hash": vacancy_hash,
                 "requirement_text": vacancy_text
             })
 
