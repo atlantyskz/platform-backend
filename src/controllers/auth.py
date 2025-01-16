@@ -25,23 +25,28 @@ class AuthController:
         self.user_repo = UserRepository(session)
         self.role_repo = RoleRepository(session)
         self.email_service = EmailService()
-    async def create_user(self, email:EmailStr,password:str) -> dict:
-        async with self.session.begin(): 
+        
+    async def create_user(self, email: str, password: str) -> dict:
+        async with self.session.begin():
             try:
-                user =await self.user_repo.get_by_email(email)
+                # Проверяем существующего пользователя
+                user = await self.user_repo.get_by_email(email)
                 if user is not None:
-                    raise BadRequestException("User already Exist")
-                role =  await self.role_repo.get_role_by_name(RoleEnum.ADMIN)
+                    raise HTTPException(status_code=400, detail="User already exists")
+                
+                # Получаем роль и создаем пользователя
+                role = await self.role_repo.get_role_by_name(RoleEnum.ADMIN)
                 password_hash = PasswordHandler.hash(password)
                 user = await self.user_repo.create_user({
-                    'email':email,
-                    'password':password_hash,
-                    'role_id':role.id
+                    'email': email,
+                    'password': password_hash,
+                    'role_id': role.id
                 })
+
+                # Генерируем токен для подтверждения email
                 verification_token = JWTHandler.encode_email_token(
                     payload={"sub": email, "type": "verification"}
                 )
-                    # Send verification email
                 verification_link = f"{self.email_service.frontend_url}/verify-email?token={verification_token}"
                 html_content = f"""
                 <h2>Welcome to Our Platform!</h2>
@@ -49,18 +54,20 @@ class AuthController:
                 <a href="{verification_link}">Verify Email</a>
                 <p>This link will expire in 1 hour.</p>
                 """
-                
+
+                # Отправляем email
                 await self.email_service.send_email(
                     to_email=email,
                     subject="Verify Your Email",
                     html_content=html_content
                 )
-                return {
-                    "message":"Verification has been sent to your email, please check it out"
-                }
-            except Exception:
-                raise
 
+                # Возвращаем ответ
+                return {"message": "Verification has been sent to your email, please check it out"}
+
+            except Exception as e:
+                raise HTTPException(status_code=500, detail=str(e))
+            
 
     async def login(self, email: str, password: str) -> Token:
         try:
