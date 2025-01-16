@@ -34,3 +34,10 @@ class LoginUserRequest(BaseModel):
     email: EmailStr
     password: str
 
+
+class VerifyEmailRequest(BaseModel):
+    token: str
+
+class PasswordResetRequest(BaseModel):
+    token: str
+    new_password: str

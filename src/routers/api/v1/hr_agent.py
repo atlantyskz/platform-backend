@@ -47,13 +47,13 @@ async def update_vacancy(
     return await hr_agent_controller.update_vacancy(current_user.get('sub'), session_id, attributes)
 
 
-@hr_agent_router.patch('/vacancy/add_to_archive/{session_id}',tags=["HR VACANCY"])
+@hr_agent_router.patch('/archive/session/add_to_archive/{session_id}',tags=["HR Archive"])
 async def add_vacancy_to_archive(
     session_id:UUID,
     current_user: dict = Depends(get_current_user),
     hr_agent_controller: HRAgentController = Depends(Factory.get_hr_agent_controller),
 ):
-    return await hr_agent_controller.add_vacancy_to_archive(current_user.get('sub'),session_id)
+    return await hr_agent_controller.add_session_to_archive(current_user.get('sub'),session_id)
 
 
 @hr_agent_router.get("/vacancy/generated/user_vacancies", tags=["HR VACANCY"])
@@ -64,6 +64,7 @@ async def get_generated_user_vacancies(
     current_user: dict = Depends(get_current_user),
 ):
     return await hr_agent_controller.get_user_vacancies(current_user.get('sub'),is_archived)
+
 
 
 @hr_agent_router.get("/vacancy/generated/{session_id}",tags=["HR VACANCY"])
@@ -105,6 +106,17 @@ async def get_user_sessions(
     hr_agent_controller: HRAgentController = Depends(Factory.get_hr_agent_controller)
 ):
     return await hr_agent_controller.get_user_sessions(current_user.get('sub'))
+
+
+@hr_agent_router.delete('/resume_analyze/sessions/{session_id}',tags=["HR SESSIONS"])
+async def delete_user_sessions(
+    session_id:UUID,
+    current_user: dict = Depends(get_current_user),
+    hr_agent_controller: HRAgentController = Depends(Factory.get_hr_agent_controller)
+):
+    return await hr_agent_controller.delete_session(session_id)
+
+
 connections = {}
 
 @hr_agent_router.websocket("/ws/progress-handling-files/{user_id}")

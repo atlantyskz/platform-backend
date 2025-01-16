@@ -25,6 +25,13 @@ class JWTHandler:
         return jwt.encode(payload, JWTHandler.secret_key, algorithm=JWTHandler.algorithm)
 
     @staticmethod
+    def encode_email_token(payload:dict) ->str:
+        expire = datetime.datetime.utcnow() + datetime.timedelta(minutes=JWTHandler.access_expire_minutes)
+        payload.update({"exp": expire})  
+        return jwt.encode(payload, JWTHandler.secret_key, algorithm=JWTHandler.algorithm)
+
+
+    @staticmethod
     def decode(token: str) -> dict:
         try:
             payload = jwt.decode(

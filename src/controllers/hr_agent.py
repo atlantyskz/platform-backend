@@ -9,6 +9,7 @@ from typing import List, Optional
 import uuid
 from fastapi import  HTTPException, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.responses import StreamingResponse
+from src.services.email import EmailService
 from src.services.websocket import manager
 from src.models.favorite_resume import FavoriteResume
 from src.core.dramatiq_worker import process_resume
@@ -45,6 +46,7 @@ class HRAgentController:
         self.bg_backend = BackgroundTasksBackend(session)
         self.organization_repo = OrganizationRepository(session)
         self.requirement_repo = VacancyRequirementRepository(session)
+        self.email_service = EmailService()
         self.manager = manager
         self.upload_progress = {}
         pdfmetrics.registerFont(TTFont('DejaVu', 'dejavu-sans-ttf-2.37/ttf/DejaVuSans.ttf'))
@@ -123,14 +125,14 @@ class HRAgentController:
             raise
     
 
-    async def add_vacancy_to_archive(self,user_id:int,session_id:UUID):
+    async def add_session_to_archive(self,user_id:int,session_id:UUID):
         try:
-            vacancy = await self.vacancy_repo.get_by_session_id(session_id)
-            if vacancy is None:
-                raise NotFoundException("Vacancy not found")
-            if user_id != vacancy.user_id:
+            session = await self.vacancy_repo.get_by_session_id(session_id)
+            if session is None:
+                raise NotFoundException("Session not found")
+            if user_id != session.user_id:
                 raise BadRequestException('You dont have permission')
-            await self.vacancy_repo.update_to_archive(session_id,{'is_archived':True})
+            await self.assistant_session_repo.update_to_archive(session_id,{'is_archived':True})
             await self.session.commit()
             return {
                 'success':True
@@ -204,6 +206,13 @@ class HRAgentController:
                 }
             except Exception as e:
                 raise e
+
+    async def delete_session(self,session_id:str):
+        await self.assistant_session_repo.delete_session(session_id)
+        return {
+            "success":True
+        }
+
 
     async def cv_analyzer(
         self, 

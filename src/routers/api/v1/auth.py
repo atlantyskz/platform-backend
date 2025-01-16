@@ -40,3 +40,11 @@ async def get_current_user(
 ):
     user_id = current_user.get('sub')
     return await auth_controller.get_current_user(user_id)
+
+@auth_router.post("/verify-email", )
+async def verify_email(
+    verify_data: VerifyEmailRequest,
+    auth_controller: AuthController = Depends(Factory.get_auth_controller),
+):
+    result = await auth_controller.verify_email(verify_data.token)
+    return result
