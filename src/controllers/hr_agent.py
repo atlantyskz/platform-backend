@@ -162,7 +162,7 @@ class HRAgentController:
             updated_data = {
                 "vacancy_text": {
                     **updated_vacancy.vacancy_text,  # Сохраняем существующие данные
-                    "llm_response": attributes    # Обновляем только llm_response
+                    "llm_response": attributes.get('vacancy_text')    # Обновляем только llm_response
                 }
             }
             v2 = await self.vacancy_repo.update_by_session_id(session_id, updated_data)
