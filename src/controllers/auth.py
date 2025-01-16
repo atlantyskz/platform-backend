@@ -25,7 +25,7 @@ class AuthController:
         self.user_repo = UserRepository(session)
         self.role_repo = RoleRepository(session)
         self.email_service = EmailService()
-    async def create_user(self, email:EmailStr,password:str) -> Token:
+    async def create_user(self, email:EmailStr,password:str) -> dict:
         async with self.session.begin(): 
             try:
                 user =await self.user_repo.get_by_email(email)
