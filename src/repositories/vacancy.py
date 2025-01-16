@@ -29,7 +29,7 @@ class VacancyRepository(BaseRepository):
         stmt = (
             update(Vacancy)
             .where(Vacancy.session_id == session_id)
-            .values(vacancy_text=attributes)
+            .values(**attributes)
             .execution_options(synchronize_session="fetch")
             .returning(Vacancy)
         )        

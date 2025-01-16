@@ -156,12 +156,21 @@ class HRAgentController:
             existing_vacancy = await self.get_generated_vacancy(session_id)
             if existing_vacancy.user_id != user_id:
                 raise BadRequestException("You dont have permissions to update vacancy")
-            updated_vacancy = await self.vacancy_repo.update_by_session_id(session_id,attributes.get("vacancy_text"))
+            
+            updated_vacancy = await self.vacancy_repo.get_by_session_id(session_id)
+        
+            updated_data = {
+                "vacancy_text": {
+                    **updated_vacancy.vacancy_text,  # Сохраняем существующие данные
+                    "llm_response": attributes    # Обновляем только llm_response
+                }
+            }
+            v2 = await self.vacancy_repo.update_by_session_id(session_id, updated_data)
             await self.session.commit()
-            await self.session.refresh(updated_vacancy)
-            return updated_vacancy
-        except Exception:
-            raise
+            await self.session.refresh(v2)
+            return v2
+        except Exception as e:
+            raise e
 
     async def get_user_vacancies(self,user_id:int,is_archived: bool = False):
         try:
