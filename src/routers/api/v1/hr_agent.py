@@ -222,13 +222,13 @@ async def make_request():
         )
         return res.json()
     
-@hr_agent_router.websocket("/ws/vacancy/ai_update/{vacancy_id}")
+@hr_agent_router.websocket("/ws/vacancy/ai_update/{session_id}")
 async def vacancy_ai_update(
-    vacancy_id:str, 
+    session_id:str, 
     websocket:WebSocket,
     hr_agent_controller: HRAgentController = Depends(Factory.get_hr_agent_controller),
 ):
-    return await hr_agent_controller.ws_update_vacancy_by_ai(vacancy_id,websocket)
+    return await hr_agent_controller.ws_update_vacancy_by_ai(session_id,websocket)
 
 
 

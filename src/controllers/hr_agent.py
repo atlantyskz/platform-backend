@@ -499,9 +499,9 @@ class HRAgentController:
         return favorite_resumes
 
 
-    async def ws_update_vacancy_by_ai(self,vacancy_id:int ,websocket: WebSocket):
+    async def ws_update_vacancy_by_ai(self,session_id:int ,websocket: WebSocket):
         try:
-            vacancy = await self.vacancy_repo.get_by_id(vacancy_id)
+            vacancy = await self.vacancy_repo.get_by_session_id(session_id)
             await websocket.accept()
             if vacancy is None :
                 await websocket.send_json({'error':'Vacancy not found or Organization not found'})
@@ -517,9 +517,7 @@ class HRAgentController:
                 }
                 try:
                     llm_response = await self.request_sender._send_request(data=data,llm_url='http://llm_service:8001/hr/generate_vacancy')
-                    await websocket.send_json({
-                        'updated_vacancy':llm_response
-                    })
+                    await websocket.send_json(llm_response)
                 except Exception:
                     await websocket.send_json({'error':'Failed to generate updated vacancy'})
                     break
