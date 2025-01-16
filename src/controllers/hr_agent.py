@@ -5,6 +5,12 @@ import json
 from io import BytesIO, StringIO
 import math
 from uuid import UUID, uuid4
+from reportlab.lib.pagesizes import letter
+from reportlab.pdfgen import canvas
+from reportlab.lib.utils import simpleSplit
+from io import BytesIO
+from fastapi.responses import StreamingResponse
+import json
 from typing import List, Optional
 import uuid
 from fastapi import  HTTPException, UploadFile, WebSocket, WebSocketDisconnect
@@ -576,8 +582,8 @@ class HRAgentController:
             pass
 
         
-    async def generate_pdf(self, vacancy_id: str):
-        vacancy = await self.vacancy_repo.get_by_id(vacancy_id)
+    async def generate_pdf(self, session_id: str):
+        vacancy = await self.vacancy_repo.get_by_session_id(session_id)
         buffer = BytesIO()
 
         # Получаем данные как байты или словарь
@@ -618,36 +624,79 @@ class HRAgentController:
         contacts = llm_response.get('contacts', {})
         location = llm_response.get('location', 'Не указано')
 
-        # Создаем PDF с помощью reportlab
         c = canvas.Canvas(buffer, pagesize=letter)
+        width, height = letter  # получаем размеры страницы
+        margin = 72  # отступ в 1 дюйм
+        line_height = 15  # высота строки
 
         # Настраиваем шрифт
         c.setFont("DejaVu", 12)
 
-        # Функция для добавления текста и обновления позиции
-        def add_text(x, y, text, offset=20):
+        def wrap_text_in_width(text, available_width):
+            """Разбивает текст на строки, помещающиеся в заданную ширину."""
+            return simpleSplit(text, "DejaVu", 12, available_width)
+
+        def add_wrapped_text(x, y, text, available_width):
+            """Добавляет текст с переносом строк и возвращает новую позицию y."""
             nonlocal y_position
-            if y_position < 50:
-                c.showPage()
-                c.setFont("DejaVu", 12)
-                y_position = 750
-            c.drawString(x, y_position, text)
-            y_position -= offset
+            
+            # Если текст короче доступной ширины, добавляем его как есть
+            if c.stringWidth(text, "DejaVu", 12) <= available_width:
+                if y_position < margin:
+                    c.showPage()
+                    c.setFont("DejaVu", 12)
+                    y_position = height - margin
+                c.drawString(x, y_position, text)
+                y_position -= line_height
+                return y_position
 
-        # Начальная позиция по Y
-        y_position = 750
+            # Разбиваем длинный текст на строки
+            lines = wrap_text_in_width(text, available_width)
+            for line in lines:
+                if y_position < margin:
+                    c.showPage()
+                    c.setFont("DejaVu", 12)
+                    y_position = height - margin
+                c.drawString(x, y_position, line)
+                y_position -= line_height
+            return y_position
 
-        # Добавляем основные поля
-        add_text(100, y_position, f"Job Title: {job_title}")
-        add_text(100, y_position, f"Specialization: {specialization}")
-        add_text(100, y_position, f"Salary Range: {salary_range}")
-        add_text(100, y_position, f"Company Name: {company_name}")
-        add_text(100, y_position, f"Experience Required: {experience_required}")
-        add_text(100, y_position, f"Work Format: {work_format}")
-        add_text(100, y_position, f"Work Schedule: {work_schedule}")
-        add_text(100, y_position, f"Location: {location}")
+        def add_section(title, items, indent=0):
+            """Добавляет раздел с заголовком и списком элементов."""
+            nonlocal y_position
+            
+            # Добавляем заголовок
+            available_width = width - (2 * margin) - indent
+            y_position = add_wrapped_text(margin + indent, y_position, title, available_width)
+            y_position -= 5  # дополнительный отступ после заголовка
+            
+            # Добавляем элементы списка
+            for item in items:
+                bullet_text = f"• {item}"
+                y_position = add_wrapped_text(margin + indent + 15, y_position, bullet_text, available_width - 15)
+            
+            y_position -= 10  # отступ после секции
 
-        # Добавляем разделы с заголовками и списками
+        # Начальная позиция
+        y_position = height - margin
+
+        # Добавляем основную информацию
+        main_info = [
+            f"Job Title: {job_title}",
+            f"Specialization: {specialization}",
+            f"Salary Range: {salary_range}",
+            f"Company Name: {company_name}",
+            f"Experience Required: {experience_required}",
+            f"Work Format: {work_format}",
+            f"Work Schedule: {work_schedule}",
+            f"Location: {location}"
+        ]
+
+        for info in main_info:
+            y_position = add_wrapped_text(margin, y_position, info, width - (2 * margin))
+
+        # Добавляем разделы
+        y_position -= 20
         sections = [
             ("Responsibilities:", responsibilities),
             ("Requirements:", requirements),
@@ -656,32 +705,34 @@ class HRAgentController:
         ]
 
         for title, items in sections:
-            y_position -= 20
-            add_text(100, y_position, title)
-            for item in items:
-                add_text(120, y_position, f"- {item}", offset=15)
+            if items:  # проверяем, что список не пустой
+                add_section(title, items)
 
         # Добавляем контактную информацию
-        y_position -= 20
-        add_text(100, y_position, "Contact Information:")
+        y_position -= 10
+        contact_title = "Contact Information:"
+        y_position = add_wrapped_text(margin, y_position, contact_title, width - (2 * margin))
+        
         if contacts:
             phone = contacts.get('phone', 'Не указано')
             email = contacts.get('email', 'Не указано')
-            add_text(120, y_position, f"Phone: {phone}", offset=15)
-            add_text(120, y_position, f"Email: {email}", offset=15)
+            contact_info = [
+                f"Phone: {phone}",
+                f"Email: {email}"
+            ]
+            for info in contact_info:
+                y_position = add_wrapped_text(margin + 20, y_position, info, width - (2 * margin) - 20)
 
         # Сохраняем PDF
-        c.showPage()
         c.save()
+        buffer.seek(0)
 
-        # Возвращаем PDF как StreamingResponse
-        buffer.seek(0)  # Возвращаемся к началу буфера перед отправкой
         return StreamingResponse(
             buffer,
             media_type="application/pdf",
             headers={"Content-Disposition": "attachment; filename=vacancy.pdf"}
         )
-    
+        
 
     def update_upload_progress(self, user_id: int, uploaded: int, total: int):
         self.upload_progress[user_id] = {"uploaded": uploaded, "total": total}

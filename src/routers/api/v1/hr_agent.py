@@ -242,12 +242,12 @@ async def resume_analyzer_chat(
     return await hr_agent_controller.ws_review_results_by_ai(session_id,websocket,current_user.get('sub'))
 
 
-@hr_agent_router.post("/generate-pdf/{vacancy_id}",tags=["VACANCY PDF GENERATOR"])
+@hr_agent_router.post("/generate-pdf/{session_id}",tags=["VACANCY PDF GENERATOR"])
 async def generate_pdf(
-    vacancy_id: UUID,
+    session_id: UUID,
     hr_agent_controller: HRAgentController = Depends(Factory.get_hr_agent_controller),
 ):
-    return await hr_agent_controller.generate_pdf(vacancy_id)
+    return await hr_agent_controller.generate_pdf(session_id)
 
 @hr_agent_router.websocket("/ws/progress/{user_id}")
 async def websocket_endpoint(
