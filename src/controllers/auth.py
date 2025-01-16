@@ -25,8 +25,8 @@ class AuthController:
         self.user_repo = UserRepository(session)
         self.role_repo = RoleRepository(session)
         self.email_service = EmailService()
-        
-    async def create_user(self, email: str, password: str) -> dict:
+
+    async def create_user(self, email: EmailStr, password: str) -> dict:
         async with self.session.begin():
             try:
                 # Проверяем существующего пользователя
@@ -64,10 +64,8 @@ class AuthController:
 
                 # Возвращаем ответ
                 return {"message": "Verification has been sent to your email, please check it out"}
-
             except Exception as e:
-                raise HTTPException(status_code=500, detail=str(e))
-            
+                raise e            
 
     async def login(self, email: str, password: str) -> Token:
         try:
