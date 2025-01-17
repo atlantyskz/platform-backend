@@ -86,7 +86,7 @@ async def insert_assistants(session:AsyncSession):
     assistants = await session.execute(select(Assistant.name))
     existing_assistants = [assistant[0] for assistant in assistants.fetchall()]
     for assistant in AssistantEnum:
-        if assistant.name not in existing_assistants:
+        if assistant.display_name not in existing_assistants:
             new_assistant = Assistant(
                 name=assistant.display_name,
                 description=assistant.description,
