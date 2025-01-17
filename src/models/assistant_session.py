@@ -20,4 +20,4 @@ class AssistantSession(Base, TimestampMixin):
     
     tasks = so.relationship("HRTask", back_populates="session", cascade="all, delete-orphan") 
     assistant = so.relationship("Assistant", back_populates="sessions")
-    vacancies = so.relationship("Vacancy",back_populates="session")
+    vacancies = so.relationship("Vacancy",back_populates="session",cascade="all, delete-orphan")

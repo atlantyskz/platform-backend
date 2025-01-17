@@ -22,7 +22,7 @@ class VacancyRequirementRepository(BaseRepository):
 
     async def get_text_by_hash(self, text_hash: str)->VacancyRequirement:
         requirement = await self.session.execute(
-            select(VacancyRequirement.requirement_text)
+            select(VacancyRequirement)
             .where(VacancyRequirement.requirement_hash == text_hash)
         )
         return requirement.scalar_one_or_none()
