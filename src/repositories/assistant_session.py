@@ -55,6 +55,7 @@ class AssistantSessionRepository(BaseRepository):
         return result.scalars().first()     
     
     async def delete_session(self,session_id:str):
+        
         stmt = (
             delete(AssistantSession).where(AssistantSession.id == session_id)
         )
