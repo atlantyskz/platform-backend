@@ -17,7 +17,7 @@ class AssistantSessionRepository(BaseRepository):
         await self.session.flush()
         return assistant_session    
     
-    async def update_to_archive(self,session_id:str,attributes:dict):
+    async def update_session(self,session_id:str,attributes:dict):
         stmt = (
             update(AssistantSession)
             .where(AssistantSession.id == session_id)

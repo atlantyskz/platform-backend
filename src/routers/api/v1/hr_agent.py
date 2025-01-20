@@ -4,6 +4,7 @@ from uuid import UUID
 from fastapi import APIRouter, Body,Depends,File, Query,UploadFile,Form, WebSocket, WebSocketDisconnect
 from fastapi.responses import StreamingResponse
 from httpx import AsyncClient, Timeout
+from src.schemas.requests.assistant import RenameRequest
 from src.core.middlewares.auth_middleware import get_current_user, get_current_user_ws,require_roles
 from src.models.role import RoleEnum
 from src.controllers.hr_agent import HRAgentController
@@ -47,13 +48,32 @@ async def update_vacancy(
     return await hr_agent_controller.update_vacancy(current_user.get('sub'), session_id, attributes)
 
 
-@hr_agent_router.patch('/archive/session/add_to_archive/{session_id}',tags=["HR Archive"])
-async def add_vacancy_to_archive(
+@hr_agent_router.patch('/archive/session/add_to_archive/{session_id}',tags=["HR SESSION Archive"])
+async def add_session_to_archive(
     session_id:UUID,
     current_user: dict = Depends(get_current_user),
     hr_agent_controller: HRAgentController = Depends(Factory.get_hr_agent_controller),
 ):
     return await hr_agent_controller.add_session_to_archive(current_user.get('sub'),session_id)
+
+@hr_agent_router.patch('/archive/session/remove_from_archive/{session_id}',tags=["HR SESSION Archive"])
+async def remove_session_from_archive(
+    session_id:UUID,
+    current_user: dict = Depends(get_current_user),
+    hr_agent_controller: HRAgentController = Depends(Factory.get_hr_agent_controller),
+):
+    return await hr_agent_controller.remove_session_from_archive(current_user.get('sub'),session_id)
+
+
+@hr_agent_router.patch('/archive/session/rename/{session_id}',tags=["HR SESSION Rename"])
+async def rename_session(
+    session_id:UUID,
+    new_title:RenameRequest,
+    current_user: dict = Depends(get_current_user),
+    hr_agent_controller: HRAgentController = Depends(Factory.get_hr_agent_controller),
+):
+    return await hr_agent_controller.rename_session(current_user.get('sub'),session_id,new_title.new_title)
+
 
 
 @hr_agent_router.get("/vacancy/generated/user_vacancies", tags=["HR VACANCY"])
@@ -108,7 +128,7 @@ async def get_user_sessions(
     return await hr_agent_controller.get_user_sessions(current_user.get('sub'))
 
 
-@hr_agent_router.delete('/resume_analyze/sessions/{session_id}',tags=["HR SESSIONS"])
+@hr_agent_router.delete('/resume_analyze/sessions/{session_id}',tags=["HR SESSION DELETE"])
 async def delete_user_sessions(
     session_id:UUID,
     current_user: dict = Depends(get_current_user),

@@ -4,7 +4,10 @@ import hashlib
 import json
 from io import BytesIO, StringIO
 import math
+import pprint
 from uuid import UUID, uuid4
+from datetime import datetime
+import pprint
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
 from reportlab.lib.utils import simpleSplit
@@ -89,11 +92,12 @@ class HRAgentController:
                     data={"user_message": user_message + f'user info:{user_organization_info}'}
                 )
                 llm_title = llm_response.get('llm_response').get("job_title")
+                assistant = await self.assistant_repo.get_assistant_by_name('ИИ Рекрутер')
                 assist_session = await self.assistant_session_repo.create_session({
                                 'user_id': user_id,
                                 'title': llm_title,
                                 'organization_id': user_organization.id,
-                                'assistant_id': 1
+                                'assistant_id': assistant.id
                             })  
                 session_id = str(assist_session.id)
                 vacancy = await self.vacancy_repo.add({
@@ -138,7 +142,7 @@ class HRAgentController:
                 raise NotFoundException("Session not found")
             if user_id != session.user_id:
                 raise BadRequestException('You dont have permission')
-            await self.assistant_session_repo.update_to_archive(session_id,{'is_archived':True})
+            await self.assistant_session_repo.update_session(session_id,{'is_archived':True})
             await self.session.commit()
             return {
                 'success':True
@@ -203,12 +207,12 @@ class HRAgentController:
                 user_organization = await self.organization_repo.get_user_organization(user_id)
                 if user_organization is None:
                     raise BadRequestException("You dont have organization")
-
+                assistant = await self.assistant_repo.get_assistant_by_name("ИИ Рекрутер")
                 assist_session = await self.assistant_session_repo.create_session({
                     'user_id': user_id,
                     'title': title,
                     'organization_id': user_organization.id,
-                    'assistant_id': 1
+                    'assistant_id': assistant.id
                 })
                 await self.vacancy_repo.add({
                     'title':title,
@@ -499,40 +503,65 @@ class HRAgentController:
         return favorite_resumes
 
 
-    async def ws_update_vacancy_by_ai(self,session_id:int ,websocket: WebSocket):
+
+    async def ws_update_vacancy_by_ai(self, session_id: int, websocket: WebSocket):
         try:
-            vacancy = await self.vacancy_repo.get_by_session_id(session_id)
             await websocket.accept()
-            if vacancy is None :
-                await websocket.send_json({'error':'Vacancy not found or Organization not found'})
+            vacancy = await self.vacancy_repo.get_by_session_id(session_id)
+            if vacancy is None:
+                await websocket.send_json({'error': 'Vacancy not found or Organization not found'})
                 await websocket.close()
                 return
+            await websocket.send_json({'vacancy_text': vacancy.vacancy_text})
 
-            await websocket.send_json(vacancy.vacancy_text)
+            message_history = {
+                'session_id': session_id,
+                'data': [],
+                'current_version':1
+            }
+
             while True:
                 user_message = await websocket.receive_json()
-                data = {
-                    'user_message':user_message.get('message'),
-                    'vacancy_to_update':vacancy.vacancy_text
-                }
+                user_content = user_message.get('message')
+                message_history['data'].append({
+                    'user_request': {
+                        'role': 'user',
+                        'content': user_content,
+                        'timestamp': datetime.now().isoformat(),
+                    },
+                    'llm_response': {
+                        'role': 'assistant',
+                        'content': vacancy.vacancy_text,
+                        'timestamp': datetime.now().isoformat(),
+                    },
+                    'version': message_history['current_version'],
+                })   
                 try:
-                    llm_response = await self.request_sender._send_request(data=data,llm_url='http://llm_service:8001/hr/generate_vacancy')
-                    await websocket.send_json(llm_response)
-                except Exception:
-                    await websocket.send_json({'error':'Failed to generate updated vacancy'})
+                    pprint.pprint(message_history)
+                    llm_response = await self.request_sender._send_request(
+                        data=message_history, llm_url='http://llm_service:8001/hr/generate_vacancy'
+                    )
+                    await self.vacancy_repo.update_by_session_id(session_id, {
+                        "vacancy_text": llm_response
+                    })
+                    await self.session.commit()
+                    message_history['current_version'] += 1
+                    updated_vacancy = await self.vacancy_repo.get_by_session_id(session_id)
+                    await websocket.send_json({'vacancy_text': updated_vacancy.vacancy_text})
+
+                except Exception as e:
+                    await websocket.send_json({'error': f'Failed to generate updated vacancy: {str(e)}'})
                     break
-        except Exception:
-            await websocket.send_json({'error': 'An unexpected error occurred'})
+        except Exception as e:
+            await websocket.send_json({'error': f'An unexpected error occurred - {str(e)}'})
             await websocket.close()
-        
+
 
     async def ws_review_results_by_ai(self,session_id:str, websocket: WebSocket,user_id:int):
         try:
             session_results = await self.bg_backend.get_results_by_session_id_ws(session_id)
-
             await websocket.accept()
             
-
             await websocket.send_json({
                 "session_id": session_id,
                 "results": [
@@ -558,13 +587,10 @@ class HRAgentController:
                             ]
                         }
                     }
-
-                    # Запрос к LLM
                     llm_response = await self.request_sender._send_request(
                         data=data,
                         llm_url="http://llm_service:8001/hr/review_cv_results"
                     )
-
                     # Отправляем результаты клиенту
                     await websocket.send_json({"review_results": llm_response})
                 except WebSocketDisconnect:
@@ -737,3 +763,32 @@ class HRAgentController:
 
     def get_upload_progress(self, user_id: int):
         return self.upload_progress.get(user_id, {"uploaded": 0, "total": 0})
+    
+
+    async def rename_session(self,user_id,session_id,new_title: str):
+        async with self.session.begin() as session:
+            user_session =  await self.assistant_session_repo.get_by_user_id(user_id)
+            print(user_session)
+            if user_session is None:
+                raise BadRequestException('Session not found')
+            await self.assistant_session_repo.update_session(session_id,{
+                'title':new_title
+            })
+            return {
+                'success':True
+            }
+        
+    async def remove_session_from_archive(self,user_id,session_id):
+        try:
+            session = await self.vacancy_repo.get_by_session_id(session_id)
+            if session is None:
+                raise NotFoundException("Session not found")
+            if user_id != session.user_id:
+                raise BadRequestException('You dont have permission')
+            await self.assistant_session_repo.update_session(session_id,{'is_archived':False})
+            await self.session.commit()
+            return {
+                'success':True
+            }
+        except Exception as e:
+            raise

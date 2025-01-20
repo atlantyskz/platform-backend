@@ -17,7 +17,7 @@ class AssistantSession(Base, TimestampMixin):
     title: so.Mapped[str] = so.mapped_column(sa.String(50), nullable=True)
     organization_id: so.Mapped[int] = so.mapped_column(sa.ForeignKey('organizations.id', ondelete="CASCADE"), nullable=False)
     assistant_id: so.Mapped[int] = so.mapped_column(sa.ForeignKey('assistants.id', ondelete="CASCADE"), nullable=False)  
-    
+    is_archived: so.Mapped[bool] = so.mapped_column(sa.Boolean,default=False, nullable=True)
     tasks = so.relationship("HRTask", back_populates="session", cascade="all, delete-orphan") 
     assistant = so.relationship("Assistant", back_populates="sessions")
     vacancies = so.relationship("Vacancy",back_populates="session",cascade="all, delete-orphan")

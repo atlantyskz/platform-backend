@@ -20,6 +20,12 @@ class AssistantRepository(BaseRepository):
         result = await self.session.execute(stmt)
         return result.scalars().first()
     
+    async def get_assistant_by_name(self,name: str)-> Assistant:
+        stmt = (select(Assistant).where(Assistant.name == name))
+        result = await self.session.execute(stmt)
+        return result.scalars().first()
+
+    
     async def add_assistant_to_organization(self,organization_id:int,assistant_id:int)->assigned_assistant: # type: ignore
         stmt = (insert(assigned_assistant).values({
             'organization_id':organization_id,
