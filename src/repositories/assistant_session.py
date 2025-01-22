@@ -39,6 +39,7 @@ class AssistantSessionRepository(BaseRepository):
             {   
                 'session_id': session.id,
                 'title':session.title,
+                'is_archived':session.is_archived,
                 'assistant_id': session.assistant_id,
                 'assistant_name': assistant_name
             }

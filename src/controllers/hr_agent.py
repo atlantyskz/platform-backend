@@ -8,6 +8,8 @@ import pprint
 from uuid import UUID, uuid4
 from datetime import datetime
 import pprint
+import json
+
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
 from reportlab.lib.utils import simpleSplit
@@ -29,6 +31,7 @@ from src.repositories.organization import OrganizationRepository
 from src.repositories.favorite_resume import FavoriteResumeRepository
 from src.repositories.vacancy import VacancyRepository
 from src.repositories.user import UserRepository
+from src.repositories.chat_message_history import ChatHistoryMessageRepository
 from src.core.exceptions import BadRequestException
 from src.repositories.user import UserRepository
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -53,6 +56,7 @@ class HRAgentController:
         self.assistant_session_repo = AssistantSessionRepository(session)
         self.assistant_repo = AssistantRepository(session)
         self.bg_backend = BackgroundTasksBackend(session)
+        self.history_repo = ChatHistoryMessageRepository(session)
         self.organization_repo = OrganizationRepository(session)
         self.requirement_repo = VacancyRequirementRepository(session)
         self.email_service = EmailService()
@@ -87,19 +91,43 @@ class HRAgentController:
                     user_message = content
                 elif vacancy_text:
                     user_message = vacancy_text
+                messages = []  
+                # Добавляем новое пользовательское сообщение в историю контекста
+                messages.append({
+                    "role": "user",
+                    "content": f"{user_message} user info:{user_organization_info}"
+                })
+
+
                 llm_response = await self.request_sender._send_request(
                     llm_url=f'http://llm_service:8001/hr/generate_vacancy',
-                    data={"user_message": user_message + f'user info:{user_organization_info}'}
+                    data={"messages": messages}
                 )
+                
+
                 llm_title = llm_response.get('llm_response').get("job_title")
                 assistant = await self.assistant_repo.get_assistant_by_name('ИИ Рекрутер')
                 assist_session = await self.assistant_session_repo.create_session({
-                                'user_id': user_id,
-                                'title': llm_title,
-                                'organization_id': user_organization.id,
-                                'assistant_id': assistant.id
-                            })  
+                    'user_id': user_id,
+                    'title': llm_title,
+                    'organization_id': user_organization.id,
+                    'assistant_id': assistant.id
+                }) 
                 session_id = str(assist_session.id)
+                
+                await self.history_repo.create({
+                    'session_id':session_id,
+                    'user_id':user_id,
+                    'role':'user',
+                    'message':user_message
+                })
+                await self.history_repo.create({
+                    'session_id':session_id,    
+                    'user_id':user_id,
+                    'role':'assistant',
+                    'message':llm_response
+                })
+ 
                 vacancy = await self.vacancy_repo.add({
                     'title':llm_title,
                     'session_id':session_id,
@@ -504,6 +532,7 @@ class HRAgentController:
 
 
 
+
     async def ws_update_vacancy_by_ai(self, session_id: int, websocket: WebSocket):
         try:
             await websocket.accept()
@@ -514,38 +543,54 @@ class HRAgentController:
                 return
             await websocket.send_json({'vacancy_text': vacancy.vacancy_text})
 
-            message_history = {
-                'session_id': session_id,
-                'data': [],
-                'current_version':1
-            }
-
             while True:
                 user_message = await websocket.receive_json()
                 user_content = user_message.get('message')
-                message_history['data'].append({
-                    'user_request': {
-                        'role': 'user',
-                        'content': user_content,
-                        'timestamp': datetime.now().isoformat(),
-                    },
-                    'llm_response': {
-                        'role': 'assistant',
-                        'content': vacancy.vacancy_text,
-                        'timestamp': datetime.now().isoformat(),
-                    },
-                    'version': message_history['current_version'],
-                })   
+                await self.history_repo.create({
+                    'session_id': session_id,
+                    'user_id': vacancy.user_id,
+                    'role': 'user',
+                    'message': user_content
+                })
+
+                history_records = await self.history_repo.get_all_by_session_id(session_id)
+                messages = []
+                for record in history_records:
+                    content = record.message
+                    if not isinstance(content, str):
+                        content = json.dumps(content, ensure_ascii=False)
+                    messages.append({
+                        "role": record.role,
+                        "content": content
+                    })
+
+                messages.append({
+                    "role": "user",
+                    "content": user_content
+                })
+
                 try:
-                    pprint.pprint(message_history)
                     llm_response = await self.request_sender._send_request(
-                        data=message_history, llm_url='http://llm_service:8001/hr/generate_vacancy'
+                        data={'messages': messages},
+                        llm_url='http://llm_service:8001/hr/generate_vacancy'
                     )
                     await self.vacancy_repo.update_by_session_id(session_id, {
                         "vacancy_text": llm_response
                     })
+
+                    assistant_content = llm_response.get('llm_response')
+                    # Преобразуем assistant_content в строку, если он не строка
+                    if not isinstance(assistant_content, str):
+                        assistant_content = json.dumps(assistant_content, ensure_ascii=False)
+
+                    await self.history_repo.create({
+                        'session_id': session_id,
+                        'user_id': vacancy.user_id,
+                        'role': 'assistant',
+                        'message': assistant_content
+                    })
+
                     await self.session.commit()
-                    message_history['current_version'] += 1
                     updated_vacancy = await self.vacancy_repo.get_by_session_id(session_id)
                     await websocket.send_json({'vacancy_text': updated_vacancy.vacancy_text})
 
@@ -555,7 +600,6 @@ class HRAgentController:
         except Exception as e:
             await websocket.send_json({'error': f'An unexpected error occurred - {str(e)}'})
             await websocket.close()
-
 
     async def ws_review_results_by_ai(self,session_id:str, websocket: WebSocket,user_id:int):
         try:

@@ -13,7 +13,7 @@ class EmailService:
         self.smtp_username = os.getenv("SMTP_USERNAME")
         self.smtp_password = os.getenv("SMTP_PASSWORD")
         self.sender_email = os.getenv("SENDER_EMAIL")
-        self.frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
+        self.frontend_url = os.getenv("FRONTEND_URL", "https://platform.atlantys.kz")
 
     async def send_email(self, to_email: str, subject: str, html_content: str):
         print(self.smtp_username,self.smtp_password)

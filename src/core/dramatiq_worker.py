@@ -1,3 +1,5 @@
+import json
+import logging
 import dramatiq
 from dramatiq.brokers.redis import RedisBroker
 from dramatiq.middleware import retries
@@ -14,7 +16,7 @@ redis_broker.add_middleware(time_limit.TimeLimit())
 dramatiq.set_broker(redis_broker)
 
 
-@dramatiq.actor(max_retries=3)
+@dramatiq.actor
 async def process_resume(task_id: str, vacancy_text: str, resume_text: str):
     from src.core.backend import BackgroundTasksBackend
     from src.services.request_sender import RequestSender
@@ -27,17 +29,19 @@ async def process_resume(task_id: str, vacancy_text: str, resume_text: str):
         try:
             bg_session = BackgroundTasksBackend(session)
             llm_service = RequestSender()
-            response = await llm_service._send_request({
-                'vacancy_text':vacancy_text,
-                'cv_text':resume_text
-            })
+            messages = [{
+                "role": "user",
+                "content": f"vacancy_text:{vacancy_text} resume_text:{resume_text}"
+            }]
+            response = await llm_service._send_request(data={'messages':messages})
+
             await bg_session.update_task_result(
                 task_id=task_id,
                 result_data=response.get('llm_response'),
                 tokens_spent=response.get('tokens_spent'),
                 status="completed", 
             )
-                        # await bg_session.session_repo.update( hacurrentndled tasks +=1)
+
         except Exception as e:
             print(f'Connection failed - {str(e)}')
             await bg_session.update_task_result(
