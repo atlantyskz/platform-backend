@@ -1,5 +1,5 @@
 from typing import List, Optional
-from sqlalchemy import delete, insert, select, update
+from sqlalchemy import delete, desc, insert, select, update
 from src.repositories import BaseRepository
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.models.assistant_session import AssistantSession
@@ -32,7 +32,7 @@ class AssistantSessionRepository(BaseRepository):
         stmt = (
                 select(AssistantSession, Assistant.name) 
                 .join(Assistant, Assistant.id == AssistantSession.assistant_id)
-                .where(AssistantSession.user_id == user_id)
+                .where(AssistantSession.user_id == user_id).order_by(desc(AssistantSession.created_at))
             )
         result = await self.session.execute(stmt)        
         sessions_with_names = [

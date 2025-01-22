@@ -1,4 +1,4 @@
-from sqlalchemy import delete, insert, select, update
+from sqlalchemy import delete, desc, insert, select, update
 from src.repositories import BaseRepository
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.models.chat_message_history import ChatMessageHistory
@@ -17,7 +17,7 @@ class ChatHistoryMessageRepository(BaseRepository):
     
     async def get_all_by_session_id(self,session_id:str)->ChatMessageHistory:
         res = await self.session.execute(
-            select(ChatMessageHistory).where(ChatMessageHistory.session_id == session_id).order_by(ChatMessageHistory.created_at)
+            select(ChatMessageHistory).where(ChatMessageHistory.session_id == session_id).order_by((ChatMessageHistory.created_at))
         )
         return res.scalars().all()
     
