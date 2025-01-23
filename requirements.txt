@@ -26,3 +26,5 @@ websockets==14.1
 arq==0.26.1 
 dramatiq
 reportlab
+dependency-injector
+minio

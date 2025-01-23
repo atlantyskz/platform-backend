@@ -15,6 +15,7 @@ class HRTask(Base):
     result_data: so.Mapped[dict] = so.mapped_column(sa.JSON, nullable=True)
     tokens_spent: so.Mapped[int] = so.mapped_column(sa.Integer,nullable=True)
     task_type: so.Mapped[str] = so.mapped_column(sa.String, nullable=False)
+    file_key: so.Mapped[str] = so.mapped_column(sa.String, nullable=True) 
     created_at: so.Mapped[str] = so.mapped_column(sa.DateTime, default=sa.func.now())
     
     session = so.relationship("AssistantSession", back_populates="tasks")

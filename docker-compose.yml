@@ -1,60 +1,75 @@
-  services:
-    web:
-      build: .
-      container_name: platform-backend
-      command: python -u main.py
+services:
+  web:
+    build: .
+    container_name: platform-backend
+    command: python -u main.py
+    ports:
+      - "9000:9000"
+    env_file:
+      - .env
+    networks:
+      - app_network
+    volumes:
+      - .:/app
+    depends_on:
+      - postgres
+      
+  postgres:
+    image: postgres:alpine
+    container_name: platform-db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - app_network
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=platform-db
+    ports:
+      - "5434:5432"
+
+  worker:
+    build: .
+    command: python -m dramatiq src.core.dramatiq_worker --processes 2 --threads 2
+    volumes:
+      - .:/app
+    env_file:
+      - .env
+    networks:
+      - app_network
+    depends_on:
+      - postgres
+      - redis
+      - web
+
+
+  redis:
+    image: redis:alpine
+    ports:
+      - "6380:6379"
+    networks:
+      - app_network
+
+  minio:
+      image: quay.io/minio/minio
+      container_name: minio
+      command: server /data --console-address ":9001"
       ports:
-        - "9000:9000"
-      env_file:
-        - .env
-      networks:
-        - app_network
-      volumes:
-        - .:/app
-      depends_on:
-        - postgres
-        
-    postgres:
-      image: postgres:alpine
-      container_name: platform-db
-      volumes:
-        - postgres_data:/var/lib/postgresql/data
-      networks:
-        - app_network
+        - "9002:9000" # S3 API порт
+        - "9003:9001" # Консоль MinIO
       environment:
-        - POSTGRES_USER=postgres
-        - POSTGRES_PASSWORD=postgres
-        - POSTGRES_DB=platform-db
-      ports:
-        - "5434:5432"
-
-    worker:
-      build: .
-      command: python -m dramatiq src.core.dramatiq_worker --processes 2 --threads 2
+        - MINIO_ROOT_USER=admin
+        - MINIO_ROOT_PASSWORD=admin123
       volumes:
-        - .:/app
-      env_file:
-        - .env
-      networks:
-        - app_network
-      depends_on:
-        - postgres
-        - redis
-        - web
-
-
-    redis:
-      image: redis:alpine
-      ports:
-        - "6380:6379"
+        - minio_data:/data
       networks:
         - app_network
 
+networks:
+  app_network:
+    external: true
 
-  networks:
-    app_network:
-      external: true
 
-
-  volumes:
-    postgres_data:
+volumes:
+  postgres_data:
+  minio_data:

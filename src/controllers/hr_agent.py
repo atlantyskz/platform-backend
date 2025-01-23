@@ -6,7 +6,7 @@ from io import BytesIO, StringIO
 import math
 import pprint
 from uuid import UUID, uuid4
-from datetime import datetime
+from datetime import datetime, timedelta
 import pprint
 import json
 
@@ -39,6 +39,7 @@ from src.core.backend import BackgroundTasksBackend
 from src.services.extractor import AsyncTextExtractor
 from src.services.request_sender import RequestSender
 from src.repositories.vacancy_requirement import VacancyRequirementRepository
+from src.services.minio import MinioUploader
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
 from reportlab.pdfbase import pdfmetrics
@@ -60,6 +61,12 @@ class HRAgentController:
         self.organization_repo = OrganizationRepository(session)
         self.requirement_repo = VacancyRequirementRepository(session)
         self.email_service = EmailService()
+        self.minio_service = MinioUploader(
+        host="minio:9000",  
+        access_key="admin",
+        secret_key="admin123",
+        bucket_name="analyze-resumes"
+    )
         self.manager = manager
         self.upload_progress = {}
         pdfmetrics.registerFont(TTFont('DejaVu', 'dejavu-sans-ttf-2.37/ttf/DejaVuSans.ttf'))
@@ -259,6 +266,25 @@ class HRAgentController:
         return {
             "success":True
         }
+    
+    async def preview_cv(self,task_id):
+        cv_task = await self.bg_backend.get_by_task_id(task_id)
+        print(cv_task)
+        if cv_task and cv_task.file_key is None:
+            raise NotFoundException('File not found')
+        file_stream = self.minio_service.get_file(cv_task.file_key)
+        if not file_stream:
+            raise HTTPException(status_code=404, detail="Файл не найден")
+        
+        return  StreamingResponse(
+            file_stream,
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": f"inline; filename={cv_task.task_id}.pdf"
+            }
+        )
+
+
 
 
     async def cv_analyzer(
@@ -280,60 +306,72 @@ class HRAgentController:
         if len(resumes) > 100:
             raise BadRequestException("Too many resume files. Max number of resume files is 100")
         
-        
+        # Извлечение текста из вакансии
         if vacancy_file:
             vacancy_text = await self.text_extractor.extract_text(vacancy_file)
         elif vacancy_text:
             vacancy_text = vacancy_text.strip()
         vacancy_hash = self.get_text_hash(vacancy_text)
 
+        # Работа с текстом вакансии
         existing_vacancy = await self.requirement_repo.get_text_by_hash(vacancy_hash)
         if existing_vacancy:
             vacancy_text = existing_vacancy.requirement_text
         else:
-            # assist_session = await self.assistant_session_repo.create_session({
-            #     'user_id': user_id,
-            #     'title': title,
-            #     'organization_id': user_organization.id,
-            #     'assistant_id': 1
-            # })
             await self.requirement_repo.create({
                 "session_id": session_id,
                 "requirement_hash": vacancy_hash,
                 "requirement_text": vacancy_text
             })
 
-        batch_texts = await asyncio.gather(*[self.text_extractor.extract_text(resume) for resume in resumes])
+        # Извлечение текста из резюме
+        resume_texts = await asyncio.gather(*[self.text_extractor.extract_text(resume) for resume in resumes])
+        for resume in resumes:
+            resume.file.seek(0) 
 
+        # Уникализация текстов
         unique_hashes = set()
-        unique_batch_texts = []
+        unique_batch = []
 
-        for resume_text in batch_texts:
-            cleaned_text = resume_text.strip()
+        for resume, text in zip(resumes, resume_texts):
+            cleaned_text = text.strip()
             text_hash = self.get_text_hash(cleaned_text)
+
             if text_hash not in unique_hashes:
                 unique_hashes.add(text_hash)
-                unique_batch_texts.append(cleaned_text)
-        
-        if not unique_batch_texts:
+                unique_batch.append((resume, cleaned_text))
+
+        if not unique_batch:
             raise BadRequestException("No unique resumes found")
-        
-        total_files = len(unique_batch_texts)
+
+        unique_resumes = [resume for resume, _ in unique_batch]
+        minio_uploader =self.minio_service
+
+        try:
+            file_info = await minio_uploader.save_files_in_minio(unique_resumes, session_id)
+        except BadRequestException as e:
+            raise e
+
+        # Сохранение уникальных текстов и файлов
+        total_files = len(unique_batch)
         processed_count = 0
         all_task_ids = []
-        for resume_text in unique_batch_texts:
+
+        for (resume, resume_text), (file_url, file_key) in zip(unique_batch, file_info):
             task_id = str(uuid.uuid4())
             await self.bg_backend.create_task({
                 "task_id": task_id,
                 "session_id": session_id,
                 "task_type": "hr cv analyze",
-                "task_status": "pending"
+                "task_status": "pending",
+                "file_key": str(file_key),
             })
+
             process_resume.send(task_id, vacancy_text, resume_text)
             processed_count += 1
             await self.send_progress(user_id, processed_count=processed_count, total_files=total_files)
             all_task_ids.append(task_id)
-        
+
         return {"session_id": session_id, "tasks": all_task_ids, "tasks_count": len(all_task_ids)}
 
 

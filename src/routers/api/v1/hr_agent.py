@@ -1,7 +1,7 @@
 import asyncio
 from io import BytesIO
 from uuid import UUID
-from fastapi import APIRouter, Body,Depends,File, Query,UploadFile,Form, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, BackgroundTasks, Body,Depends,File, Query,UploadFile,Form, WebSocket, WebSocketDisconnect
 from fastapi.responses import StreamingResponse
 from httpx import AsyncClient, Timeout
 from src.schemas.requests.assistant import RenameRequest
@@ -158,6 +158,12 @@ async def session_creator(
 ):
     return await hr_agent_controller.session_creator(current_user.get('sub'),title)
 
+@hr_agent_router.get("/tasks/{task_id}/preview")
+async def preview_candidate_cv(
+    task_id: str,    
+    hr_agent_controller: HRAgentController = Depends(Factory.get_hr_agent_controller),
+):
+    return await hr_agent_controller.preview_cv(task_id)
 
 @hr_agent_router.post('/resume_analyze', tags=["HR RESUME ANALYZER"])
 async def cv_analyzer(
@@ -166,7 +172,7 @@ async def cv_analyzer(
     vacancy_requirement: UploadFile = File(None),  
     vacancy_requirement_text: Optional[str] = Form(None),    
     cv_files: List[UploadFile] = File(...),
-    hr_agent_controller: HRAgentController = Depends(Factory.get_hr_agent_controller)
+    hr_agent_controller: HRAgentController = Depends(Factory.get_hr_agent_controller),
 ):
     if not session_id:
         session_id = None
@@ -198,7 +204,7 @@ async def cv_analyzer(
             "message": "Все файлы успешно обработаны"
         })
 
-    return await hr_agent_controller.cv_analyzer(current_user.get('sub'), session_id, vacancy_requirement,vacancy_requirement_text, cv_files)
+    return await hr_agent_controller.cv_analyzer(current_user.get('sub'), session_id, vacancy_requirement,vacancy_requirement_text, cv_files,)
 
  # return await hr_agent_controller.cv_analyzer(current_user.get('sub'), session_id, vacancy_requirement,vacancy_requirement_text, cv_files, title)
 

@@ -85,3 +85,9 @@ class BackgroundTasksBackend:
         stmt = select(HRTask).where(HRTask.session_id == session_id)
         result = await self.session.execute(stmt)
         return result.scalars().all()    
+    
+
+    async def get_by_task_id(self,task_id:str):
+        stmt = select(HRTask).where(HRTask.task_id == task_id)
+        result = await self.session.execute(stmt)
+        return result.scalars().first()    

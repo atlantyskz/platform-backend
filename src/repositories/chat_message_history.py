@@ -25,6 +25,6 @@ class ChatHistoryMessageRepository(BaseRepository):
     async def update_by_session_id(self,session_id:str,attributes: dict)->ChatMessageHistory:
         res = await self.session.execute(
             update(ChatMessageHistory).values(**attributes).returning(ChatMessageHistory)
-        )
+        ) 
         await self.session.flush()
         return res.scalars().first()

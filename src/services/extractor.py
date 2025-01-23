@@ -52,7 +52,7 @@ class AsyncTextExtractor:
             raise
         except Exception as e:
             logger.error(f"Failed to extract text from {file.filename}: {str(e)}")
-            raise TextExtractionError(f"Failed to extract text from {file.filename}")
+            raise TextExtractionError(f"Failed to extract text from {file.filename} - {str(e)}")
 
     async def _read_file(self, file: UploadFile) -> bytes:
         try:
