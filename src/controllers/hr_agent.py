@@ -526,6 +526,7 @@ class HRAgentController:
             "results": [
                 {
                     "id": res[0].id, 
+                    "task_id":res[0].task_id,
                     "result_data": res[0].result_data,
                     "is_favorite": res[1] 
                 }

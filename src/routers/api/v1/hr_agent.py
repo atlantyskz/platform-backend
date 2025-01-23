@@ -158,7 +158,7 @@ async def session_creator(
 ):
     return await hr_agent_controller.session_creator(current_user.get('sub'),title)
 
-@hr_agent_router.get("/tasks/{task_id}/preview")
+@hr_agent_router.get("/tasks/{task_id}/preview",tags=["HR RESUME ANALYZER"])
 async def preview_candidate_cv(
     task_id: str,    
     hr_agent_controller: HRAgentController = Depends(Factory.get_hr_agent_controller),
