@@ -25,3 +25,4 @@ class User(Base,TimestampMixin):
         "Vacancy",back_populates="user",cascade="all, delete-orphan"
     )
     favorite_resumes = so.relationship("FavoriteResume", back_populates="user", cascade="all, delete-orphan")
+    user_feedbacks = so.relationship("UserFeedback", back_populates="user", )

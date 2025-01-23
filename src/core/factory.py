@@ -4,6 +4,7 @@ from src.controllers.hr_agent import HRAgentController
 from src.controllers.organization import OrganizationController
 from src.controllers.organization_member import OrganizationMemberController
 from src.controllers.assistant import AssistantController
+from src.controllers.user_feedback import UserFeedbackController
 from src.core.databases import get_session
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.services.extractor import get_thread_pool
@@ -44,5 +45,10 @@ class Factory:
     
     def get_assistant_controller(session: AsyncSession = Depends(get_session))->AssistantController:
         return AssistantController(
+            session
+        )
+    
+    def get_user_feedback_controller(session: AsyncSession = Depends(get_session),)->UserFeedbackController:
+        return UserFeedbackController(
             session
         )
