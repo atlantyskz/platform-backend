@@ -7,4 +7,4 @@ class UserFeedbackRequest(BaseModel):
     improvements:str = Field(..., description="Предложения по улучшению (максимум 100 символов)")
     vacancy_price:str = Field(..., description="Цена за вакансию (максимум 100 символов)")
     resume_analysis_price:str = Field(..., description="Цена анализа резюме (максимум 100 символов)")
-    free_comment:str = Field(..., description="Свободный комментарий (максимум 100 символов)")
+    free_comment:str|None
