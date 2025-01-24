@@ -13,6 +13,7 @@ class UserFeedback(Base,TimestampMixin):
     id: so.Mapped[int] = so.mapped_column(sa.Integer, primary_key=True, index=True)
     user_id: so.Mapped[int] = so.mapped_column(sa.ForeignKey('users.id'),nullable=False)
     user_email: so.Mapped[str] = so.mapped_column(sa.String,nullable=False)
+    user_organization: so.Mapped[str] = so.mapped_column(sa.String,nullable=True)
     experience_rating: so.Mapped[float] = so.mapped_column(sa.Float, nullable=False)  # Оценка опыта использования сайта
     vacancy_creation_rating: so.Mapped[float] = so.mapped_column(sa.Float, nullable=False)  # Оценка создания вакансии
     resume_analysis_rating: so.Mapped[float] = so.mapped_column(sa.Float, nullable=False)  # Оценка анализа резюме
