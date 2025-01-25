@@ -1,5 +1,8 @@
 from dependency_injector import containers
+from dependency_injector import providers
+from src.core.databases import async_session_factory
 
 
 class Container(containers.Container):
-    pass
+    db = providers.Object(async_session_factory)
+    
