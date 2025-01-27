@@ -48,3 +48,19 @@ async def verify_email(
 ):
     result = await auth_controller.verify_email(verify_data.token)
     return result
+
+
+@auth_router.post("/request-reset-password", summary="Request password reset")
+async def request_reset_password(
+    request: ResetPasswordRequest, 
+    auth_controller: AuthController = Depends(Factory.get_auth_controller),
+):
+    return await auth_controller.request_to_reset_password(email=request.email)
+
+@auth_router.post("/reset-password", summary="Reset password")
+async def reset_password(
+    request: SetNewPassword, 
+    auth_controller: AuthController = Depends(Factory.get_auth_controller),
+
+):
+    return await auth_controller.reset_password(token=request.token, new_password=request.new_password)

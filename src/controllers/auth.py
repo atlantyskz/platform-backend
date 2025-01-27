@@ -102,7 +102,6 @@ class AuthController:
             user = await self._get_user_by_email(email)
             reset_token = JWTHandler.encode_email_token(
                 payload={"sub": user.id, "type": "password_reset"},
-                expires_delta=timedelta(hours=1)
             )
 
             reset_link = f"{self.email_service.frontend_url}/reset-password?token={reset_token}"
@@ -154,8 +153,9 @@ class AuthController:
                 )
                 
                 return {"message": "Password reset successfully"}
+            except BadRequestException as e:
+                raise e
             except Exception as e:
-                await self.session.rollback()
                 raise BadRequestException(str(e))
         
     async def _get_user_by_email(self,email: str)-> User:

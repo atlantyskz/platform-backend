@@ -41,3 +41,11 @@ class VerifyEmailRequest(BaseModel):
 class PasswordResetRequest(BaseModel):
     token: str
     new_password: str
+
+
+class ResetPasswordRequest(BaseModel):
+    email: EmailStr
+
+class SetNewPassword(BaseModel):
+    token: str
+    new_password: str
