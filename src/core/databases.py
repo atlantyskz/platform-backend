@@ -72,7 +72,7 @@ from sqlalchemy.orm import sessionmaker
 from src.core.settings import settings
 
 engine = create_async_engine(
-    settings.async_db_url,
+    settings.get_db_url,
     echo=False,
 )
 

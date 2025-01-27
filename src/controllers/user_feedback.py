@@ -24,7 +24,7 @@ class UserFeedbackController:
             await self.feedback_repo.create({
                 'user_id':user.id,
                 'user_email':user.email,
-                'user_organization':organization.name
+                'user_organization':organization.name,
                 **attributes
             })
             return {'success':True}
