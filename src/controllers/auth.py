@@ -49,10 +49,11 @@ class AuthController:
                 )
                 verification_link = f"{self.email_service.frontend_url}/verify-email?token={verification_token}"
                 html_content = f"""
-                <h2>Welcome to Our Platform!</h2>
-                <p>Please verify your email address by clicking the link below:</p>
-                <a href="{verification_link}">Verify Email</a>
-                <p>This link will expire in 1 hour.</p>
+                <h2>Добро пожаловать на нашу платформу!</h2>
+                <p>Пожалуйста, подтвердите свой адрес электронной почты, кликнув по ссылке ниже:</p>
+                <a href="{verification_link}">Подтвердить email</a>
+                <p>Ссылка будет действительна в течение 1 часа.</p>
+
                 """
 
                 # Отправляем email
@@ -106,11 +107,11 @@ class AuthController:
 
             reset_link = f"{self.email_service.frontend_url}/reset-password?token={reset_token}"
             html_content = f"""
-            <h2>Password Reset Request</h2>
-            <p>Click the link below to reset your password:</p>
-            <a href="{reset_link}">Reset Password</a>
-            <p>This link will expire in 1 hour.</p>
-            <p>If you didn't request this, please ignore this email.</p>
+            <h2>Запрос на сброс пароля</h2>
+            <p>Нажмите на ссылку ниже, чтобы сбросить пароль:</p>
+            <a href="{reset_link}">Сбросить пароль</a>
+            <p>Ссылка будет действительна в течение 1 часа.</p>
+            <p>Если вы не запрашивали сброс пароля, просто проигнорируйте это письмо.</p>
             """
 
             await self.email_service.send_email(
@@ -141,9 +142,10 @@ class AuthController:
                 
                 # Send confirmation email
                 html_content = """
-                <h2>Password Reset Successful</h2>
-                <p>Your password has been successfully reset.</p>
-                <p>If you didn't make this change, please contact support immediately.</p>
+                <h2>Сброс пароля успешно выполнен</h2>
+                <p>Ваш пароль был успешно сброшен.</p>
+                <p>Если вы не совершали это действие, пожалуйста, немедленно свяжитесь со службой поддержки.</p>
+
                 """
                 
                 await self.email_service.send_email(
