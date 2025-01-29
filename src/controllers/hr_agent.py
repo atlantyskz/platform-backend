@@ -597,7 +597,6 @@ class HRAgentController:
                     await websocket.send_json({'error': 'Vacancy not found or Organization not found'})
                     await websocket.close()
                     return
-                await websocket.send_json({'vacancy_text': vacancy.vacancy_text})
 
                 await self.history_repo.create({
                     'session_id': session_id,
