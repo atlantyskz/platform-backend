@@ -197,25 +197,38 @@ class HRAgentController:
 
 
     async def update_vacancy(self,user_id,session_id:str, attributes:dict):
-        try:
-            existing_vacancy = await self.get_generated_vacancy(session_id)
-            if existing_vacancy.user_id != user_id:
-                raise BadRequestException("You dont have permissions to update vacancy")
+        async with self.session.begin():
+            try:
+                existing_vacancy = await self.get_generated_vacancy(session_id)
+                if existing_vacancy.user_id != user_id:
+                    raise BadRequestException("You dont have permissions to update vacancy")
+                
+                updated_vacancy = await self.vacancy_repo.get_by_session_id(session_id)
             
-            updated_vacancy = await self.vacancy_repo.get_by_session_id(session_id)
-        
-            updated_data = {
-                "vacancy_text": {
-                    **updated_vacancy.vacancy_text,  # Сохраняем существующие данные
-                    "llm_response": attributes.get('vacancy_text')    # Обновляем только llm_response
+                updated_data = {
+                    "vacancy_text": {
+                        **updated_vacancy.vacancy_text,  
+                        "llm_response": attributes.get('vacancy_text')    
+                    }
                 }
-            }
-            v2 = await self.vacancy_repo.update_by_session_id(session_id, updated_data)
-            await self.session.commit()
-            await self.session.refresh(v2)
-            return v2
-        except Exception as e:
-            raise e
+                
+                updated_vacancy = await self.vacancy_repo.update_by_session_id(session_id, updated_data)
+                await self.history_repo.create({
+                    'session_id': session_id,
+                    'user_id': existing_vacancy.user_id,
+                    'role': 'user',
+                    'message': updated_vacancy.vacancy_text
+                })
+
+                return {
+                    "id": updated_vacancy.id,
+                    "title": updated_vacancy.title,
+                    "is_archived": updated_vacancy.is_archived,
+                    "session_id": updated_vacancy.session_id,
+                    "vacancy_text": updated_vacancy.vacancy_text
+                }
+            except Exception as e:
+                raise e
 
     async def get_user_vacancies(self,user_id:int,is_archived: bool = False):
         try:
@@ -575,16 +588,17 @@ class HRAgentController:
     async def ws_update_vacancy_by_ai(self, session_id: int, websocket: WebSocket):
         try:
             await websocket.accept()
-            vacancy = await self.vacancy_repo.get_by_session_id(session_id)
-            if vacancy is None:
-                await websocket.send_json({'error': 'Vacancy not found or Organization not found'})
-                await websocket.close()
-                return
-            await websocket.send_json({'vacancy_text': vacancy.vacancy_text})
 
             while True:
                 user_message = await websocket.receive_json()
                 user_content = user_message.get('message')
+                vacancy = await self.vacancy_repo.get_by_session_id(session_id)
+                if vacancy is None:
+                    await websocket.send_json({'error': 'Vacancy not found or Organization not found'})
+                    await websocket.close()
+                    return
+                await websocket.send_json({'vacancy_text': vacancy.vacancy_text})
+
                 await self.history_repo.create({
                     'session_id': session_id,
                     'user_id': vacancy.user_id,
