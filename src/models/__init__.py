@@ -34,3 +34,6 @@ from .favorite_resume import FavoriteResume
 from .vacancy_requirement import VacancyRequirement
 from .chat_message_history import ChatMessageHistory
 from .user_feedback import UserFeedback
+from .billing_transactions import BillingTransaction
+from .balance import Balance
+from .discount import Discount

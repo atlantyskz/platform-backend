@@ -1,4 +1,6 @@
 from fastapi import Depends
+from src.controllers.billing import BillingController
+from src.controllers.balance import BalanceController
 from src.controllers.auth import AuthController
 from src.controllers.hr_agent import HRAgentController
 from src.controllers.organization import OrganizationController
@@ -50,5 +52,15 @@ class Factory:
     
     def get_user_feedback_controller(session: AsyncSession = Depends(get_session),)->UserFeedbackController:
         return UserFeedbackController(
+            session
+        )
+    
+    def get_balance_controller(session: AsyncSession = Depends(get_session))->BalanceController:
+        return BalanceController(
+            session
+        )
+    
+    def get_billing_controller(session: AsyncSession = Depends(get_session))->BillingController:
+        return BillingController(
             session
         )
