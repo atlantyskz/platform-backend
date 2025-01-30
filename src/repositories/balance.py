@@ -8,11 +8,15 @@ class BalanceRepository:
     def __init__(self, session: AsyncSession):
         self.session = session
 
-    async def get_balance(self, organization_id: int):
+    async def get_balance(self, organization_id: int)->Balance:
         stmt = select(Balance).where(Balance.organization_id == organization_id)
         result = await self.session.execute(stmt)
         return result.scalars().first()
     
+    async def create_balance(self, attributes: dict)->Balance:
+        stmt = insert(Balance).values(**attributes).returning(Balance)
+        result = await self.session.execute(stmt)
+        return result.scalars().first()
 
     async def topup_balance(self, organization_id: int, amount: float):
         stmt = (

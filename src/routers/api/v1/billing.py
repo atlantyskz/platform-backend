@@ -13,8 +13,8 @@ billing_router = APIRouter(prefix='/api/v1/balance',tags=['BILLING'])
 @billing_router.post('/topup')
 async def topup_balance(
     billing_request: TopUpBillingRequest,
-    billing_controller: BillingController = Depends(Factory.get_balance_controller),
+    billing_controller: BillingController = Depends(Factory.get_billing_controller),
     current_user: dict = Depends(get_current_user)
 )-> dict:
     user_id = current_user.get('sub')
-    return await billing_controller.top_up_balance(user_id,billing_request)
+    return await billing_controller.top_up_balance(user_id, billing_request)

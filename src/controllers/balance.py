@@ -20,6 +20,8 @@ class BalanceController:
         if user is None:
             raise NotFoundException("User not found")
         organization = await self.organization_repository.get_user_organization(user_id)
-        
-        return await self.balance_repository.get_balance(organization.id)
-    
+        print(organization)
+        balance = await self.balance_repository.get_balance(organization.id)
+        if balance is None:
+            balance = await self.balance_repository.create_balance({"organization_id":organization.id,"atl_tokens":0})
+        return {"balance":balance.atl_tokens}

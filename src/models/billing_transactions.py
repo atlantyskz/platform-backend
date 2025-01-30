@@ -14,3 +14,8 @@ class BillingTransaction(Base, TimestampMixin):
     discount_id: so.Mapped[int] = so.mapped_column(sa.ForeignKey('discounts.id', ondelete="SET NULL"), nullable=True)  # Теперь можно не применять скидку
     status: so.Mapped[str] = so.mapped_column(sa.String, default='pending')
     payment_type: so.Mapped[str] = so.mapped_column(sa.String, nullable=True)
+
+    user = so.relationship('User', back_populates='billing_transactions')
+    organization = so.relationship('Organization', back_populates='billing_transactions')
+    discount = so.relationship('Discount', back_populates='billing_transactions')
+    

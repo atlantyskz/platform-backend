@@ -17,3 +17,8 @@ class BalanceUsage(Base, TimestampMixin):
     file_count: so.Mapped[int] = so.mapped_column(sa.Integer, nullable=False, default=0)
     file_size: so.Mapped[int] = so.mapped_column(sa.Integer, nullable=True, default=None)  
     atl_token_spent: so.Mapped[int] = so.mapped_column(sa.Integer, nullable=True)
+
+    user = so.relationship('User', back_populates='balance_usages')
+    organization = so.relationship('Organization', back_populates='balance_usages')
+    balance = so.relationship('Balance', back_populates='balance_usages')
+    

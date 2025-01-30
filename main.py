@@ -9,6 +9,8 @@ from src.routers.api.v1.organization import organization_router
 from src.routers.api.v1.organization_member import organization_member_router
 from src.routers.api.v1.assistant import assistant_router
 from src.routers.api.v1.user_feedback import  user_feedback_router
+from src.routers.api.v1.billing import billing_router
+from src.routers.api.v1.balance import balance_router
 from fastapi.middleware.cors import CORSMiddleware
 from src.core.store import lifespan
 from fastapi.responses import JSONResponse
@@ -81,6 +83,8 @@ def create_app(create_custom_static_urls: bool = False) -> FastAPI:
     app.include_router(organization_member_router)
     app.include_router(assistant_router)
     app.include_router(user_feedback_router)
+    app.include_router(billing_router)
+    app.include_router(balance_router)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["*"], 

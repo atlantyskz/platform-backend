@@ -8,7 +8,7 @@ class DiscountRepository:
     def __init__(self, session: AsyncSession):
         self.session = session
 
-    async def get_discount(self, discount_id)->Discount:
-        stmt = select(Discount).where(Discount.id == discount_id)
+    async def get_discount(self, value)->Discount:
+        stmt = select(Discount).where(Discount.value == value)
         result = await self.session.execute(stmt)
         return result.scalars().first()

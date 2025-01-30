@@ -37,3 +37,4 @@ from .user_feedback import UserFeedback
 from .billing_transactions import BillingTransaction
 from .balance import Balance
 from .discount import Discount
+from .balance_usage import BalanceUsage

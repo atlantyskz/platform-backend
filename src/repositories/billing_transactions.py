@@ -9,9 +9,8 @@ class BillingTransactionRepository:
         self.session = session
 
     async def create(self, attributes: dict):
-        stmt = insert(BillingTransaction).values(**attributes)
+        stmt = insert(BillingTransaction).values(**attributes).returning(BillingTransaction)
         result = await self.session.execute(stmt)
-        await self.session.flush()
         return result.scalars().first()
     
     async def get_all_by_user_id(self, user_id: int):

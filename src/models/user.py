@@ -26,3 +26,5 @@ class User(Base,TimestampMixin):
     )
     favorite_resumes = so.relationship("FavoriteResume", back_populates="user", cascade="all, delete-orphan")
     user_feedbacks = so.relationship("UserFeedback", back_populates="user", )
+    balance_usages = so.relationship('BalanceUsage', back_populates='user')
+    billing_transactions = so.relationship('BillingTransaction', back_populates='user')
