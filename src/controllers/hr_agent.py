@@ -20,6 +20,7 @@ from typing import List, Optional
 import uuid
 from fastapi import  HTTPException, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.responses import StreamingResponse
+from src.repositories.balance_usage import BalanceUsageRepository
 from src.services.email import EmailService
 from src.services.websocket import manager
 from src.models.favorite_resume import FavoriteResume
@@ -61,6 +62,7 @@ class HRAgentController:
         self.organization_repo = OrganizationRepository(session)
         self.requirement_repo = VacancyRequirementRepository(session)
         self.email_service = EmailService()
+        self.balance_usage_repo = BalanceUsageRepository(session)
         self.minio_service = MinioUploader(
         host="minio:9000",  
         access_key="admin",

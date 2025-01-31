@@ -1,3 +1,4 @@
+from typing import Optional
 from sqlalchemy import insert, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.models.user import User
@@ -20,6 +21,15 @@ class BillingTransactionRepository:
     
     async def get_all_by_organization_id(self, organization_id: int):
         stmt = select(BillingTransaction).join(User, BillingTransaction.user_id == User.id).where(BillingTransaction.organization_id == organization_id)
+        result = await self.session.execute(stmt)
+        return result.scalars().all()
+    
+    async def get_all_transactions(self,user_id: Optional[int], organization_id: Optional[int], status: Optional[str]):
+        stmt = select(BillingTransaction).filter(
+            (user_id is None or BillingTransaction.user_id == user_id),
+            (organization_id is None or BillingTransaction.organization_id == organization_id),
+            (status is None or BillingTransaction.status == status)
+        )
         result = await self.session.execute(stmt)
         return result.scalars().all()
     

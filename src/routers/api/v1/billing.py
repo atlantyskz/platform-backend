@@ -18,3 +18,14 @@ async def topup_balance(
 )-> dict:
     user_id = current_user.get('sub')
     return await billing_controller.top_up_balance(user_id, billing_request)
+
+
+
+@billing_router.get('/transactions')
+async def get_billing_transactions(
+    billing_controller: BillingController = Depends(Factory.get_billing_controller),
+    current_user: dict = Depends(get_current_user)
+)-> dict:
+    user_id = current_user.get('sub')
+    return await billing_controller.get_all_billing_transactions_by_organization_id(user_id)
+
