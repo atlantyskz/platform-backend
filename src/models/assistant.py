@@ -21,6 +21,7 @@ class Assistant(Base,TimestampMixin):
         cascade="all"
     )
     sessions = so.relationship("AssistantSession", back_populates="assistant")
+    balance_usages = so.relationship("BalanceUsage", back_populates="assistant")
 
 
 class AssistantEnum(Enum):

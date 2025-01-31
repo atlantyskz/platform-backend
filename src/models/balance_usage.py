@@ -10,6 +10,7 @@ class BalanceUsage(Base, TimestampMixin):
     id: so.Mapped[int] = so.mapped_column(sa.Integer, primary_key=True, autoincrement=True, index=True)
     user_id: so.Mapped[int] = so.mapped_column(sa.ForeignKey('users.id', ondelete="CASCADE"), nullable=False)
     organization_id: so.Mapped[int] = so.mapped_column(sa.ForeignKey('organizations.id', ondelete="CASCADE"), nullable=False)
+    assistant_id: so.Mapped[int] = so.mapped_column(sa.ForeignKey('assistants.id', ondelete="CASCADE"), nullable=True)
     balance_id: so.Mapped[int] = so.mapped_column(sa.ForeignKey('balances.id', ondelete="CASCADE"), nullable=False)
     input_text_count: so.Mapped[int] = so.mapped_column(sa.Integer, nullable=False, default=0)
     gpt_token_spent: so.Mapped[int] = so.mapped_column(sa.Integer, nullable=False, default=0)
@@ -21,4 +22,5 @@ class BalanceUsage(Base, TimestampMixin):
     user = so.relationship('User', back_populates='balance_usages')
     organization = so.relationship('Organization', back_populates='balance_usages')
     balance = so.relationship('Balance', back_populates='balance_usages')
+    assistant = so.relationship('Assistant', back_populates='balance_usages')
     
