@@ -43,7 +43,7 @@ class BillingController:
                     await self.balance_repository.topup_balance(billing_transaction.organization_id,billing_transaction.atl_tokens)
                     return {"status":"charged"}
                 else:
-                    await self.billing_transaction_repository.update(billing_transaction.id,{"status":"charged"})
+                    await self.billing_transaction_repository.update(billing_transaction.id,{"status":"rejected"})
                 return billing_transaction
 
     async def get_all_billing_transactions_by_organization_id(self,user_id:int):
