@@ -36,8 +36,10 @@ class BalanceRepository:
             .returning(Balance)
         )
         result = await self.session.execute(stmt)
-        return result.scalars().first()
-    
+        # Remove the explicit flush/commit here
+        return result.scalars().first()  
+
+
     async def transfer_balance(self, sender_id: int, receiver_id: int, amount: float):
         stmt = (
             update(Balance)

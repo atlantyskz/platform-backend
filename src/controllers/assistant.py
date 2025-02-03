@@ -5,7 +5,6 @@ from uuid import uuid4
 from typing import List, Optional
 from fastapi import  UploadFile, WebSocket
 from fastapi.responses import StreamingResponse
-from src.core.dramatiq_worker import process_resume
 from src.core.exceptions import BadRequestException,NotFoundException
 from src.repositories.assistant_session import AssistantSessionRepository
 from src.repositories.assistant import AssistantRepository

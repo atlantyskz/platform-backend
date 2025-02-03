@@ -54,13 +54,14 @@ class BillingController:
                 raise NotFoundException("Organization not found")
             
             kzt_amount = request.atl_amount * self.ATL_TOKEN_RATE
-            discount = await self.discount_checker_by_range(request.atl_amount)
-            kzt_amount = kzt_amount * (1 - (discount.value / 100))
+            discount_value, discount_id = await self.discount_checker_by_range(request.atl_amount)
+
+            kzt_amount = kzt_amount * (1 - (discount_value / 100))
             billing_transaction_data = {
                 "user_id": user.id,
                 "organization_id": organization.id,
                 "user_role": user.role.name,
-                "discount_id": discount.id,
+                "discount_id": discount_id if discount_id else None,
                 "amount": kzt_amount,
                 "atl_tokens": request.atl_amount,
                 "status": "pending",
@@ -68,6 +69,7 @@ class BillingController:
             }
 
             billing_transaction = await self.billing_transaction_repository.create(billing_transaction_data)
+            await self.balance_repository.topup_balance(organization.id, request.atl_amount)
             
             return {
                 "id": billing_transaction.id,
@@ -79,16 +81,22 @@ class BillingController:
     
     async def discount_checker_by_range(self,atl_amount: int):
         if atl_amount <= 100 :
-            return await self.discount_repository.get_discount(5)
+            discount = await self.discount_repository.get_discount(5)
+            return discount.value,discount.id
         elif atl_amount <= 300:
-            return await self.discount_repository.get_discount(10)
+            discount = await self.discount_repository.get_discount(10)
+            return discount.value,discount.id
         elif atl_amount <= 500:
-            return await self.discount_repository.get_discount(15)
+            discount = await self.discount_repository.get_discount(15)
+            return discount.value,discount.id
         elif atl_amount <= 1000:
-            return await self.discount_repository.get_discount(20)
+            discount = await self.discount_repository.get_discount(20)
+            return discount.value,discount.id
         elif atl_amount <= 5000:
-            return await self.discount_repository.get_discount(25)
+            discount = await self.discount_repository.get_discount(25)
+            return discount.value,discount.id
         elif atl_amount <= 10000:
-            return await self.discount_repository.get_discount(30)
+            discount = await self.discount_repository.get_discount(30)
+            return discount.value,discount.id
         else:
-            return 0
+            return 0,None

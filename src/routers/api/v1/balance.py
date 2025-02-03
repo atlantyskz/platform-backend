@@ -27,6 +27,6 @@ async def get_balance_usage(
     balance_controller:BalanceController = Depends(Factory.get_balance_controller),
     current_user: dict = Depends(get_current_user)
     
-)-> dict:
+):
     user_id = current_user.get('sub')
     return await balance_controller.get_balance_usage(user_id, assistant_id, start_date, end_date)

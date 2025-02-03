@@ -20,11 +20,12 @@ from typing import List, Optional
 import uuid
 from fastapi import  HTTPException, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.responses import StreamingResponse
+from src.repositories.balance import BalanceRepository
 from src.repositories.balance_usage import BalanceUsageRepository
 from src.services.email import EmailService
 from src.services.websocket import manager
 from src.models.favorite_resume import FavoriteResume
-from src.core.dramatiq_worker import process_resume
+from src.core.dramatiq_worker import DramatiqWorker
 from src.core.exceptions import BadRequestException,NotFoundException
 from src.repositories.assistant_session import AssistantSessionRepository
 from src.repositories.assistant import AssistantRepository
@@ -62,6 +63,7 @@ class HRAgentController:
         self.organization_repo = OrganizationRepository(session)
         self.requirement_repo = VacancyRequirementRepository(session)
         self.email_service = EmailService()
+        self.balance_repo = BalanceRepository(session)
         self.balance_usage_repo = BalanceUsageRepository(session)
         self.minio_service = MinioUploader(
         host="minio:9000",  
@@ -73,10 +75,25 @@ class HRAgentController:
         self.upload_progress = {}
         pdfmetrics.registerFont(TTFont('DejaVu', 'dejavu-sans-ttf-2.37/ttf/DejaVuSans.ttf'))
 
+    async def process_balance_usage(self, user_id: int, organization_id: int, balance_id: int, user_message: str, llm_tokens: int, file: Optional[UploadFile]):
+            atl_tokens_spent = llm_tokens / 3000
+            await self.balance_usage_repo.create({
+                'user_id': user_id,
+                'organization_id': organization_id,
+                'balance_id': balance_id,
+                'input_text_count': len(user_message),
+                'gpt_token_spent': llm_tokens,
+                'input_token_count': llm_tokens,
+                'file_count': 1 if file else 0,
+                'file_size': file.size if file else None,
+                'atl_token_spent': (atl_tokens_spent)
+            })
+            await self.balance_repo.withdraw_balance(organization_id, atl_tokens_spent)
 
     async def create_vacancy(self,user_id:int, file: Optional[UploadFile], vacancy_text: Optional[str]):
         async with self.session.begin() as session:
             try:
+                
                 user_organization = await self.organization_repo.get_user_organization(user_id)
                 if user_organization is None:
                     raise BadRequestException('You dont have organization')
@@ -86,6 +103,12 @@ class HRAgentController:
                     'company_phone':user_organization.phone_number,
                     'company_email':user_organization.email
                 }
+                balance = await self.balance_repo.get_balance(user_organization.id)
+                if balance is None:
+                    raise BadRequestException('Balance not found')
+                if balance.atl_tokens < 5:
+                    raise BadRequestException('Not enough tokens')
+
                 if file and file.filename == "":
                     file = None
 
@@ -101,18 +124,21 @@ class HRAgentController:
                 elif vacancy_text:
                     user_message = vacancy_text
                 messages = []  
-                # Добавляем новое пользовательское сообщение в историю контекста
                 messages.append({
                     "role": "user",
                     "content": f"{user_message} user info:{user_organization_info}"
                 })
-
-
+                balance = await self.balance_repo.get_balance(user_organization.id)
+                if balance is None:
+                    raise BadRequestException('Balance not found')
                 llm_response = await self.request_sender._send_request(
                     llm_url=f'http://llm_service:8001/hr/generate_vacancy',
                     data={"messages": messages}
                 )
-                
+                print(llm_response.get('tokens_spent'))
+                await self.process_balance_usage(
+                    user_id, user_organization.id, balance.id, user_message, llm_response.get('tokens_spent'), file
+                )                
 
                 llm_title = llm_response.get('llm_response').get("job_title")
                 assistant = await self.assistant_repo.get_assistant_by_name('ИИ Рекрутер')
@@ -309,85 +335,95 @@ class HRAgentController:
         vacancy_file: Optional[UploadFile], 
         vacancy_text: Optional[str],  
         resumes: List[UploadFile], 
-    ):        
-        user_organization = await self.organization_repo.get_user_organization(user_id)
-        if user_organization is None:
-            raise BadRequestException("You don't have an organization")
-        
-        if not vacancy_file and not vacancy_text:
-            raise BadRequestException("You must upload a file or provide text")
-        if len(resumes) == 0:
-            raise BadRequestException("You must upload resume files")
-        if len(resumes) > 100:
-            raise BadRequestException("Too many resume files. Max number of resume files is 100")
-        
-        # Извлечение текста из вакансии
-        if vacancy_file:
-            vacancy_text = await self.text_extractor.extract_text(vacancy_file)
-        elif vacancy_text:
-            vacancy_text = vacancy_text.strip()
-        vacancy_hash = self.get_text_hash(vacancy_text)
+    ):      
+        async with self.session.begin() as session:
+            user_organization = await self.organization_repo.get_user_organization(user_id)
+            if user_organization is None:
+                raise BadRequestException("You don't have an organization")
+            balance = await self.balance_repo.get_balance(user_organization.id) 
+            if balance is None:
+                raise BadRequestException("Balance not found")
+            if balance.atl_tokens < 5:
+                raise BadRequestException("Not enough tokens")
+            
+            if not vacancy_file and not vacancy_text:
+                raise BadRequestException("You must upload a file or provide text")
+            if len(resumes) == 0:
+                raise BadRequestException("You must upload resume files")
+            if len(resumes) > 100:
+                raise BadRequestException("Too many resume files. Max number of resume files is 100")
+            
+            # Извлечение текста из вакансии
+            if vacancy_file:
+                vacancy_text = await self.text_extractor.extract_text(vacancy_file)
+            elif vacancy_text:
+                vacancy_text = vacancy_text.strip()
+            vacancy_hash = self.get_text_hash(vacancy_text)
 
-        # Работа с текстом вакансии
-        existing_vacancy = await self.requirement_repo.get_text_by_hash(vacancy_hash)
-        if existing_vacancy:
-            vacancy_text = existing_vacancy.requirement_text
-        else:
-            await self.requirement_repo.create({
-                "session_id": session_id,
-                "requirement_hash": vacancy_hash,
-                "requirement_text": vacancy_text
-            })
+            # Работа с текстом вакансии
+            existing_vacancy = await self.requirement_repo.get_text_by_hash(vacancy_hash)
+            if existing_vacancy:
+                vacancy_text = existing_vacancy.requirement_text
+            else:
+                await self.requirement_repo.create({
+                    "session_id": session_id,
+                    "requirement_hash": vacancy_hash,
+                    "requirement_text": vacancy_text
+                })
 
-        # Извлечение текста из резюме
-        resume_texts = await asyncio.gather(*[self.text_extractor.extract_text(resume) for resume in resumes])
-        for resume in resumes:
-            resume.file.seek(0) 
+            # Извлечение текста из резюме
+            resume_texts = await asyncio.gather(*[self.text_extractor.extract_text(resume) for resume in resumes])
+            for resume in resumes:
+                resume.file.seek(0) 
 
-        # Уникализация текстов
-        unique_hashes = set()
-        unique_batch = []
+            # Уникализация текстов
+            unique_hashes = set()
+            unique_batch = []
 
-        for resume, text in zip(resumes, resume_texts):
-            cleaned_text = text.strip()
-            text_hash = self.get_text_hash(cleaned_text)
+            for resume, text in zip(resumes, resume_texts):
+                cleaned_text = text.strip()
+                text_hash = self.get_text_hash(cleaned_text)
 
-            if text_hash not in unique_hashes:
-                unique_hashes.add(text_hash)
-                unique_batch.append((resume, cleaned_text))
+                if text_hash not in unique_hashes:
+                    unique_hashes.add(text_hash)
+                    unique_batch.append((resume, cleaned_text))
 
-        if not unique_batch:
-            raise BadRequestException("No unique resumes found")
+            if not unique_batch:
+                raise BadRequestException("No unique resumes found")
 
-        unique_resumes = [resume for resume, _ in unique_batch]
-        minio_uploader =self.minio_service
+            unique_resumes = [resume for resume, _ in unique_batch]
+            minio_uploader =self.minio_service
 
-        try:
-            file_info = await minio_uploader.save_files_in_minio(unique_resumes, session_id)
-        except BadRequestException as e:
-            raise e
+            try:
+                file_info = await minio_uploader.save_files_in_minio(unique_resumes, session_id)
+            except BadRequestException as e:
+                raise e
 
-        # Сохранение уникальных текстов и файлов
-        total_files = len(unique_batch)
-        processed_count = 0
-        all_task_ids = []
+            # Сохранение уникальных текстов и файлов
+            total_files = len(unique_batch)
+            processed_count = 0
+            all_task_ids = []
 
-        for (resume, resume_text), (file_url, file_key) in zip(unique_batch, file_info):
-            task_id = str(uuid.uuid4())
-            await self.bg_backend.create_task({
-                "task_id": task_id,
-                "session_id": session_id,
-                "task_type": "hr cv analyze",
-                "task_status": "pending",
-                "file_key": str(file_key),
-            })
+            for (resume, resume_text), (file_url, file_key) in zip(unique_batch, file_info):
+                balance = await self.balance_repo.get_balance(user_organization.id)
+                if balance.atl_tokens < 5:
+                    break
 
-            process_resume.send(task_id, vacancy_text, resume_text)
-            processed_count += 1
-            await self.send_progress(user_id, processed_count=processed_count, total_files=total_files)
-            all_task_ids.append(task_id)
+                task_id = str(uuid.uuid4())
+                await self.bg_backend.create_task({
+                    "task_id": task_id,
+                    "session_id": session_id,
+                    "task_type": "hr cv analyze",
+                    "task_status": "pending",
+                    "file_key": str(file_key),
+                })
 
-        return {"session_id": session_id, "tasks": all_task_ids, "tasks_count": len(all_task_ids)}
+                DramatiqWorker.process_resume.send(task_id, vacancy_text, resume_text,user_id, user_organization.id, balance.id, vacancy_text,)
+                processed_count += 1
+                await self.send_progress(user_id, processed_count=processed_count, total_files=total_files)
+                all_task_ids.append(task_id)
+
+            return {"session_id": session_id, "tasks": all_task_ids, "tasks_count": len(all_task_ids)}
 
 
 

@@ -13,6 +13,7 @@ class VacancyRequirementRepository(BaseRepository):
     async def create(self,attributes: dict):
         stmt = VacancyRequirement(**attributes)
         self.session.add(stmt)
+        await self.session.flush()
         return stmt
     
     async def get_by_session_id(self,session_id: str):

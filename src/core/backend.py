@@ -23,20 +23,18 @@ class BackgroundTasksBackend:
         self.session.add(task)
         
         # Делаем commit, чтобы сохранить объект в базе данных
-        await self.session.commit()
+        await self.session.flush()
         
         # Возвращаем сохраненный объект
         return task
 
-    async def update_task_result(self,task_id:str,result_data:dict,tokens_spent:int,status:str = 'completed'):
+    async def update_task_result(self, task_id: str, result_data: dict, tokens_spent: int, status: str = 'completed'):
         stmt = await self.session.execute(select(HRTask).where(HRTask.task_id == task_id))
         task = stmt.scalars().first()
         if task:
             task.result_data = result_data
             task.task_status = status
-            task.tokens_spent = tokens_spent
-            await self.session.commit()
-            
+            task.tokens_spent = tokens_spent            
     async def get_results_by_session_id(self, session_id: str, user_id: int, offset: int = 0, limit: int = 10) -> List[HRTask]:
         favorite_subquery = (
             select(FavoriteResume.resume_id)

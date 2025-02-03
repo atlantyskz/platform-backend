@@ -4,9 +4,12 @@ from datetime import timedelta
 from fastapi import HTTPException
 from pydantic import EmailStr
 from sqlalchemy import select
+from src.repositories.organization_member import OrganizationMemberRepository
+from src.repositories.balance import BalanceRepository
 from src.services.email import EmailService
 from src.repositories.role import RoleRepository
 from src.repositories.user import UserRepository
+from src.repositories.organization import OrganizationRepository
 from src.controllers import BaseController
 from src.models import User
 from src.core.security import JWTHandler
@@ -24,6 +27,9 @@ class AuthController:
         self.session = session
         self.user_repo = UserRepository(session)
         self.role_repo = RoleRepository(session)
+        self.organization_repo = OrganizationRepository(session)   
+        self.balance_repo = BalanceRepository(session)
+        self.organization_member_repo = OrganizationMemberRepository(session)
         self.email_service = EmailService()
 
     async def create_user(self, email: EmailStr, password: str) -> dict:
@@ -42,8 +48,15 @@ class AuthController:
                     'password': password_hash,
                     'role_id': role.id
                 })
+                organization = await self.organization_repo.get_organization(1)
+                await self.organization_member_repo.add({
+                    'organization_id':organization.id,
+                    'user_id':user.id,
+                    'role_alias':'admin'
 
-                # Генерируем токен для подтверждения email
+                })
+                await self.balance_repo.create_balance({'organization_id':organization.id,'atl_tokens':0})
+                
                 verification_token = JWTHandler.encode_email_token(
                     payload={"sub": email, "type": "verification"}
                 )

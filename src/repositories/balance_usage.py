@@ -11,9 +11,8 @@ class BalanceUsageRepository:
     async def create(self, attributes: dict):
         stmt = insert(BalanceUsage).values(**attributes)
         result = await self.session.execute(stmt)
-        await self.session.flush()
-        return result.scalars().first()
-    
+        # Remove the explicit flush here
+        return result.scalars().first()    
     async def get_all_by_user_id(self, user_id: int):
         stmt = select(BalanceUsage).where(BalanceUsage.user_id == user_id)
         result = await self.session.execute(stmt)
