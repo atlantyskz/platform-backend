@@ -49,12 +49,11 @@ class AuthController:
                     'role_id': role.id
                 })
                 organization = await self.organization_repo.get_organization(1)
-                await self.organization_member_repo.add({
-                    'organization_id':organization.id,
-                    'user_id':user.id,
-                    'role_alias':'admin'
-
-                })
+                await self.organization_member_repo.add(
+                    organization.id,
+                    'admin',
+                    user.id,
+                )
                 await self.balance_repo.create_balance({'organization_id':organization.id,'atl_tokens':0})
                 
                 verification_token = JWTHandler.encode_email_token(
