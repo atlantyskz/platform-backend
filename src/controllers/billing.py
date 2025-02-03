@@ -25,7 +25,12 @@ class BillingController:
         self.discount_repository = DiscountRepository(session)
         
     
-    
+    async def billing_status(self,data:dict):
+        print("Billing status")
+        print(data)
+        return data
+
+
     async def get_all_billing_transactions_by_organization_id(self,user_id:int):
         user = await self.user_repository.get_by_user_id(user_id)
         if user is None:

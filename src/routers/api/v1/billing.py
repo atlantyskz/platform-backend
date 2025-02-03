@@ -19,6 +19,12 @@ async def topup_balance(
     user_id = current_user.get('sub')
     return await billing_controller.top_up_balance(user_id, billing_request)
 
+@billing_router.post('/billing-status')
+async def billing_status(
+    data: dict,
+    billing_controller: BillingController = Depends(Factory.get_billing_controller),
+)-> dict:
+    return await billing_controller.billing_status(data)
 
 
 @billing_router.get('/transactions')
