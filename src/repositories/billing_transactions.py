@@ -1,5 +1,5 @@
 from typing import Optional
-from sqlalchemy import insert, select
+from sqlalchemy import insert, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.models.user import User
 from src.models.billing_transactions import BillingTransaction
@@ -14,6 +14,20 @@ class BillingTransactionRepository:
         result = await self.session.execute(stmt)
         return result.scalars().first()
     
+    async def update(self, transaction_id, attributes: dict):
+        stmt = (
+            update(BillingTransaction)
+            .where(BillingTransaction.id == transaction_id)
+            .values(**attributes)
+            .returning(BillingTransaction)
+        )
+        result = await self.session.execute(stmt)
+        return result.scalars().first()
+
+    async def get_by_invoice_id(self, invoice_id: str) -> BillingTransaction:
+        stmt = select(BillingTransaction).where(BillingTransaction.invoice_id == invoice_id)
+        result = await self.session.execute(stmt)
+        return result.scalars().first()
     async def get_all_by_user_id(self, user_id: int):
         stmt = select(BillingTransaction).where(BillingTransaction.user_id == user_id)
         result = await self.session.execute(stmt)

@@ -41,8 +41,6 @@ class OrganizationRepository(BaseRepository):
         result = await self.session.execute(stmt)
         return result.scalars().first()
 
-
-
     async def update(self,organization_id,attributes:dict)-> Organization:
         stmt = (
             update(Organization)

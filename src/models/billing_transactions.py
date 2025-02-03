@@ -15,6 +15,8 @@ class BillingTransaction(Base, TimestampMixin):
     atl_tokens: so.Mapped[int] = so.mapped_column(sa.Integer, nullable=False)
     discount_id: so.Mapped[int] = so.mapped_column(sa.ForeignKey('discounts.id', ondelete="SET NULL"), nullable=True)  # Теперь можно не применять скидку
     status: so.Mapped[str] = so.mapped_column(sa.String, default='pending')
+    access_token: so.Mapped[str] = so.mapped_column(sa.String, nullable=True)
+    invoice_id: so.Mapped[str] = so.mapped_column(sa.String, nullable=True) 
     payment_type: so.Mapped[str] = so.mapped_column(sa.String, nullable=True)
 
     user = so.relationship('User', back_populates='billing_transactions')

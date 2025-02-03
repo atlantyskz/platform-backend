@@ -1,4 +1,5 @@
 from fastapi import HTTPException
+import httpx
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.core.exceptions import NotFoundException, BadRequestException
 from src.repositories.discount import DiscountRepository
@@ -26,10 +27,24 @@ class BillingController:
         
     
     async def billing_status(self,data:dict):
-        print("Billing status")
-        print(data)
-        return data
-
+        async with self.session.begin() as session:
+            httpx_client = httpx.AsyncClient()
+            async with httpx_client as client:
+                invoice_id = data.get('invoice_id') 
+                billing_transaction = await self.billing_transaction_repository.get_by_invoice_id(invoice_id)
+                bank_transaction_response = await client.get(f'https://testepay.homebank.kz/api/check-status/payment/transaction/{invoice_id}',headers={'Authorization':f'Bearer {billing_transaction.access_token}'})
+                bank_transaction_response.raise_for_status()
+                statusName = bank_transaction_response.json().get('transaction').get('statusName')
+                transaction_id = bank_transaction_response.json().get('transaction').get('id')
+                if statusName =='AUTH':
+                    charge_payment = await client.post(f"https://testepay.homebank.kz/api/operation/{transaction_id}/charge",headers={'Authorization':f'Bearer {billing_transaction.access_token}'})
+                    charge_payment.raise_for_status()
+                    await self.billing_transaction_repository.update(billing_transaction.id,{"status":"charged"})
+                    await self.balance_repository.topup_balance(billing_transaction.organization_id,billing_transaction.atl_tokens)
+                    return {"status":"charged"}
+                else:
+                    await self.billing_transaction_repository.update(billing_transaction.id,{"status":"charged"})
+                return billing_transaction
 
     async def get_all_billing_transactions_by_organization_id(self,user_id:int):
         user = await self.user_repository.get_by_user_id(user_id)
@@ -69,12 +84,14 @@ class BillingController:
                 "discount_id": discount_id if discount_id else None,
                 "amount": kzt_amount,
                 "atl_tokens": request.atl_amount,
+                "access_token": request.access_token,
+                "invoice_id": request.invoice_id,
                 "status": "pending",
-                "payment_type": request.payment_method
+                "payment_type": 'card'
             }
 
             billing_transaction = await self.billing_transaction_repository.create(billing_transaction_data)
-            await self.balance_repository.topup_balance(organization.id, request.atl_amount)
+            # await self.balance_repository.topup_balance(organization.id, request.atl_amount)
             
             return {
                 "id": billing_transaction.id,
@@ -100,7 +117,7 @@ class BillingController:
         elif atl_amount <= 5000:
             discount = await self.discount_repository.get_discount(25)
             return discount.value,discount.id
-        elif atl_amount <= 10000:
+        elif atl_amount <= 10000 or atl_amount > 10000:
             discount = await self.discount_repository.get_discount(30)
             return discount.value,discount.id
         else:
