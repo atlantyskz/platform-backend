@@ -24,29 +24,60 @@ class BillingController:
         self.organization_repository = OrganizationRepository(session)
         self.user_repository = UserRepository(session)
         self.discount_repository = DiscountRepository(session)
-        
+        import httpx
 
-    async def billing_status(self,data:dict):
+    async def billing_status(self, data: dict):
         async with self.session.begin() as session:
-            httpx_client = httpx.AsyncClient()
-            async with httpx_client as client:
-                print(data)
-                invoice_id = data.get('invoiceId') 
-                billing_transaction = await self.billing_transaction_repository.get_by_invoice_id(invoice_id)
-                bank_transaction_response = await client.get(f'https://testepay.homebank.kz/api/check-status/payment/transaction/{invoice_id}',headers={'Authorization':f'Bearer {billing_transaction.access_token}'})
-                bank_transaction_response.raise_for_status()
-                statusName = bank_transaction_response.json().get('transaction').get('statusName')
-                transaction_id = bank_transaction_response.json().get('transaction').get('id')
-                if statusName =='AUTH':
-                    charge_payment = await client.post(f"https://testepay.homebank.kz/api/operation/{transaction_id}/charge",headers={'Authorization':f'Bearer {billing_transaction.access_token}'})
-                    charge_payment.raise_for_status()
-                    await self.billing_transaction_repository.update(billing_transaction.id,{"status":"charged"})
-                    await self.balance_repository.topup_balance(billing_transaction.organization_id,billing_transaction.atl_tokens)
-                    print("Success Charge") 
-                    return {"status":"charged"}
-                else:
-                    await self.billing_transaction_repository.update(billing_transaction.id,{"status":"rejected"})
-                return data
+            async with httpx.AsyncClient() as client:
+                try:
+                    print(data)
+                    invoice_id = data.get("invoiceId")
+                    billing_transaction = await self.billing_transaction_repository.get_by_invoice_id(invoice_id)
+
+                    bank_transaction_response = await client.get(
+                        f"https://testepay.homebank.kz/api/check-status/payment/transaction/{invoice_id}",
+                        headers={"Authorization": f"Bearer {billing_transaction.access_token}"},
+                    )
+                    bank_transaction_response.raise_for_status() 
+                    bank_transaction_response_json = bank_transaction_response.json()
+                    print(bank_transaction_response_json)
+
+                    transaction_data = bank_transaction_response_json.get("transaction", {})
+                    status_name = transaction_data.get("statusName")
+                    transaction_id = transaction_data.get("id")
+
+                    print(status_name)
+                    if status_name == "AUTH":
+                        charge_payment = await client.post(
+                            f"https://testepay.homebank.kz/api/operation/{transaction_id}/charge",
+                            headers={"Authorization": f"Bearer {billing_transaction.access_token}"},
+                        )
+                        charge_payment.raise_for_status()
+
+                        await self.billing_transaction_repository.update(
+                            billing_transaction.id, {"status": "charged"}
+                        )
+                        await self.balance_repository.topup_balance(
+                            billing_transaction.organization_id, billing_transaction.atl_tokens
+                        )
+
+                        print("Success Charge")
+                        return {"status": "charged"}
+                    else:
+                        print("Rejected")
+                        await self.billing_transaction_repository.update(
+                            billing_transaction.id, {"status": "rejected"}
+                        )
+                        return {"status": "rejected"}
+
+                except httpx.HTTPStatusError as e:
+                    print(f"HTTP Error: {e.response.status_code} - {e.response.text}")
+                    return {"error": "HTTP error", "details": e.response.text}
+
+                except Exception as e:
+                    print(f"Unexpected error: {str(e)}")
+                    return {"error": "Unexpected error", "details": str(e)}
+
 
     async def get_all_billing_transactions_by_organization_id(self,user_id:int):
         user = await self.user_repository.get_by_user_id(user_id)
