@@ -42,6 +42,7 @@ class BillingController:
                     charge_payment.raise_for_status()
                     await self.billing_transaction_repository.update(billing_transaction.id,{"status":"charged"})
                     await self.balance_repository.topup_balance(billing_transaction.organization_id,billing_transaction.atl_tokens)
+                    print("Success Charge") 
                     return {"status":"charged"}
                 else:
                     await self.billing_transaction_repository.update(billing_transaction.id,{"status":"rejected"})
