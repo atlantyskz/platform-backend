@@ -9,6 +9,7 @@ from src.repositories.balance import BalanceRepository
 from src.repositories.organization import OrganizationRepository
 from src.repositories.user import UserRepository
 from src.schemas.requests.billing import TopUpBillingRequest
+import httpx
 
 
 
@@ -24,7 +25,6 @@ class BillingController:
         self.organization_repository = OrganizationRepository(session)
         self.user_repository = UserRepository(session)
         self.discount_repository = DiscountRepository(session)
-        import httpx
 
     async def billing_status(self, data: dict):
         async with self.session.begin() as session:
@@ -47,7 +47,8 @@ class BillingController:
                     transaction_id = transaction_data.get("id")
 
                     print(status_name)
-                    if status_name == "AUTH" or status_name == "CHARGE":
+                    if status_name == "AUTH":
+                        print("Charging...")
                         charge_payment = await client.post(
                             f"https://testepay.homebank.kz/api/operation/{transaction_id}/charge",
                             headers={"Authorization": f"Bearer {billing_transaction.access_token}"},
@@ -60,9 +61,19 @@ class BillingController:
                         await self.balance_repository.topup_balance(
                             billing_transaction.organization_id, billing_transaction.atl_tokens
                         )
-
                         print("Success Charge")
                         return {"status": "charged"}
+
+                    elif status_name == "CHARGE":
+                        print("Already charged, updating balance...")
+                        await self.billing_transaction_repository.update(
+                            billing_transaction.id, {"status": "charged"}
+                        )
+                        await self.balance_repository.topup_balance(
+                            billing_transaction.organization_id, billing_transaction.atl_tokens
+                        )
+                        return {"status": "charged"}
+
                     else:
                         print("Rejected")
                         await self.billing_transaction_repository.update(
