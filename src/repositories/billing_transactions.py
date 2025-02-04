@@ -33,8 +33,14 @@ class BillingTransactionRepository:
         result = await self.session.execute(stmt)
         return result.scalars().all()
     
-    async def get_all_by_organization_id(self, organization_id: int):
-        stmt = select(BillingTransaction).join(User, BillingTransaction.user_id == User.id).where(BillingTransaction.organization_id == organization_id)
+    async def get_all_by_organization_id(self, organization_id: int,status: Optional[str]):
+        stmt = (select(BillingTransaction)
+                .join(User, BillingTransaction.user_id == User.id)
+                .where(BillingTransaction.organization_id == organization_id)
+                .order_by(BillingTransaction.created_at.desc())
+        )
+        if status is not None:
+            stmt = stmt.where(BillingTransaction.status == status)
         result = await self.session.execute(stmt)
         return result.scalars().all()
     

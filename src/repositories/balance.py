@@ -36,7 +36,6 @@ class BalanceRepository:
             .returning(Balance)
         )
         result = await self.session.execute(stmt)
-        # Remove the explicit flush/commit here
         return result.scalars().first()  
 
 

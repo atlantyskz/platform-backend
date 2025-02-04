@@ -54,7 +54,7 @@ class AuthController:
                     'admin',
                     user.id,
                 )
-                await self.balance_repo.create_balance({'organization_id':organization.id,'atl_tokens':0})
+                # await self.balance_repo.create_balance({'organization_id':organization.id,'atl_tokens':10})
                 
                 verification_token = JWTHandler.encode_email_token(
                     payload={"sub": email, "type": "verification"}
@@ -68,14 +68,12 @@ class AuthController:
 
                 """
 
-                # Отправляем email
                 await self.email_service.send_email(
                     to_email=email,
                     subject="Verify Your Email",
                     html_content=html_content
                 )
 
-                # Возвращаем ответ
                 return {"message": "Verification has been sent to your email, please check it out"}
             except Exception as e:
                 raise e            

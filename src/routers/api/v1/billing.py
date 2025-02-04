@@ -1,4 +1,5 @@
-from fastapi import APIRouter,Depends
+from typing import Optional
+from fastapi import APIRouter,Depends, Query
 
 from src.core.factory import Factory
 from src.schemas.requests.balance import *
@@ -29,9 +30,10 @@ async def billing_status(
 
 @billing_router.get('/transactions')
 async def get_billing_transactions(
+    status: Optional[str] = Query(None),
     billing_controller: BillingController = Depends(Factory.get_billing_controller),
     current_user: dict = Depends(get_current_user)
 ):
     user_id = current_user.get('sub')
-    return await billing_controller.get_all_billing_transactions_by_organization_id(user_id)
+    return await billing_controller.get_all_billing_transactions_by_organization_id(user_id,status)
 

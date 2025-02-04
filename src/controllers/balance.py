@@ -25,9 +25,10 @@ class BalanceController:
         print(organization)
         balance = await self.balance_repository.get_balance(organization.id)
         if balance is None:
-            balance = await self.balance_repository.create_balance({"organization_id":organization.id,"atl_tokens":0})
-        return {"balance":balance.atl_tokens}
+            balance = await self.balance_repository.create_balance({"organization_id":organization.id,"atl_tokens":10})
+        return {"balance":round(balance.atl_tokens,2)}
     
+
     async def get_balance_usage(self,user_id, assistant_id, start_date, end_date):
         user = await self.user_repository.get_by_user_id(user_id)
         if user is None:

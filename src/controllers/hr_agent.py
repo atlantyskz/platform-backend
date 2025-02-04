@@ -76,7 +76,7 @@ class HRAgentController:
         pdfmetrics.registerFont(TTFont('DejaVu', 'dejavu-sans-ttf-2.37/ttf/DejaVuSans.ttf'))
 
     async def process_balance_usage(self, user_id: int, organization_id: int, balance_id: int, user_message: str, llm_tokens: int, file: Optional[UploadFile]):
-            atl_tokens_spent = llm_tokens / 3000
+            atl_tokens_spent = round(llm_tokens / 3000,2)
             await self.balance_usage_repo.create({
                 'user_id': user_id,
                 'organization_id': organization_id,
@@ -407,7 +407,7 @@ class HRAgentController:
             for (resume, resume_text), (file_url, file_key) in zip(unique_batch, file_info):
                 balance = await self.balance_repo.get_balance(user_organization.id)
                 if balance.atl_tokens < 5:
-                    break
+                    raise BadRequestException("Not enough tokens")
 
                 task_id = str(uuid.uuid4())
                 await self.bg_backend.create_task({
