@@ -90,24 +90,30 @@ class BillingController:
                     return {"error": "Unexpected error", "details": str(e)}
 
 
-    async def get_all_billing_transactions_by_organization_id(self,user_id:int, status: str = None):
+    async def get_all_billing_transactions_by_organization_id(self, user_id: int, status: str = None, limit: int = 10, offset: int = 0):
         user = await self.user_repository.get_by_user_id(user_id)
         if user is None:
             raise NotFoundException("User not found")
+        
         organization = await self.organization_repository.get_user_organization(user_id)
         if organization is None:
             raise NotFoundException("Organization not found")
-        transactions = await self.billing_transaction_repository.get_all_by_organization_id(organization.id, status)
-        data =  [
-                {
-                    "id": transaction.id,
-                    "amount": transaction.amount,
-                    "atl_tokens": transaction.atl_tokens,
-                    "status": transaction.status,
-                    "created_at": transaction.created_at,
-                }
-                for transaction in transactions
-            ]
+        
+        transactions = await self.billing_transaction_repository.get_all_by_organization_id(
+            organization.id, status, limit, offset
+        )
+        
+        data = [
+            {
+                "id": transaction.id,
+                "amount": transaction.amount,
+                "atl_tokens": transaction.atl_tokens,
+                "status": transaction.status,
+                "created_at": transaction.created_at,
+            }
+            for transaction in transactions
+        ]
+        
         return data
     
     async def get_billing_transactions_by_user_id(self,user_id:int):
