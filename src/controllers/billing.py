@@ -43,11 +43,11 @@ class BillingController:
                     print(bank_transaction_response_json)
 
                     transaction_data = bank_transaction_response_json.get("transaction", {})
-                    resultMessage = bank_transaction_response_json.get("resultMessage")
+                    status_name = transaction_data.get("statusName")
                     transaction_id = transaction_data.get("id")
 
-                    print(resultMessage)
-                    if resultMessage == "SUCCESS":
+                    print(status_name)
+                    if status_name == "AUTH" or status_name == "CHARGE":
                         charge_payment = await client.post(
                             f"https://testepay.homebank.kz/api/operation/{transaction_id}/charge",
                             headers={"Authorization": f"Bearer {billing_transaction.access_token}"},
