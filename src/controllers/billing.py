@@ -198,6 +198,7 @@ class BillingController:
                     refund_transaction = await self.billing_transaction_repository.create({
                         "user_id": user.id,
                         "organization_id": organization.id,
+                        "user_role": user.role.name,
                         "amount": amount,
                         "atl_tokens": atl_tokens_to_refund,
                         "type": "refund",
