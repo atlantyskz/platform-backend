@@ -28,3 +28,4 @@ class User(Base,TimestampMixin):
     user_feedbacks = so.relationship("UserFeedback", back_populates="user", )
     balance_usages = so.relationship('BalanceUsage', back_populates='user')
     billing_transactions = so.relationship('BillingTransaction', back_populates='user')
+    refund_applications = so.relationship('RefundApplication', back_populates='user')

@@ -75,11 +75,12 @@ class HRAgentController:
         self.upload_progress = {}
         pdfmetrics.registerFont(TTFont('DejaVu', 'dejavu-sans-ttf-2.37/ttf/DejaVuSans.ttf'))
 
-    async def process_balance_usage(self, user_id: int, organization_id: int, balance_id: int, user_message: str, llm_tokens: int, file: Optional[UploadFile]):
+    async def process_balance_usage(self, user_id: int, organization_id: int, balance_id: int, user_message: str, llm_tokens: int, file: Optional[UploadFile],assistant_id:int):
             atl_tokens_spent = round(llm_tokens / 3000,2)
             await self.balance_usage_repo.create({
                 'user_id': user_id,
                 'organization_id': organization_id,
+                'assistant_id': assistant_id,
                 'balance_id': balance_id,
                 'input_text_count': len(user_message),
                 'gpt_token_spent': llm_tokens,
@@ -136,8 +137,9 @@ class HRAgentController:
                     data={"messages": messages}
                 )
                 print(llm_response.get('tokens_spent'))
+                assistant_id = await self.assistant_repo.get_assistant_by_name('ИИ Рекрутер')
                 await self.process_balance_usage(
-                    user_id, user_organization.id, balance.id, user_message, llm_response.get('tokens_spent'), file
+                    user_id, user_organization.id, balance.id, user_message, llm_response.get('tokens_spent'), file,assistant_id
                 )                
 
                 llm_title = llm_response.get('llm_response').get("job_title")

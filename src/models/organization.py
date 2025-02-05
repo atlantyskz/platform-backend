@@ -31,3 +31,4 @@ class Organization(Base,TimestampMixin):
     balance = so.relationship('Balance', back_populates='organization', uselist=False)
     balance_usages = so.relationship('BalanceUsage', back_populates='organization')
     billing_transactions = so.relationship('BillingTransaction', back_populates='organization')
+    refund_applications = so.relationship('RefundApplication', back_populates='organization')

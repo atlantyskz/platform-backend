@@ -18,3 +18,11 @@ class BalanceUsageController:
     async def create_balance_usage(self, attributes: dict):
         balance_usage = await self.balance_usage_repository.create(attributes)
         return balance_usage    
+    
+    async def get_balance_usage(self, user_id: int, assistant_id: int, start_date: str, end_date: str):
+        user = await self.user_repository.get_by_user_id(user_id)
+        if user is None:
+            raise NotFoundException("User not found")
+        organization = await self.organization_repository.get_user_organization(user_id)
+        balance_usage = await self.balance_usage_repository.get_balance_usage(user.id, organization.id, assistant_id, start_date, end_date)
+        return balance_usage

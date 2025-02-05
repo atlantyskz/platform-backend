@@ -1,7 +1,8 @@
 import uuid
-from fastapi import HTTPException
+from fastapi import File, HTTPException, UploadFile
 import httpx
 from sqlalchemy.ext.asyncio import AsyncSession
+from src.services.minio import MinioUploader
 from src.core.exceptions import NotFoundException, BadRequestException
 from src.repositories.discount import DiscountRepository
 from src.repositories.billing_transactions import BillingTransactionRepository
@@ -10,6 +11,7 @@ from src.repositories.balance import BalanceRepository
 from src.repositories.organization import OrganizationRepository
 from src.repositories.user import UserRepository
 from src.schemas.requests.billing import TopUpBillingRequest
+from src.repositories.refund_application import RefundApplicationRepository
 import httpx
 
 
@@ -26,7 +28,42 @@ class BillingController:
         self.organization_repository = OrganizationRepository(session)
         self.user_repository = UserRepository(session)
         self.discount_repository = DiscountRepository(session)
+        self.refund_repository = RefundApplicationRepository(session)
+        self.minio_service = MinioUploader(
+        host="minio:9000",  
+        access_key="admin",
+        secret_key="admin123",
+        bucket_name="analyze-resumes"
+    )
     
+    async def refund_application_create(self, user_id: int,transaction_id:int, email: str, reason: str, file:UploadFile = File(None)): 
+        async with self.session.begin() as session:
+            user = await self.user_repository.get_by_user_id(user_id)
+            if user is None:
+                raise NotFoundException("User not found")
+            
+            organization = await self.organization_repository.get_user_organization(user_id)
+            if organization is None:
+                raise NotFoundException("Organization not found")
+            if file is not None:
+                file_bytes = await file.read()
+                permanent_url, file_key = await self.minio_service.upload_single_file(file_bytes, f"refund_applications/{uuid.uuid4()}_{file.filename}")   
+
+            
+            refund_application = await self.refund_repository.create({
+                "user_id": user.id,
+                "email": email,
+                "organization_id": organization.id,
+                "transaction_id": transaction_id,
+                "reason": reason,
+                "status": "pending",
+                "file_path": file_key if file else None
+            })
+            return {
+                "id": refund_application.id,
+                "email": refund_application.email,
+                "status": refund_application.status,
+            }
 
     async def top_up_balance(self, user_id: int, request: TopUpBillingRequest):
         """Пополнение баланса через платежную систему"""
@@ -153,8 +190,7 @@ class BillingController:
                     print(f"Unexpected error: {str(e)}")
                     return {"error": "Unexpected error", "details": str(e)}
 
-
-    async def refund_billing_transaction(self, access_token: str, amount: float, user_id: int, transaction_id: int):
+    async def refund_billing_transaction(self, access_token: str, user_id: int, transaction_id: int):
         async with self.session.begin() as session:
 
             user = await self.user_repository.get_by_user_id(user_id)
@@ -171,21 +207,16 @@ class BillingController:
             
             if billing_transaction.organization_id != organization.id:
                 raise BadRequestException("Transaction does not belong to your organization")
-            
-            existing_refunds = await self.billing_transaction_repository.get_refunds_by_transaction(transaction_id)
-            refunded_amount = sum(refund.amount for refund in existing_refunds)
-            
-            if refunded_amount + amount > billing_transaction.amount:
-                raise BadRequestException("Refund amount exceeds original transaction")
+        
+            if billing_transaction.status == "pending":
+                raise BadRequestException("Transaction is pending")
+
+            if billing_transaction.status == "refunded":
+                raise BadRequestException("Transaction already fully refunded")
 
             async with httpx.AsyncClient() as client:
                 try:
                     url = f"https://testepay.homebank.kz/api/operation/{billing_transaction.bank_transaction_id}/refund"
-                    external_id = str(uuid.uuid4())
-
-                    if amount is not None:
-                        url += f"?amount={amount}"
-                    url += f"{'&' if amount is not None else '?'}externalID={external_id}" 
 
                     refund_response = await client.post(
                         url,
@@ -193,12 +224,13 @@ class BillingController:
                     )
                     refund_response.raise_for_status()
 
-                    atl_tokens_to_refund = round((amount / billing_transaction.amount) * billing_transaction.atl_tokens,2)
+                    amount = billing_transaction.amount
+                    atl_tokens_to_refund = billing_transaction.atl_tokens
 
                     refund_transaction = await self.billing_transaction_repository.create({
                         "user_id": user.id,
                         "organization_id": organization.id,
-                        "user_role": user.role.name,
+                        "user_role": user.role.name if user.role else "default_role",
                         "amount": amount,
                         "atl_tokens": atl_tokens_to_refund,
                         "type": "refund",
@@ -207,12 +239,10 @@ class BillingController:
                         "bank_transaction_id": billing_transaction.bank_transaction_id,
                         "access_token": access_token,
                     })
-                    print(external_id)
 
-                    if refunded_amount + amount == billing_transaction.amount:
-                        await self.billing_transaction_repository.update(
-                            billing_transaction.id, {"status": "fully_refunded"}
-                        )
+                    await self.billing_transaction_repository.update(
+                        billing_transaction.id, {"status": "refunded"}
+                    )
 
                     await self.balance_repository.withdraw_balance(
                         billing_transaction.organization_id, atl_tokens_to_refund
@@ -227,7 +257,6 @@ class BillingController:
                 except Exception as e:
                     print(f"Unexpected error: {str(e)}")
                     raise HTTPException(status_code=400, detail=f"Unexpected error: {str(e)}")
-
 
 
     async def get_all_billing_transactions_by_organization_id(self, user_id: int, status: str, limit: int, offset: int):

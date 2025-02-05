@@ -24,8 +24,8 @@ class MinioUploader:
         self.bucket_name = bucket_name
         self.executor = ThreadPoolExecutor(max_workers=10)
         self.base_url = f"http://{host}" if not secure else f"https://{host}"
-
     async def upload_single_file(self, file_data: bytes, file_key: str) -> Tuple[str, str]:
+
         """Асинхронная загрузка одного файла"""
         try:
             # Конвертируем bytes в BytesIO

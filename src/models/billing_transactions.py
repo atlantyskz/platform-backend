@@ -24,4 +24,5 @@ class BillingTransaction(Base, TimestampMixin):
     user = so.relationship('User', back_populates='billing_transactions')
     organization = so.relationship('Organization', back_populates='billing_transactions')
     discount = so.relationship('Discount', back_populates='billing_transactions')
+    refund_applications = so.relationship('RefundApplication', back_populates='transaction')
     
