@@ -95,28 +95,29 @@ class BillingController:
 
 
     async def refund_billing_transaction(self, access_token: str, amount: float, user_id: int, transaction_id: int):
-        user = await self.user_repository.get_by_user_id(user_id)
-        if user is None:
-            raise NotFoundException("User not found")
-        
-        organization = await self.organization_repository.get_user_organization(user_id)
-        if organization is None:
-            raise NotFoundException("Organization not found")
-        
-        billing_transaction = await self.billing_transaction_repository.get_transaction(transaction_id, user.id, organization.id)
-        if billing_transaction is None:
-            raise NotFoundException("Transaction not found")
-        
-        if billing_transaction.organization_id != organization.id:
-            raise BadRequestException("Transaction does not belong to your organization")
-        
-        existing_refunds = await self.billing_transaction_repository.get_refunds_by_transaction(transaction_id)
-        refunded_amount = sum(refund.amount for refund in existing_refunds)
-        
-        if refunded_amount + amount > billing_transaction.amount:
-            raise BadRequestException("Refund amount exceeds original transaction")
-
         async with self.session.begin() as session:
+
+            user = await self.user_repository.get_by_user_id(user_id)
+            if user is None:
+                raise NotFoundException("User not found")
+            
+            organization = await self.organization_repository.get_user_organization(user_id)
+            if organization is None:
+                raise NotFoundException("Organization not found")
+            
+            billing_transaction = await self.billing_transaction_repository.get_transaction(transaction_id, user.id, organization.id)
+            if billing_transaction is None:
+                raise NotFoundException("Transaction not found")
+            
+            if billing_transaction.organization_id != organization.id:
+                raise BadRequestException("Transaction does not belong to your organization")
+            
+            existing_refunds = await self.billing_transaction_repository.get_refunds_by_transaction(transaction_id)
+            refunded_amount = sum(refund.amount for refund in existing_refunds)
+            
+            if refunded_amount + amount > billing_transaction.amount:
+                raise BadRequestException("Refund amount exceeds original transaction")
+
             async with httpx.AsyncClient() as client:
                 try:
                     url = f"https://testepay.homebank.kz/api/operation/{billing_transaction.bank_transaction_id}/refund"
