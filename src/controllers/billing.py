@@ -205,9 +205,8 @@ class BillingController:
                         "payment_type": billing_transaction.payment_type,
                         "bank_transaction_id": billing_transaction.bank_transaction_id,
                         "access_token": access_token,
-                        "external_id": external_id,
-                        "parent_transaction_id": billing_transaction.id
                     })
+                    print(external_id)
 
                     if refunded_amount + amount == billing_transaction.amount:
                         await self.billing_transaction_repository.update(
