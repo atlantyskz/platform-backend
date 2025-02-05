@@ -193,7 +193,7 @@ class BillingController:
                     )
                     refund_response.raise_for_status()
 
-                    atl_tokens_to_refund = round((amount / billing_transaction.amount,2) * billing_transaction.atl_tokens)
+                    atl_tokens_to_refund = round((amount / billing_transaction.amount) * billing_transaction.atl_tokens,2)
 
                     refund_transaction = await self.billing_transaction_repository.create({
                         "user_id": user.id,
