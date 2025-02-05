@@ -40,3 +40,14 @@ async def get_billing_transactions(
     return await billing_controller.get_all_billing_transactions_by_organization_id(
         user_id, status, limit, offset
     )
+
+@billing_router.post('/refund/{transaction_id}')
+async def refund_transaction(
+    transaction_id: int,
+    amount: float|None = Query(None),
+    access_token: str = Query(...),
+    billing_controller: BillingController = Depends(Factory.get_billing_controller),
+    current_user: dict = Depends(get_current_user)
+):
+    user_id = current_user.get('sub')
+    return await billing_controller.refund_billing_transaction(access_token,amount,user_id, transaction_id)

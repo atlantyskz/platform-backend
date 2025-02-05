@@ -1,5 +1,5 @@
 from typing import Optional
-from sqlalchemy import insert, select, update
+from sqlalchemy import and_, insert, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.models.user import User
 from src.models.billing_transactions import BillingTransaction
@@ -8,6 +8,16 @@ class BillingTransactionRepository:
 
     def __init__(self, session: AsyncSession):
         self.session = session
+
+    async def get_refunds_by_transaction(self, transaction_id: int):
+        stmt = select(BillingTransaction).where(
+            and_(
+                BillingTransaction.id == transaction_id,
+                BillingTransaction.status == 'refunded'
+            )
+        )
+        result = await self.session.execute(stmt)
+        return result.scalars().all()
 
     async def create(self, attributes: dict):
         stmt = insert(BillingTransaction).values(**attributes).returning(BillingTransaction)
@@ -59,3 +69,13 @@ class BillingTransactionRepository:
         result = await self.session.execute(stmt)
         return result.scalars().all()
     
+    async def get_transaction(self, transaction_id: int,user_id: int, organization_id: int):
+        stmt = select(BillingTransaction).where(
+            and_(
+                BillingTransaction.id == transaction_id,
+                BillingTransaction.organization_id == organization_id,
+                BillingTransaction.user_id == user_id,
+                BillingTransaction.status == 'charged')
+            )
+        result = await self.session.execute(stmt)
+        return result.scalars().first()
