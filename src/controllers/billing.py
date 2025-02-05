@@ -166,3 +166,18 @@ class BillingController:
                 except Exception as e:
                     print(f"Unexpected error: {str(e)}")
                     return {"error": "Unexpected error", "details": str(e)}
+
+
+    async def get_all_billing_transactions_by_organization_id(self, user_id: int, status: str, limit: int, offset: int):
+        user = await self.user_repository.get_by_user_id(user_id)
+        if user is None:
+            raise NotFoundException("User not found")
+        
+        organization = await self.organization_repository.get_user_organization(user_id)
+        if organization is None:
+            raise NotFoundException("Organization not found")
+        
+        billing_transactions = await self.billing_transaction_repository.get_all_by_organization_id(
+            organization.id, status, limit, offset
+        )
+        return billing_transactions
