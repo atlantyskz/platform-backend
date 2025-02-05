@@ -3,6 +3,7 @@ from typing import Dict, List
 from fastapi import FastAPI, HTTPException, Request,status
 from fastapi.exceptions import RequestValidationError
 from pydantic import BaseModel
+from src.models import sql_admin_models_list
 from src.routers.api.v1.auth import auth_router
 from src.routers.api.v1.hr_agent import hr_agent_router
 from src.routers.api.v1.organization import organization_router
@@ -14,12 +15,14 @@ from src.routers.api.v1.balance import balance_router
 from fastapi.middleware.cors import CORSMiddleware
 from src.core.store import lifespan
 from fastapi.responses import JSONResponse
+from src.core.databases import session_manager
 from fastapi.openapi.docs import (
     get_redoc_html,
     get_swagger_ui_html,
     get_swagger_ui_oauth2_redirect_html,
 )
 from fastapi.openapi.utils import get_openapi
+from sqladmin import Admin,ModelView
 
 
 origins = [
@@ -103,6 +106,13 @@ def create_app(create_custom_static_urls: bool = False) -> FastAPI:
     return app
 
 app = create_app(create_custom_static_urls=True)
+
+sqlAdmin = Admin(app, session_manager._engine)
+for model in sql_admin_models_list:
+    class GenericAdmin(ModelView, model=model):
+        column_list = [column.name for column in model.__table__.columns]  
+
+    sqlAdmin.add_view(GenericAdmin)
 
 
 from sqlalchemy.exc import IntegrityError,DBAPIError,SQLAlchemyError

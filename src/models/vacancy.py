@@ -24,3 +24,6 @@ class Vacancy(Base,TimestampMixin):
     session = so.relationship(
         "AssistantSession",back_populates='vacancies'
     )
+
+    def __str__(self):
+        return f"{self.id} - {self.title} - {self.user_id} - {self.is_archived}"

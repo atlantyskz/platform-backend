@@ -18,3 +18,6 @@ class RefundApplication(Base,TimestampMixin):
     user = so.relationship('User',back_populates='refund_applications')
     organization = so.relationship('Organization',back_populates='refund_applications')
     transaction = so.relationship('BillingTransaction',back_populates='refund_applications')
+
+    def __str__(self):
+        return f"{self.id} - {self.user_id} - {self.email} - {self.organization_id} - {self.transaction_id} - {self.status} - {self.reason} - {self.file_path}"

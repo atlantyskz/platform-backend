@@ -26,3 +26,5 @@ class BillingTransaction(Base, TimestampMixin):
     discount = so.relationship('Discount', back_populates='billing_transactions')
     refund_applications = so.relationship('RefundApplication', back_populates='transaction')
     
+    def __str__(self):
+        return f"{self.id} - {self.user_id} - {self.organization_id} - {self.amount} - {self.user_role} - {self.atl_tokens} - {self.discount_id} - {self.status} - {self.type} - {self.access_token} - {self.invoice_id} - {self.bank_transaction_id} - {self.payment_type}"

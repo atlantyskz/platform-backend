@@ -28,3 +28,4 @@ dramatiq
 reportlab
 dependency-injector
 minio
+sqladmin[full]

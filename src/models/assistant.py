@@ -23,6 +23,9 @@ class Assistant(Base,TimestampMixin):
     sessions = so.relationship("AssistantSession", back_populates="assistant")
     balance_usages = so.relationship("BalanceUsage", back_populates="assistant")
 
+    def __str__(self):
+        return self.name
+
 
 class AssistantEnum(Enum):
     HR_ASSISTANT = (

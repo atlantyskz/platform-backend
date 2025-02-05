@@ -21,3 +21,6 @@ class AssistantSession(Base, TimestampMixin):
     tasks = so.relationship("HRTask", back_populates="session", cascade="all, delete-orphan") 
     assistant = so.relationship("Assistant", back_populates="sessions")
     vacancies = so.relationship("Vacancy",back_populates="session",cascade="all, delete-orphan")
+
+    def __str__(self,):
+        return f"{self.title } - {self.assistant} - {self.organization_id} - {self.user_id}"

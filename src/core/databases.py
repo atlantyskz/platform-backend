@@ -12,7 +12,6 @@ from sqlalchemy.ext.asyncio import (
 )
 from sqlalchemy.orm import declarative_base
 
-Base = declarative_base()
 
 class DatabaseSessionManager:
     def __init__(self, url: str, engine_kwargs: dict[str, Any] = None):

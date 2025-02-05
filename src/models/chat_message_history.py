@@ -17,3 +17,5 @@ class ChatMessageHistory(Base,TimestampMixin):
     user_id: so.Mapped[int] = so.mapped_column(sa.ForeignKey('users.id', ondelete="CASCADE"), nullable=False)
     role: so.Mapped[str] = so.mapped_column(sa.String,nullable=True)
     message: so.Mapped[dict] = so.mapped_column(sa.JSON,nullable=True)
+
+    

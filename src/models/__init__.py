@@ -2,7 +2,7 @@ import os
 from sqlalchemy.orm import declarative_base,mapped_column
 from sqlalchemy import DateTime, func
 from sqlalchemy.ext.declarative import declared_attr
-
+from sqladmin import Admin, ModelView
 
 class TimestampMixin:
     @declared_attr
@@ -39,3 +39,24 @@ from .balance import Balance
 from .discount import Discount
 from .balance_usage import BalanceUsage
 from .refund_application import RefundApplication
+
+sql_admin_models_list = [
+    User,
+    Role,
+    Organization,
+    OrganizationMember,
+    Assistant,
+    HRTask,
+    AssistantSession,
+    Vacancy,
+    FavoriteResume,
+    VacancyRequirement,
+    ChatMessageHistory,
+    UserFeedback,   
+    BillingTransaction,
+    Balance,
+    Discount,
+    BalanceUsage,
+    RefundApplication,
+]
+

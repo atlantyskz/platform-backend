@@ -11,3 +11,6 @@ class VacancyRequirement(Base):
     session_id: so.Mapped[uuid.UUID] = so.mapped_column(sa.ForeignKey('assistant_sessions.id', ondelete="CASCADE"), nullable=False)
     requirement_hash : so.Mapped[str] = so.mapped_column(sa.String,index=True)
     requirement_text: so.Mapped[str] = so.mapped_column(sa.String,index=True,nullable=True)
+
+    def __str__(self):
+        return f"{self.id}"
