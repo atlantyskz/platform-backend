@@ -45,7 +45,12 @@ class BillingController:
             organization = await self.organization_repository.get_user_organization(user_id)
             if organization is None:
                 raise NotFoundException("Organization not found")
+            billing_transaction = await self.billing_transaction_repository.get_transaction(transaction_id, user.id, organization.id)
+            if billing_transaction is None:
+                raise NotFoundException("Transaction not found")
             if file is not None:
+                if file.content_type not in ["application/pdf", "image/jpeg", "image/png", "image/jpg"]:
+                    raise BadRequestException("Invalid file type")
                 file_bytes = await file.read()
                 permanent_url, file_key = await self.minio_service.upload_single_file(file_bytes, f"refund_applications/{uuid.uuid4()}_{file.filename}")   
 
@@ -59,6 +64,10 @@ class BillingController:
                 "status": "pending",
                 "file_path": file_key if file else None
             })
+            await self.billing_transaction_repository.update(
+                    billing_transaction.id, {"status": "pending refund"}
+                )
+
             return {
                 "id": refund_application.id,
                 "email": refund_application.email,
