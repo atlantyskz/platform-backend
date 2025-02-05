@@ -162,11 +162,12 @@ class BillingController:
 
                 except httpx.HTTPStatusError as e:
                     print(f"HTTP Error: {e.response.status_code} - {e.response.text}")
-                    return {"error": "HTTP error", "details": e.response.text}
+                    raise HTTPException(status_code=400, detail=f"HTTP Error: {e.response.status_code} - {e.response.text}")
 
                 except Exception as e:
                     print(f"Unexpected error: {str(e)}")
-                    return {"error": "Unexpected error", "details": str(e)}
+                    raise HTTPException(status_code=400, detail=f"Unexpected error: {str(e)}")
+
 
 
     async def get_all_billing_transactions_by_organization_id(self, user_id: int, status: str, limit: int, offset: int):
