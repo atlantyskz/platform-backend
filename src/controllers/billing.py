@@ -313,7 +313,7 @@ class BillingController:
             if transaction is None:
                 raise NotFoundException("Transaction not found")
             
-            if transaction.status != "charged":
+            if transaction.status != 'pending refound':
                 raise BadRequestException("Transaction already refunded,pending or rejected")
             print({"retrieved_transaction": transaction})
 
