@@ -330,6 +330,7 @@ class BillingController:
                     await self.refund_billing_transaction(
                         access_token, refund_application.user_id, refund_application.transaction_id
                     )
+                    await self.refund_repository.update_refund(refund_application.id, {"status": "refunded"})
                 except httpx.HTTPError as e:
                     raise Exception(f"Halyk API error: {str(e)}")
 
