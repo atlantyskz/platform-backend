@@ -306,7 +306,7 @@ class BillingController:
             if status == 'approved':
                 transaction = await self.billing_transaction_repository.get_transaction(refund_application.transaction_id, refund_application.user_id, refund_application.organization_id)
                 print({
-                    "transaction": transaction
+                    "transaction": transaction.__dict__
                 })
                 if transaction is None or transaction.status == "pending":
                     raise NotFoundException("Transaction not found or pending")
