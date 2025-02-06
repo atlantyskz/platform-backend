@@ -2,7 +2,6 @@ import os
 from sqlalchemy.orm import declarative_base,mapped_column
 from sqlalchemy import DateTime, func
 from sqlalchemy.ext.declarative import declared_attr
-from sqladmin import Admin, ModelView
 
 class TimestampMixin:
     @declared_attr

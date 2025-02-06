@@ -24,10 +24,7 @@ from fastapi.openapi.docs import (
     get_swagger_ui_oauth2_redirect_html,
 )
 from fastapi.openapi.utils import get_openapi
-from sqladmin import Admin,ModelView
-import sqladmin
-
-
+from starlette_admin.contrib.sqla import Admin, ModelView
 origins = [
     "http://localhost",  
     "http://localhost:3000",  
@@ -111,21 +108,15 @@ def create_app(create_custom_static_urls: bool = False) -> FastAPI:
 
 
 app = create_app(create_custom_static_urls=True)
-STATIC_PATH = Path(sqladmin.__path__[0]) / "statics"
-app.mount("/admin/static", StaticFiles(directory=str(STATIC_PATH)), name="admin_static")
-if not STATIC_PATH.exists():
-    print("Статическая директория не найдена:", STATIC_PATH)
-else:
-    print("Статическая директория найдена:", STATIC_PATH)
 
 
 
-sqlAdmin = Admin(app, session_manager._engine)
+
+admin = Admin(session_manager._engine)
 for model in sql_admin_models_list:
-    class GenericAdmin(ModelView, model=model):
-        column_list = [column.name for column in model.__table__.columns]  
+    admin.add_view(ModelView(model))
 
-    sqlAdmin.add_view(GenericAdmin)
+admin.mount_to(app)    
 
 
 from sqlalchemy.exc import IntegrityError,DBAPIError,SQLAlchemyError

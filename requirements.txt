@@ -28,4 +28,4 @@ dramatiq
 reportlab
 dependency-injector
 minio
-sqladmin[full]
+starlette-admin==0.14.1

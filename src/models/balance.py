@@ -13,5 +13,6 @@ class Balance(Base, TimestampMixin):
     organization = so.relationship('Organization', back_populates='balance')
     balance_usages = so.relationship('BalanceUsage', back_populates='balance')
 
-
-    
+    __table_args__ = (
+        sa.UniqueConstraint('organization_id'),
+    )
