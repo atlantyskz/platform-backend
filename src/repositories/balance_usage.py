@@ -23,13 +23,20 @@ class BalanceUsageRepository:
         result = await self.session.execute(stmt)
         return result.scalars().all()
     
-    async def get_balance_usage(self,user_id: Optional[int], organization_id: Optional[int], assistant_id: Optional[int], start_date: Optional[str], end_date: Optional[str]):
-        stmt = select(BalanceUsage).filter(
-            (user_id is None or BalanceUsage.user_id == user_id),
-            (organization_id is None or BalanceUsage.organization_id == organization_id),
-            (assistant_id is None or BalanceUsage.assistant_id == assistant_id),
-            (start_date is None or BalanceUsage.created_at >= start_date),
-            (end_date is None or BalanceUsage.created_at <= end_date)
-        ).order_by(BalanceUsage.created_at)
+    async def get_balance_usage(self, user_id: Optional[int], organization_id: Optional[int], assistant_id: Optional[int], start_date: Optional[str], end_date: Optional[str]):
+        filters = []
+        
+        if user_id is not None:
+            filters.append(BalanceUsage.user_id == user_id)
+        if organization_id is not None:
+            filters.append(BalanceUsage.organization_id == organization_id)
+        if assistant_id is not None:
+            filters.append(BalanceUsage.assistant_id == assistant_id)
+        if start_date is not None:
+            filters.append(BalanceUsage.created_at >= start_date)
+        if end_date is not None:
+            filters.append(BalanceUsage.created_at <= end_date)
+        
+        stmt = select(BalanceUsage).filter(*filters).order_by(BalanceUsage.created_at)
         result = await self.session.execute(stmt)
         return result.scalars().all()

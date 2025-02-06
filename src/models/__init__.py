@@ -19,12 +19,12 @@ class TimestampMixin:
 
 
 Base = declarative_base()
+from .user import User
 from .permission import Permission,role_permissions
 from .role import Role,role_permissions
 from .organization import Organization
 from .assistant import Assistant
 from .organization_member import OrganizationMember
-from .user import User
 from .hr_assistant_task import HRTask
 from .assistant_session import AssistantSession
 from .assigned_assistant import assigned_assistant
