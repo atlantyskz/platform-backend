@@ -5,7 +5,7 @@ from pathlib import Path
 from fastapi.exceptions import RequestValidationError
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
-from src.models import sql_admin_models_list
+from src.models import sql_admin_models_list,User
 from src.routers.api.v1.auth import auth_router
 from src.routers.api.v1.hr_agent import hr_agent_router
 from src.routers.api.v1.organization import organization_router
@@ -113,9 +113,10 @@ app = create_app(create_custom_static_urls=True)
 
 
 admin = Admin(session_manager._engine)
-for model in sql_admin_models_list:
-    admin.add_view(ModelView(model))
-
+# for model in sql_admin_models_list:
+#     print(model)
+#     admin.add_view(ModelView(model))
+admin.add_view(ModelView(User))
 admin.mount_to(app)    
 
 

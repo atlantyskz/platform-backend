@@ -309,12 +309,14 @@ class BillingController:
                 refund_application.user_id, 
                 refund_application.organization_id
             )
-            if transaction.status == "refunded" or transaction.status == "rejected" or transaction.status == "pending" or transaction.status == "pending refund":
+
+            if transaction is None:
+                raise NotFoundException("Transaction not found")
+            
+            if transaction.status != "charged":
                 raise BadRequestException("Transaction already refunded,pending or rejected")
             print({"retrieved_transaction": transaction})
 
-            if transaction is None or transaction.status == "pending":
-                raise NotFoundException("Transaction not found or pending")
 
             if status == 'approved':
 
