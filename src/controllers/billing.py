@@ -305,7 +305,10 @@ class BillingController:
                     refund_application.transaction_id, {"status": "refunded"}
                 )
                 transaction = await self.billing_transaction_repository.get_transaction(refund_application.transaction_id, refund_application.user_id, refund_application.organization_id)
-                if transaction is None:
+                print({
+                    "transaction": transaction
+                })
+                if transaction is None and transaction.status == "pending":
                     raise NotFoundException("Transaction not found or pending")
                 invoice_id = transaction.invoice_id
                 print(transaction)
