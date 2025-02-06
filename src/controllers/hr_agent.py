@@ -137,9 +137,9 @@ class HRAgentController:
                     data={"messages": messages}
                 )
                 print(llm_response.get('tokens_spent'))
-                assistant_id = await self.assistant_repo.get_assistant_by_name('ИИ Рекрутер')
+                assistant = await self.assistant_repo.get_assistant_by_name('ИИ Рекрутер')
                 await self.process_balance_usage(
-                    user_id, user_organization.id, balance.id, user_message, llm_response.get('tokens_spent'), file,assistant_id
+                    user_id, user_organization.id, balance.id, user_message, llm_response.get('tokens_spent'), file,assistant.id
                 )                
 
                 llm_title = llm_response.get('llm_response').get("job_title")
