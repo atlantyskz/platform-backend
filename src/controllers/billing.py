@@ -220,8 +220,6 @@ class BillingController:
             if billing_transaction.status == "pending":
                 raise BadRequestException("Transaction is pending")
             
-            if billing_transaction.status == "pending refund":
-                raise BadRequestException("Transaction is already pending refund")
 
             if billing_transaction.status == "refunded":
                 raise BadRequestException("Transaction already fully refunded")
