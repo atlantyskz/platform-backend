@@ -13,6 +13,5 @@ class Balance(Base, TimestampMixin):
     organization = so.relationship('Organization', back_populates='balance')
     balance_usages = so.relationship('BalanceUsage', back_populates='balance')
 
-    def __str__(self):
-        return f"{self.id} - {self.organization_id} - {self.atl_tokens}"
+
     

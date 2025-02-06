@@ -12,5 +12,4 @@ class VacancyRequirement(Base):
     requirement_hash : so.Mapped[str] = so.mapped_column(sa.String,index=True)
     requirement_text: so.Mapped[str] = so.mapped_column(sa.String,index=True,nullable=True)
 
-    def __str__(self):
-        return f"{self.id}"
+   

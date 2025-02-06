@@ -27,6 +27,12 @@ async def billing_status(
 ):
     return await billing_controller.billing_status(data)
 
+@billing_router.post('/failure-status')
+async def failure_status(
+    data: dict,
+    billing_controller: BillingController = Depends(Factory.get_billing_controller),
+):
+    return await billing_controller.failure_status(data)
 
 @billing_router.get('/transactions')
 async def get_billing_transactions(

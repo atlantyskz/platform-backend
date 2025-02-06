@@ -30,5 +30,4 @@ class User(Base,TimestampMixin):
     billing_transactions = so.relationship('BillingTransaction', back_populates='user')
     refund_applications = so.relationship('RefundApplication', back_populates='user')
 
-    def __str__(self,):
-        return f"{self.email}"
+  
