@@ -231,23 +231,12 @@ class BillingController:
                         url,
                         headers={"Authorization": f"Bearer {access_token}"},
                     )
+                    print(refund_response)
                     refund_response.raise_for_status()
 
                     amount = billing_transaction.amount
                     atl_tokens_to_refund = billing_transaction.atl_tokens
 
-                    refund_transaction = await self.billing_transaction_repository.create({
-                        "user_id": user.id,
-                        "organization_id": organization.id,
-                        "user_role": user.role.name if user.role else "default_role",
-                        "amount": amount,
-                        "atl_tokens": atl_tokens_to_refund,
-                        "type": "refund",
-                        "status": "refunded",
-                        "payment_type": billing_transaction.payment_type,
-                        "bank_transaction_id": billing_transaction.bank_transaction_id,
-                        "access_token": access_token,
-                    })
 
                     await self.billing_transaction_repository.update(
                         billing_transaction.id, {"status": "refunded"}
@@ -257,7 +246,7 @@ class BillingController:
                         billing_transaction.organization_id, atl_tokens_to_refund
                     )
 
-                    return {"status": "refunded", "refund_transaction_id": refund_transaction.id}
+                    return {"status": "refunded", "refund_transaction_id": transaction_id}
 
                 except httpx.HTTPStatusError as e:
                     print(f"HTTP Error: {e.response.status_code} - {e.response.text}")
@@ -325,9 +314,7 @@ class BillingController:
                 raise NotFoundException("Transaction not found or pending")
 
             if status == 'approved':
-                await self.billing_transaction_repository.update(
-                    refund_application.transaction_id, {"status": "refunded"}
-                )
+
                 invoice_id = transaction.invoice_id
                 amount = transaction.amount
                 
