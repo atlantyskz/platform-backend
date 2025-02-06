@@ -282,3 +282,15 @@ class BillingController:
             organization.id, status, limit, offset
         )
         return billing_transactions
+    
+    async def get_refunds_application(self, user_id: int,status:str,limit: int|None, offset: int|None):
+        user = await self.user_repository.get_by_user_id(user_id)
+        if user is None:
+            raise NotFoundException("User not found")
+        
+        organization = await self.organization_repository.get_user_organization(user_id)
+        if organization is None:
+            raise NotFoundException("Organization not found")
+        
+        refund_application = await self.refund_repository.get_refunds_by_organization_id(organization.id,status, limit, offset)
+        return refund_application

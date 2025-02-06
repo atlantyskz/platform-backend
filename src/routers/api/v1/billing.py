@@ -1,10 +1,11 @@
 from typing import Annotated, Optional
 from fastapi import APIRouter,Depends, File, Form, Query, UploadFile
 
+from src.models.role import RoleEnum
 from src.core.factory import Factory
 from src.schemas.requests.balance import *
 
-from src.core.middlewares.auth_middleware import get_current_user
+from src.core.middlewares.auth_middleware import get_current_user,require_roles
 from src.schemas.requests.billing import TopUpBillingRequest
 from src.controllers.billing import BillingController
 
@@ -69,3 +70,15 @@ async def refund_application(
 ):
     user_id = current_user.get('sub')
     return await billing_controller.refund_application_create(user_id, transaction_id,email,reason, file)
+
+@billing_router.get('/refund_applications')
+@require_roles([RoleEnum.SUPER_ADMIN.value])
+async def get_refund_applications(
+    status: Optional[str] = Query(None),
+    limit: int |None  = Query(None, ge=1),  
+    offset: int = Query(None, ge=0), 
+    billing_controller: BillingController = Depends(Factory.get_billing_controller),
+    current_user: dict = Depends(get_current_user)
+):
+    user_id = current_user.get('sub')
+    return await billing_controller.get_refunds_application(user_id, status, limit, offset)
