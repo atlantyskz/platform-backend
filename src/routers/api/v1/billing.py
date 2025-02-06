@@ -1,5 +1,5 @@
 from typing import Annotated, Optional
-from fastapi import APIRouter, Body,Depends, File, Form, Query, UploadFile
+from fastapi import APIRouter, Body,Depends, File, Form, Path, Query, UploadFile
 
 from src.models.role import RoleEnum
 from src.core.factory import Factory
@@ -86,7 +86,7 @@ async def get_refund_applications(
 @billing_router.patch('/refund_application/{refund_id}')
 @require_roles([RoleEnum.SUPER_ADMIN.value])
 async def update_refund_application(
-    refund_id: int,
+    refund_id: int = Path(...),
     status: str = Form(...),
     billing_controller: BillingController = Depends(Factory.get_billing_controller),
     current_user: dict = Depends(get_current_user)
