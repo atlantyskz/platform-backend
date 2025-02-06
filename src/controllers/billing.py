@@ -297,19 +297,22 @@ class BillingController:
     async def update_refund_application(self,refund_id:int, status:str):
         async with self.session.begin() as session:
             refund_application = await self.refund_repository.get_refund_application(refund_id)
+            print({
+                "refund_application": refund_application
+            })
             if refund_application is None:
                 raise NotFoundException("Refund application not found")
             
             if status == 'approved':
-                await self.billing_transaction_repository.update(
-                    refund_application.transaction_id, {"status": "refunded"}
-                )
                 transaction = await self.billing_transaction_repository.get_transaction(refund_application.transaction_id, refund_application.user_id, refund_application.organization_id)
                 print({
                     "transaction": transaction
                 })
-                if transaction is None and transaction.status == "pending":
+                if transaction is None or transaction.status == "pending":
                     raise NotFoundException("Transaction not found or pending")
+                await self.billing_transaction_repository.update(
+                    refund_application.transaction_id, {"status": "refunded"}
+                )
                 invoice_id = transaction.invoice_id
                 print(transaction)
                 print(invoice_id)
