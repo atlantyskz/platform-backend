@@ -219,6 +219,9 @@ class BillingController:
         
             if billing_transaction.status == "pending":
                 raise BadRequestException("Transaction is pending")
+            
+            if billing_transaction.status == "pending refund":
+                raise BadRequestException("Transaction is already pending refund")
 
             if billing_transaction.status == "refunded":
                 raise BadRequestException("Transaction already fully refunded")
@@ -306,7 +309,7 @@ class BillingController:
                 refund_application.user_id, 
                 refund_application.organization_id
             )
-            if transaction.status == "refunded" or transaction.status == "rejected" or transaction.status == "pending":
+            if transaction.status == "refunded" or transaction.status == "rejected" or transaction.status == "pending" or transaction.status == "pending refund":
                 raise BadRequestException("Transaction already refunded,pending or rejected")
             print({"retrieved_transaction": transaction})
 
