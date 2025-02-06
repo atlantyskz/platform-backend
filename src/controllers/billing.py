@@ -362,7 +362,7 @@ class BillingController:
                 raise BadRequestException("Invalid status")
 
           
-    async def fetch_halyk_token(unique_invoice_id: str, discounted_price: float):
+    async def fetch_halyk_token(self,unique_invoice_id: str, discounted_price: float):
         url = "https://testoauth.homebank.kz/epay2/oauth2/token"
         data = {
             "grant_type": "client_credentials",
