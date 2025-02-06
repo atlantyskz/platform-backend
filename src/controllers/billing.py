@@ -201,7 +201,6 @@ class BillingController:
                     return {"error": "Unexpected error", "details": str(e)}
 
     async def refund_billing_transaction(self, access_token: str, user_id: int, transaction_id: int):
-        async with self.session.begin() as session:
 
             user = await self.user_repository.get_by_user_id(user_id)
             if user is None:
@@ -294,3 +293,58 @@ class BillingController:
         
         refund_application = await self.refund_repository.get_refunds_by_organization_id(organization.id,status, limit, offset)
         return refund_application
+    
+    async def update_refund_application(self,refund_id:int, status:str):
+        async with self.session.begin() as session:
+            refund_application = await self.refund_repository.get_refund_application(refund_id)
+            if refund_application is None:
+                raise NotFoundException("Refund application not found")
+            
+            if status == 'approved':
+                await self.billing_transaction_repository.update(
+                    refund_application.transaction_id, {"status": "refunded"}
+                )
+                transaction = await self.billing_transaction_repository.get_transaction(refund_application.transaction_id, refund_application.user_id, refund_application.organization_id)
+                invoice_id = transaction.invoice_id
+                amount = transaction.amount
+                response = await self.fetch_halyk_token(invoice_id, amount)
+                access_token = response.get("access_token")
+                await self.refund_billing_transaction(access_token, refund_application.user_id, refund_application.transaction_id)
+                return {
+                    "id": refund_application.id,
+                    "status": "approved"
+                }
+            elif status == 'rejected':
+                await self.refund_repository.update_refund(refund_id, {"status": "rejected"})
+                return {
+                    "id": refund_application.id,
+                    "status": "rejected"
+                }
+           
+
+            return {
+                "id": refund_application.id,
+                "status": status
+            }
+    async def fetch_halyk_token(unique_invoice_id: str, discounted_price: float):
+        url = "https://testoauth.homebank.kz/epay2/oauth2/token"
+        data = {
+            "grant_type": "client_credentials",
+            "scope": "webapi usermanagement email_send verification statement statistics payment",
+            "client_id": "test",
+            "client_secret": "yF587AV9Ms94qN2QShFzVR3vFnWkhjbAK3sG",
+            "invoiceID": unique_invoice_id,
+            "secret_hash": "HelloWorld123#",
+            "amount": str(discounted_price),
+            "currency": "KZT",
+            "terminal": "67e34d63-102f-4bd1-898e-370781d0074d",
+            "postLink": "https://api.atlantys.kz/api/v1/balance/billing-status",
+            "failurePostLink": "https://platform.atlantys.kz/payment/failure",
+        }
+        
+        headers = {"Content-Type": "application/x-www-form-urlencoded"}
+
+        async with httpx.AsyncClient() as client:
+            response = await client.post(url, data=data, headers=headers)
+            response.raise_for_status() 
+            return response.json()

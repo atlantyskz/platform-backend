@@ -42,7 +42,7 @@ class RefundApplicationRepository:
         result = await self.session.execute(stmt)
         return result.scalars().all()
     
-    async def update(self,refund_application_id,attributes:dict)-> RefundApplication:
+    async def update_refund(self,refund_application_id,attributes:dict)-> RefundApplication:
         stmt = (
             update(RefundApplication)
             .where(RefundApplication.id == refund_application_id)

@@ -82,3 +82,13 @@ async def get_refund_applications(
 ):
     user_id = current_user.get('sub')
     return await billing_controller.get_refunds_application(user_id, status, limit, offset)
+
+@billing_router.patch('/refund_application/{refund_id}')
+@require_roles([RoleEnum.SUPER_ADMIN.value])
+async def update_refund_application(
+    refund_id: int,
+    status: str = Query(...),
+    billing_controller: BillingController = Depends(Factory.get_billing_controller),
+    current_user: dict = Depends(get_current_user)
+):
+    return await billing_controller.update_refund_application(refund_id, status)
