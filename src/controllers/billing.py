@@ -293,25 +293,35 @@ class BillingController:
         
         refund_application = await self.refund_repository.get_refunds_by_organization_id(organization.id,status, limit, offset)
         return refund_application
-    
-    async def update_refund_application(self,refund_id:int, status:str):
+        
+    async def update_refund_application(self, refund_id: int, status: str):
         async with self.session.begin() as session:
             refund_application = await self.refund_repository.get_refund_application(refund_id)
-            print({
-                "id": refund_application.id,
-                "status": refund_application.status,
-                "transaction": {
-                    "id": refund_application.transaction.id,
-                    "status": refund_application.transaction.status,
-                    "invoice_id": refund_application.transaction.invoice_id
-                }
-            })
-            transaction_status = refund_application.transaction.status
+            
             if refund_application is None:
                 raise NotFoundException("Refund application not found")
-            transaction_status = refund_application.transaction.status
-            transaction = await self.billing_transaction_repository.get_transaction(refund_application.transaction_id, refund_application.user_id, refund_application.organization_id)
-            if transaction is None or transaction_status == "pending":
+            
+            # Логируем данные заявки на возврат
+            print({
+                "refund_id": refund_application.id,
+                "refund_status": refund_application.status,
+                "transaction_id": refund_application.transaction_id,
+                "transaction": refund_application.transaction
+            })
+
+            if refund_application.transaction is None:
+                raise NotFoundException("Transaction not linked to refund application")
+
+            transaction = await self.billing_transaction_repository.get_transaction(
+                refund_application.transaction_id, 
+                refund_application.user_id, 
+                refund_application.organization_id
+            )
+
+            # Логируем полученную транзакцию
+            print({"retrieved_transaction": transaction})
+
+            if transaction is None or transaction.status == "pending":
                 raise NotFoundException("Transaction not found or pending")
 
             if status == 'approved':
@@ -319,24 +329,38 @@ class BillingController:
                     refund_application.transaction_id, {"status": "refunded"}
                 )
                 invoice_id = transaction.invoice_id
-                print(transaction)
-                print(invoice_id)
                 amount = transaction.amount
-                response = await self.fetch_halyk_token(invoice_id, amount)
-                access_token = response.get("access_token")
-                await self.refund_billing_transaction(access_token, refund_application.user_id, refund_application.transaction_id)
+                
+                # Логируем перед запросом в Halyk
+                print("Fetching Halyk token with invoice_id:", invoice_id, "amount:", amount)
+
+                try:
+                    response = await self.fetch_halyk_token(invoice_id, amount)
+                    access_token = response.get("access_token")
+                    if not access_token:
+                        raise Exception("Failed to get access_token from Halyk")
+                    
+                    await self.refund_billing_transaction(
+                        access_token, refund_application.user_id, refund_application.transaction_id
+                    )
+                except httpx.HTTPError as e:
+                    raise Exception(f"Halyk API error: {str(e)}")
+
                 return {
                     "id": refund_application.id,
                     "status": "approved"
                 }
+
             elif status == 'rejected':
                 await self.refund_repository.update_refund(refund_id, {"status": "rejected"})
                 return {
                     "id": refund_application.id,
                     "status": "rejected"
                 }
+
             else:
                 raise BadRequestException("Invalid status")
+
           
     async def fetch_halyk_token(unique_invoice_id: str, discounted_price: float):
         url = "https://testoauth.homebank.kz/epay2/oauth2/token"
