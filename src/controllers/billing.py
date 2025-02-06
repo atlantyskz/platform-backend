@@ -62,7 +62,7 @@ class BillingController:
                 "organization_id": organization.id,
                 "transaction_id": transaction_id,
                 "reason": reason,
-                "status": "pending",
+                "status": "pending refund",
                 "file_path": file_key if file else None
             })
             await self.billing_transaction_repository.update(
