@@ -317,8 +317,8 @@ class BillingController:
                 refund_application.user_id, 
                 refund_application.organization_id
             )
-
-            # Логируем полученную транзакцию
+            if transaction.status == "refunded" or transaction.status == "rejected" or transaction.status == "pending":
+                raise BadRequestException("Transaction already refunded,pending or rejected")
             print({"retrieved_transaction": transaction})
 
             if transaction is None or transaction.status == "pending":

@@ -74,8 +74,7 @@ class BillingTransactionRepository:
             and_(
                 BillingTransaction.id == transaction_id,
                 BillingTransaction.organization_id == organization_id,
-                BillingTransaction.user_id == user_id,
-                BillingTransaction.status == 'charged')
+                BillingTransaction.user_id == user_id,)
             )
         result = await self.session.execute(stmt)
         return result.scalars().first()
