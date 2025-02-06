@@ -339,7 +339,7 @@ class BillingController:
                 }
 
             elif status == 'rejected':
-                await self.refund_repository.update_refund(refund_id, {"status": "rejected"})
+                await self.refund_repository.update_refund(refund_application.id, {"status": "rejected"})
                 return {
                     "id": refund_application.id,
                     "status": "rejected"
