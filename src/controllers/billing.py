@@ -298,7 +298,7 @@ class BillingController:
         async with self.session.begin() as session:
             refund_application = await self.refund_repository.get_refund_application(refund_id)
             print({
-                "refund_application": refund_application
+                "refund_application": refund_application.__dict__
             })
             if refund_application is None:
                 raise NotFoundException("Refund application not found")
