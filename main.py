@@ -1,7 +1,9 @@
 from contextlib import asynccontextmanager
 from typing import Dict, List
 from fastapi import FastAPI, HTTPException, Request,status
+from pathlib import Path
 from fastapi.exceptions import RequestValidationError
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from src.models import sql_admin_models_list
 from src.routers.api.v1.auth import auth_router
@@ -23,6 +25,7 @@ from fastapi.openapi.docs import (
 )
 from fastapi.openapi.utils import get_openapi
 from sqladmin import Admin,ModelView
+import sqladmin
 
 
 origins = [
@@ -105,7 +108,17 @@ def create_app(create_custom_static_urls: bool = False) -> FastAPI:
     app.openapi = custom_openapi
     return app
 
+
+
 app = create_app(create_custom_static_urls=True)
+STATIC_PATH = Path(sqladmin.__path__[0]) / "statics"
+app.mount("/admin/static", StaticFiles(directory=str(STATIC_PATH)), name="admin_static")
+if not STATIC_PATH.exists():
+    print("Статическая директория не найдена:", STATIC_PATH)
+else:
+    print("Статическая директория найдена:", STATIC_PATH)
+
+
 
 sqlAdmin = Admin(app, session_manager._engine)
 for model in sql_admin_models_list:
