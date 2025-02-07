@@ -76,7 +76,7 @@ class HRAgentController:
         pdfmetrics.registerFont(TTFont('DejaVu', 'dejavu-sans-ttf-2.37/ttf/DejaVuSans.ttf'))
 
     async def process_balance_usage(self, user_id: int, organization_id: int, balance_id: int, user_message: str, llm_tokens: int, file: Optional[UploadFile],assistant_id:int,type_of_usage):
-            atl_tokens_spent = round(llm_tokens / 3000,4)
+            atl_tokens_spent = round(llm_tokens / 3000,2)
             print("TOKENS SPENT",atl_tokens_spent)
             await self.balance_usage_repo.create({
                 'user_id': user_id,
