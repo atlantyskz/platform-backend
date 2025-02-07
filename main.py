@@ -19,6 +19,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from src.core.store import lifespan
 from fastapi.responses import JSONResponse
 from src.core.databases import session_manager
+from src.core.middlewares.auth_admin import authentication_backend
 from fastapi.openapi.docs import (
     get_redoc_html,
     get_swagger_ui_html,
@@ -108,9 +109,10 @@ def create_app(create_custom_static_urls: bool = False) -> FastAPI:
 
 
 
-app = create_app(create_custom_static_urls=False)
+app = create_app(create_custom_static_urls=True)
+app.mount("/static", staticfiles.StaticFiles(directory="collected_static"), name="static")
 
-admin = Admin(app,session_manager._engine)
+admin = Admin(app,session_manager._engine,authentication_backend=authentication_backend)
 
 for model in sql_admin_models_list:
     # Динамически создаем класс ModelView

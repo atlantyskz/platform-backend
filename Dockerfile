@@ -17,6 +17,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Копируем все файлы проекта в контейнер
 COPY . .
 
+# Создаем папку static внутри контейнера (опционально, но рекомендуется для порядка)
+RUN mkdir -p /app/static
+# Копируем собранные статические файлы в контейнер
+COPY collected_static /app/static 
 # Открываем порт, на котором будет работать приложение
 EXPOSE 9000
 
