@@ -31,4 +31,4 @@ class User(Base,TimestampMixin):
     refund_applications = so.relationship('RefundApplication', back_populates='user')
 
     def __str__(self):
-        return self.id
+        return f"{self.id}"

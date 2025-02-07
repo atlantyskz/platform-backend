@@ -22,4 +22,4 @@ class HRTask(Base):
     favorites = so.relationship("FavoriteResume", back_populates="task", cascade="all, delete-orphan")
 
     def __str__(self):
-        return self.id
+        return f"{self.id}"

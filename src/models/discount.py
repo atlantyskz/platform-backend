@@ -15,4 +15,4 @@ class Discount(Base,TimestampMixin):
 
 
     def __str__(self):
-        return self.id
+        return f"{self.id}"

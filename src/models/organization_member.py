@@ -19,4 +19,4 @@ class OrganizationMember(Base,TimestampMixin):
     organization = so.relationship("Organization", back_populates="members") 
 
     def __str__(self):
-        return self.id
+        return f"{self.id}"

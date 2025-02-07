@@ -25,4 +25,4 @@ class Vacancy(Base,TimestampMixin):
         "AssistantSession",back_populates='vacancies'
     )
     def __str__(self):
-        return self.id
+        return f"{self.title}"

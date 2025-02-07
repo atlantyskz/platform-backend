@@ -27,4 +27,4 @@ class BillingTransaction(Base, TimestampMixin):
     refund_applications = so.relationship('RefundApplication', back_populates='transaction')
     
     def __str__(self):
-        return self.id
+        return f"{self.id}"

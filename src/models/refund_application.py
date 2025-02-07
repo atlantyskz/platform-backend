@@ -19,4 +19,4 @@ class RefundApplication(Base,TimestampMixin):
     organization = so.relationship('Organization',back_populates='refund_applications')
     transaction = so.relationship('BillingTransaction',back_populates='refund_applications')
     def __str__(self):
-        return self.id
+        return f"{self.id}"

@@ -24,4 +24,4 @@ class UserFeedback(Base,TimestampMixin):
 
     user = so.relationship("User",back_populates='user_feedbacks')
     def __str__(self):
-        return self.id
+        return f"{self.id}"
