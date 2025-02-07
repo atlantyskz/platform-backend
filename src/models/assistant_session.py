@@ -22,3 +22,5 @@ class AssistantSession(Base, TimestampMixin):
     assistant = so.relationship("Assistant", back_populates="sessions")
     vacancies = so.relationship("Vacancy",back_populates="session",cascade="all, delete-orphan")
 
+    def __str__(self):
+        return self.title

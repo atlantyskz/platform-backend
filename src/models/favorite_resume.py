@@ -13,3 +13,7 @@ class FavoriteResume(Base,TimestampMixin):
 
     user = so.relationship("User", back_populates="favorite_resumes")
     task = so.relationship("HRTask", back_populates="favorites") 
+
+
+    def __str__(self):
+        return self.id

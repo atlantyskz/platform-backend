@@ -25,4 +25,5 @@ class BalanceUsage(Base, TimestampMixin):
     balance = so.relationship('Balance', back_populates='balance_usages')
     assistant = so.relationship('Assistant', back_populates='balance_usages')
     
-    
+    def __str__(self):
+        return self.id

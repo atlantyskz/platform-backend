@@ -23,3 +23,5 @@ class UserFeedback(Base,TimestampMixin):
     free_comment: so.Mapped[str | None] = so.mapped_column(sa.Text, nullable=True)  # Свободный комментарий
 
     user = so.relationship("User",back_populates='user_feedbacks')
+    def __str__(self):
+        return self.id

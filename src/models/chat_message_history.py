@@ -19,3 +19,6 @@ class ChatMessageHistory(Base,TimestampMixin):
     message: so.Mapped[dict] = so.mapped_column(sa.JSON,nullable=True)
 
     
+
+    def __str__(self):
+        return self.id

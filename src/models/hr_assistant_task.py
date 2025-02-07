@@ -20,3 +20,6 @@ class HRTask(Base):
     
     session = so.relationship("AssistantSession", back_populates="tasks")
     favorites = so.relationship("FavoriteResume", back_populates="task", cascade="all, delete-orphan")
+
+    def __str__(self):
+        return self.id

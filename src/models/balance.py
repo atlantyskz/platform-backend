@@ -16,3 +16,6 @@ class Balance(Base, TimestampMixin):
     __table_args__ = (
         sa.UniqueConstraint('organization_id'),
     )
+
+    def __str__(self):
+        return self.id

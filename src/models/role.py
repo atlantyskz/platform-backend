@@ -25,7 +25,8 @@ class Role(Base,TimestampMixin):
         "User",back_populates="role"
     )
 
-    
+    def __str__(self):
+        return self.name
 
 
 

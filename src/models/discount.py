@@ -12,3 +12,7 @@ class Discount(Base,TimestampMixin):
     value: so.Mapped[int] = so.mapped_column(sa.Integer, nullable=False)  
 
     billing_transactions = so.relationship('BillingTransaction', back_populates='discount')
+
+
+    def __str__(self):
+        return self.id
