@@ -50,7 +50,7 @@ class DramatiqWorker:
                     
                     response = await llm_service._send_request(data={'messages': messages})
                     llm_tokens = response.get('tokens_spent')
-                    atl_tokens_spent = round(llm_tokens / 3000, 2)
+                    atl_tokens_spent = round(llm_tokens / 3000, 4)
                     assistant = await assistant_repo.get_assistant_by_name("ИИ Рекрутер")
                     print("TOKENS SPENT",atl_tokens_spent)
                     balance_usage = await balance_usage_repo.create({
