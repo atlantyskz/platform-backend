@@ -2,6 +2,7 @@ from contextlib import asynccontextmanager
 from typing import Dict, List
 from fastapi import FastAPI, HTTPException, Request,status
 from pathlib import Path
+from fastapi import staticfiles
 from fastapi.exceptions import RequestValidationError
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -107,8 +108,7 @@ def create_app(create_custom_static_urls: bool = False) -> FastAPI:
 
 
 
-app = create_app(create_custom_static_urls=True)
-
+app = create_app(create_custom_static_urls=False)
 
 admin = Admin(app,session_manager._engine)
 
