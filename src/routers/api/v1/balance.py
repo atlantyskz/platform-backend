@@ -32,3 +32,4 @@ async def get_balance_usage(
 ):
     user_id = current_user.get('sub')
     return await balance_controller.get_balance_usage(user_id, assistant_id, start_date, end_date, limit, offset)
+

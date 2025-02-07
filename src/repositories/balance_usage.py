@@ -3,6 +3,7 @@ from typing import Optional
 from sqlalchemy import insert, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.models.balance_usage import BalanceUsage
+from sqlalchemy.orm import joinedload
 
 class BalanceUsageRepository:
 
@@ -28,7 +29,7 @@ class BalanceUsageRepository:
         stmt = select(BalanceUsage).where(
             (BalanceUsage.user_id == user_id),
             (BalanceUsage.organization_id == organization_id) 
-        )
+        ).options(joinedload(BalanceUsage.assistant))
         
         if assistant_id is not None:
             stmt = stmt.where(BalanceUsage.assistant_id == assistant_id)

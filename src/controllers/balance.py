@@ -35,5 +35,17 @@ class BalanceController:
             raise NotFoundException("User not found")
         organization = await self.organization_repository.get_user_organization(user_id)
         balance_usage = await self.balance_usage_repository.get_balance_usage(user.id, organization.id, assistant_id, start_date, end_date, limit, offset)
-        return balance_usage
-    
+        return [
+            {
+                "id": usage.id,
+                "user_id": usage.user_id,
+                "organization_id": usage.organization_id,
+                "assistant_id": usage.assistant_id,
+                "assistant": usage.assistant.name,
+                "atl_token_spent": round(usage.atl_token_spent, 2),
+                "type": usage.type,
+                "atl_tokens": round(usage.atl_token_spent, 2),
+                "created_at": usage.created_at,
+            }
+            for usage in balance_usage
+        ]

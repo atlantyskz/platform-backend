@@ -29,3 +29,4 @@ reportlab
 dependency-injector
 minio
 starlette-admin==0.14.1
+sqladmin
