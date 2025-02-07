@@ -29,11 +29,11 @@ class BalanceController:
         return {"balance":round(balance.atl_tokens,2)}
     
 
-    async def get_balance_usage(self,user_id, assistant_id, start_date, end_date):
+    async def get_balance_usage(self,user_id, assistant_id, start_date, end_date, limit, offset):
         user = await self.user_repository.get_by_user_id(user_id)
         if user is None:
             raise NotFoundException("User not found")
         organization = await self.organization_repository.get_user_organization(user_id)
-        balance_usage = await self.balance_usage_repository.get_balance_usage(user.id, organization.id, assistant_id, start_date, end_date)
+        balance_usage = await self.balance_usage_repository.get_balance_usage(user.id, organization.id, assistant_id, start_date, end_date, limit, offset)
         return balance_usage
     

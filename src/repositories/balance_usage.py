@@ -24,7 +24,7 @@ class BalanceUsageRepository:
         result = await self.session.execute(stmt)
         return result.scalars().all()
 
-    async def get_balance_usage(self, user_id: int, organization_id: Optional[int], assistant_id: Optional[int], start_date: Optional[str], end_date: Optional[str]):
+    async def get_balance_usage(self, user_id: int, organization_id: Optional[int], assistant_id: Optional[int], start_date: Optional[str], end_date: Optional[str], limit: int = 10, offset: int = 0):
         stmt = select(BalanceUsage).where(
             (BalanceUsage.user_id == user_id),
             (BalanceUsage.organization_id == organization_id) 
@@ -41,6 +41,6 @@ class BalanceUsageRepository:
             end_date = datetime.strptime(end_date, "%Y-%m-%d")
             end_date = end_date.replace(hour=23, minute=59, second=59, microsecond=999999)
             stmt = stmt.where(BalanceUsage.created_at <= end_date)
-
+        stmt = stmt.order_by(BalanceUsage.created_at.desc()).limit(limit).offset(offset)
         result = await self.session.execute(stmt)   
         return result.scalars().all()
