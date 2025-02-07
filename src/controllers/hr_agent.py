@@ -75,7 +75,7 @@ class HRAgentController:
         self.upload_progress = {}
         pdfmetrics.registerFont(TTFont('DejaVu', 'dejavu-sans-ttf-2.37/ttf/DejaVuSans.ttf'))
 
-    async def process_balance_usage(self, user_id: int, organization_id: int, balance_id: int, user_message: str, llm_tokens: int, file: Optional[UploadFile],assistant_id:int):
+    async def process_balance_usage(self, user_id: int, organization_id: int, balance_id: int, user_message: str, llm_tokens: int, file: Optional[UploadFile],assistant_id:int,type_of_usage):
             atl_tokens_spent = round(llm_tokens / 3000,2)
             await self.balance_usage_repo.create({
                 'user_id': user_id,
@@ -87,7 +87,8 @@ class HRAgentController:
                 'input_token_count': llm_tokens,
                 'file_count': 1 if file else 0,
                 'file_size': file.size if file else None,
-                'atl_token_spent': (atl_tokens_spent)
+                'atl_token_spent': (atl_tokens_spent),
+                "type": type_of_usage
             })
             await self.balance_repo.withdraw_balance(organization_id, atl_tokens_spent)
 
@@ -138,8 +139,9 @@ class HRAgentController:
                 )
                 print(llm_response.get('tokens_spent'))
                 assistant = await self.assistant_repo.get_assistant_by_name('ИИ Рекрутер')
+                
                 await self.process_balance_usage(
-                    user_id, user_organization.id, balance.id, user_message, llm_response.get('tokens_spent'), file,assistant.id
+                    user_id, user_organization.id, balance.id, user_message, llm_response.get('tokens_spent'), file,assistant.id,type_of_usage="vacancy generation"
                 )                
 
                 llm_title = llm_response.get('llm_response').get("job_title")

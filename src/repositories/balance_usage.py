@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Optional
 from sqlalchemy import insert, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -22,21 +23,24 @@ class BalanceUsageRepository:
         stmt = select(BalanceUsage).where(BalanceUsage.organization_id == organization_id)
         result = await self.session.execute(stmt)
         return result.scalars().all()
-    
-    async def get_balance_usage(self, user_id: Optional[int], organization_id: Optional[int], assistant_id: Optional[int], start_date: Optional[str], end_date: Optional[str]):
-        filters = []
+
+    async def get_balance_usage(self, user_id: int, organization_id: Optional[int], assistant_id: Optional[int], start_date: Optional[str], end_date: Optional[str]):
+        stmt = select(BalanceUsage).where(
+            (BalanceUsage.user_id == user_id),
+            (BalanceUsage.organization_id == organization_id) 
+        )
         
-        if user_id is not None:
-            filters.append(BalanceUsage.user_id == user_id)
-        if organization_id is not None:
-            filters.append(BalanceUsage.organization_id == organization_id)
         if assistant_id is not None:
-            filters.append(BalanceUsage.assistant_id == assistant_id)
+            stmt = stmt.where(BalanceUsage.assistant_id == assistant_id)
+
         if start_date is not None:
-            filters.append(BalanceUsage.created_at >= start_date)
-        if end_date is not None:
-            filters.append(BalanceUsage.created_at <= end_date)
+            start_date = datetime.strptime(start_date, "%Y-%m-%d")
+            stmt = stmt.where(BalanceUsage.created_at >= start_date)
         
-        stmt = select(BalanceUsage).filter(*filters).order_by(BalanceUsage.created_at)
-        result = await self.session.execute(stmt)
+        if end_date is not None:
+            end_date = datetime.strptime(end_date, "%Y-%m-%d")
+            end_date = end_date.replace(hour=23, minute=59, second=59, microsecond=999999)
+            stmt = stmt.where(BalanceUsage.created_at <= end_date)
+
+        result = await self.session.execute(stmt)   
         return result.scalars().all()

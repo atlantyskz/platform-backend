@@ -24,6 +24,7 @@ class DramatiqWorker:
     async def process_resume(task_id: str, vacancy_text: str, resume_text: str, user_id: int, 
                            organization_id: int, balance_id: int, user_message: str, file=None):
         from src.core.backend import BackgroundTasksBackend
+        from src.repositories.assistant import AssistantRepository
         from src.services.request_sender import RequestSender
         from src.core.databases import session_manager
         
@@ -34,6 +35,7 @@ class DramatiqWorker:
                 try:
                     bg_session = BackgroundTasksBackend(session)
                     balance_usage_repo = BalanceUsageRepository(session)
+                    assistant_repo = AssistantRepository(session)
                     balance_repo = BalanceRepository(session)
                     
                     balance = await balance_repo.get_balance(organization_id)
@@ -49,10 +51,12 @@ class DramatiqWorker:
                     response = await llm_service._send_request(data={'messages': messages})
                     llm_tokens = response.get('tokens_spent')
                     atl_tokens_spent = round(llm_tokens / 3000,2)
-                    
+                    assistant = await assistant_repo.get_assistant_by_name("ИИ Рекрутер")
                     # Log balance usage
                     balance_usage = await balance_usage_repo.create({
                         'user_id': user_id,
+                        "assistant_id": assistant.id,
+                        "type": "resume analysis",
                         'organization_id': organization_id,
                         'balance_id': balance_id,
                         'input_text_count': len(user_message),
