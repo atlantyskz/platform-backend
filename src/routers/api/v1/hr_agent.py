@@ -37,7 +37,6 @@ async def delete_vacancy(
 
 
 @hr_agent_router.put("/vacancy/update/{session_id}",tags=["HR VACANCY"])
-@require_roles([RoleEnum.ADMIN,RoleEnum.EMPLOYER])
 async def update_vacancy(
     session_id:UUID,
     vacancy_text:VacancyTextUpdate,
@@ -77,7 +76,6 @@ async def rename_session(
 
 
 @hr_agent_router.get("/vacancy/generated/user_vacancies", tags=["HR VACANCY"])
-@require_roles([RoleEnum.ADMIN, RoleEnum.EMPLOYER])
 async def get_generated_user_vacancies(
     is_archived: bool = Query(False, description="Filter by archived status"),
     hr_agent_controller: HRAgentController = Depends(Factory.get_hr_agent_controller),

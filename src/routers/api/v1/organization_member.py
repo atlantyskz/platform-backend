@@ -13,7 +13,7 @@ organization_member_router = APIRouter(prefix='/api/v1/organization_member',tags
 
 
 @organization_member_router.post('/create_member')
-@require_roles([RoleEnum.ADMIN.value])
+@require_roles([RoleEnum.ADMIN.value,RoleEnum.SUPER_ADMIN.value])
 async def create_organization_member(
     create_member_request: CreateOrganizationMemberRequest,
     org_member_controller: OrganizationMemberController = Depends(Factory.get_org_member_controller),
@@ -23,7 +23,7 @@ async def create_organization_member(
     return await org_member_controller.create_organization_member(attributes, current_user.get('sub'))
 
 @organization_member_router.get("/get_organization_members/{organization_id}")
-@require_roles([RoleEnum.ADMIN.value])
+@require_roles([RoleEnum.ADMIN.value,RoleEnum.SUPER_ADMIN.value])
 async def get_organization_members_by_org_id(
     organization_id:int,
     org_member_controller: OrganizationMemberController = Depends(Factory.get_org_member_controller),
@@ -33,7 +33,7 @@ async def get_organization_members_by_org_id(
     return members
 
 @organization_member_router.delete('/delete_employee/{employee_id}')
-@require_roles([RoleEnum.ADMIN.value])
+@require_roles([RoleEnum.ADMIN.value,RoleEnum.SUPER_ADMIN.value])
 async def delete_employee(
     employee_id:int,
     org_member_controller: OrganizationMemberController = Depends(Factory.get_org_member_controller),
@@ -43,7 +43,7 @@ async def delete_employee(
 
 
 @organization_member_router.patch('/update_employee/')
-@require_roles([RoleEnum.ADMIN.value])
+@require_roles([RoleEnum.ADMIN.value,RoleEnum.SUPER_ADMIN.value])
 async def update_employee(
     update_member_request:UpdateOrganizationMemberRequest,
     org_member_controller: OrganizationMemberController = Depends(Factory.get_org_member_controller),

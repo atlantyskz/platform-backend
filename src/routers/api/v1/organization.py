@@ -14,7 +14,7 @@ from src.core.middlewares.auth_middleware import get_current_user,require_roles
 organization_router = APIRouter(prefix='/api/v1/organization',tags=['ORGANIZATION'])
 
 @organization_router.post("/create/organization")
-@require_roles([RoleEnum.ADMIN.value])
+@require_roles([RoleEnum.ADMIN.value,RoleEnum.SUPER_ADMIN.value])
 async def create_organization(
     create_organization_request:CreateOrganizationRequest,
     current_user:dict = Depends(get_current_user),
@@ -25,7 +25,6 @@ async def create_organization(
     return organization
 
 @organization_router.get("/get/organization_info")
-@require_roles([RoleEnum.SUPER_ADMIN.value,RoleEnum.ADMIN.value, RoleEnum.EMPLOYER.value])
 async def get_organization_info(
     current_user:dict = Depends(get_current_user),
     organization_controller:OrganizationController = Depends(Factory.get_organization_controller)
@@ -35,7 +34,7 @@ async def get_organization_info(
 
 
 @organization_router.patch('/update/organization')
-@require_roles([RoleEnum.ADMIN.value])
+@require_roles([RoleEnum.ADMIN.value,RoleEnum.SUPER_ADMIN.value])
 async def update_organization(
     update_organization_request: UpdateOrganizationRequest,
     current_user:dict = Depends(get_current_user),
