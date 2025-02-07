@@ -44,7 +44,6 @@ class BalanceController:
                 "assistant": usage.assistant.name,
                 "atl_token_spent": round(usage.atl_token_spent, 2),
                 "type": usage.type,
-                "atl_tokens": round(usage.atl_token_spent, 2),
                 "created_at": usage.created_at,
             }
             for usage in balance_usage
