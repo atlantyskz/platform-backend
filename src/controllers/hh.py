@@ -81,7 +81,9 @@ class HHController:
             await self.hh_account_repository.update_hh_account(user_id, attributes)
 
         await self.session.commit()
-        return attributes
+        return {
+            "message": "Authorization successful",
+        }
 
     async def refresh_token(self, user_id: int):
         """
@@ -127,7 +129,9 @@ class HHController:
 
         updated_hh_account = await self.hh_account_repository.update_hh_account(user_id, new_attributes)
         await self.session.commit()
-        return updated_hh_account
+        return {
+            "message": "Token refreshed",
+        }
 
     async def get_hh_account_info(self, user_id: int) -> dict:
         """
@@ -228,3 +232,4 @@ class HHController:
                 raise BadRequestException(f"HTTP error during vacancy retrieval: {exc}") from exc            
 
         return response.json()
+    
