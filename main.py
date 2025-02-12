@@ -83,6 +83,7 @@ def create_app(create_custom_static_urls: bool = False) -> FastAPI:
             redoc_url=None if create_custom_static_urls else '/api/redoc',
             openapi_url="/api/openapi.json"  
     )
+    app.include_router(hh_router)
     app.include_router(auth_router)
     app.include_router(hr_agent_router)
     app.include_router(organization_router)
@@ -91,7 +92,6 @@ def create_app(create_custom_static_urls: bool = False) -> FastAPI:
     app.include_router(user_feedback_router)
     app.include_router(billing_router)
     app.include_router(balance_router)
-    app.include_router(hh_router)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["*"], 
