@@ -17,6 +17,7 @@ from src.routers.api.v1.billing import billing_router
 from src.routers.api.v1.balance import balance_router
 from fastapi.middleware.cors import CORSMiddleware
 from src.core.store import lifespan
+from src.routers.api.v1.hh import hh_router
 from fastapi.responses import JSONResponse
 from src.core.databases import session_manager
 from src.core.middlewares.auth_admin import authentication_backend
@@ -90,6 +91,7 @@ def create_app(create_custom_static_urls: bool = False) -> FastAPI:
     app.include_router(user_feedback_router)
     app.include_router(billing_router)
     app.include_router(balance_router)
+    app.include_router(hh_router)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["*"], 

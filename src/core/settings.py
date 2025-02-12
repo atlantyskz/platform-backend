@@ -6,6 +6,9 @@ class Settings:
     load_dotenv()
 
     SECRET_KEY:str = os.getenv('SECRET_KEY')
+    CLIENT_ID:str = os.getenv('CLIENT_ID')
+    CLIENT_SECRET:str = os.getenv('CLIENT_SECRET')
+    REDIRECT_URI:str = os.getenv('REDIRECT_URI')
     JWT_ALGORITHM: str = "HS256"
     JWT_ACCESS_EXPIRE_MINUTES :int = 60 * 24
     JWT_REFRESH_EXPIRE_MINUTES  : int = 60 * 24 *7
