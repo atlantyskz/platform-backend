@@ -7,7 +7,6 @@ hh_router = APIRouter(prefix='/api/v1/hh',tags=['HH'])
 
 @hh_router.get("/get_auth_url")
 async def get_auth_url(
-    current_user: dict = Depends(get_current_user),
     hh_controller:HHController = Depends(Factory.get_hh_controller)
 ):
     return await hh_controller.get_auth_url()
