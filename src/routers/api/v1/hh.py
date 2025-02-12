@@ -33,3 +33,21 @@ async def hh_account_info(
     hh_controller:HHController = Depends(Factory.get_hh_controller)
 ):
     return await hh_controller.get_hh_account_info(current_user.get('sub'))
+
+
+@hh_router.get("/user_vacancies")
+async def get_user_vacancies(
+    status:str|None = None,
+    current_user: dict = Depends(get_current_user),
+    hh_controller:HHController = Depends(Factory.get_hh_controller)
+):
+    return await hh_controller.get_user_vacancies(current_user.get('sub'),status)
+
+
+@hh_router.get("/vacancy/{vacancy_id}")
+async def get_vacancy(
+    vacancy_id:int,
+    current_user: dict = Depends(get_current_user),
+    hh_controller:HHController = Depends(Factory.get_hh_controller)
+):
+    return await hh_controller.get_vacancy_by_id(current_user.get('sub'),vacancy_id)

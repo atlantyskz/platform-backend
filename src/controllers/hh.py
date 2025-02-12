@@ -20,7 +20,7 @@ class HHController:
         params = {
             "response_type": "code",
             "client_id": settings.CLIENT_ID,
-            "redirect_uri": "https://platform.atlantys.kz/assistansts/hr",
+            "redirect_uri": "https://platform.atlantys.kz/assistants/hr/hh",
         }
         auth_url = f"https://hh.ru/oauth/authorize?{urlencode(params)}"
         return RedirectResponse(auth_url)
@@ -37,7 +37,7 @@ class HHController:
             "code": code,
             "client_id": settings.CLIENT_ID,
             "client_secret": settings.CLIENT_SECRET,
-            "redirect_uri": "https://platform.atlantys.kz/assistansts/hr",
+            "redirect_uri": "https://platform.atlantys.kz/assistants/hr/hh",
         }
 
         user = await self.user_repository.get_by_user_id(user_id)
@@ -165,5 +165,66 @@ class HHController:
 
         if response.status_code != 200:
             raise BadRequestException(f"Error retrieving HH account info: {response.text}")
+
+        return response.json()
+    
+    async def get_user_vacancies(self, user_id: int,status:str|None) -> dict:
+        """
+        Получение списка вакансий пользователя на HH.
+        """
+        hh_account = await self.hh_account_repository.get_hh_account_by_user_id(user_id)
+        if hh_account is None:
+            raise NotFoundException("HH account not found")
+
+        if datetime.utcnow() >= hh_account.expires_at - timedelta(minutes=5):
+            hh_account = await self.refresh_token(user_id)
+
+        headers = {"Authorization": f"Bearer {hh_account.access_token}"}
+        employer_data = await self.get_hh_account_info(user_id)
+        emp_id = employer_data.get("employer", {}).get("id")
+        async with httpx.AsyncClient() as client:
+            try:
+                if status == 'archived':
+                    response = await client.get(
+                        f"https://api.hh.ru/employers/{emp_id}/vacancies/archived",
+                        headers=headers,
+                        timeout=10.0,
+                    )
+                else:
+                    response = await client.get(
+                        f"https://api.hh.ru/employers/{emp_id}/vacancies/active",
+                        headers=headers,
+                        timeout=10.0,
+                    )
+            except httpx.RequestError as exc:
+                raise BadRequestException(f"HTTP error during vacancies retrieval: {exc}") from exc
+
+        if response.status_code != 200:
+            raise BadRequestException(f"Error retrieving user vacancies: {response.text}")
+
+        return response.json()
+
+
+    async def get_vacancy_by_id(self, user_id: int, vacancy_id: int) -> dict:
+        """
+        Получение информации о вакансии по её ID.
+        """
+        hh_account = await self.hh_account_repository.get_hh_account_by_user_id(user_id)
+        if hh_account is None:
+            raise NotFoundException("HH account not found")
+
+        if datetime.utcnow() >= hh_account.expires_at - timedelta(minutes=5):
+            hh_account = await self.refresh_token(user_id)
+
+        headers = {"Authorization": f"Bearer {hh_account.access_token}"}
+        async with httpx.AsyncClient() as client:
+            try:
+                response = await client.get(
+                    f"https://api.hh.ru/vacancies/{vacancy_id}",
+                    headers=headers,
+                    timeout=10.0,
+                )
+            except httpx.RequestError as exc:
+                raise BadRequestException(f"HTTP error during vacancy retrieval: {exc}") from exc            
 
         return response.json()
