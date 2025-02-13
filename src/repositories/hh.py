@@ -2,7 +2,6 @@ from sqlalchemy import delete, insert, select, update
 from src.repositories import BaseRepository
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.models.hh import HHAccount
-from src.models.user import User
 
 class HHAccountRepository(BaseRepository):
     

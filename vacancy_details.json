@@ -1,0 +1,54 @@
+{
+  "name": "Frontend-разработчик",
+  "area": "Алматы",
+  "salary": {
+    "from": 400000,
+    "to": 450000,
+    "currency": "KZT",
+    "gross": true
+  },
+  "full_address": "Алматы, проспект Сакена Сейфуллина, 609",
+  "metro": {
+    "station_name": "Байконур",
+    "line_name": "Первая",
+    "station_id": "64.434",
+    "line_id": "64",
+    "lat": 43.240401,
+    "lng": 76.927696
+  },
+  "metro_stations": [
+    {
+      "station_name": "Байконур",
+      "line_name": "Первая",
+      "station_id": "64.434",
+      "line_id": "64",
+      "lat": 43.240401,
+      "lng": 76.927696
+    }
+  ],
+  "experience": "От 1 года до 3 лет",
+  "schedule": "Полный день",
+  "employment": "Полная занятость",
+  "description": "Обязанности:  Разработка, тестирование, отладка респонсивных веб и мобильных приложений. Перевод потребностей пользователей и бизнеса в функциональный фронтенд дизайн с использованием JavaScript, HTML и CSS.",
+  "key_skills": [
+    "JavaScript",
+    "HTML",
+    "CSS3"
+  ],
+  "professional_roles": [
+    "Программист, разработчик"
+  ],
+  "fly_in_fly_out_duration": [],
+  "internship": false,
+  "night_shifts": false,
+  "work_format": [],
+  "work_schedule_by_days": [
+    {
+      "id": "FIVE_ON_TWO_OFF",
+      "name": "5/2"
+    }
+  ],
+  "vacancy_properties": {
+    "properties": []
+  }
+}

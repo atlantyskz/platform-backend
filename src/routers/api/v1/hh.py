@@ -1,4 +1,4 @@
-from fastapi import Depends, FastAPI,APIRouter
+from fastapi import Depends, FastAPI,APIRouter, Form
 from src.core.middlewares.auth_middleware import get_current_user
 from src.core.factory import Factory
 from src.controllers.hh import HHController 
@@ -51,3 +51,21 @@ async def get_vacancy(
     hh_controller:HHController = Depends(Factory.get_hh_controller)
 ):
     return await hh_controller.get_vacancy_by_id(current_user.get('sub'),vacancy_id)
+
+
+@hh_router.get("/vacancy/{vacancy_id}/applications")
+async def get_vacancy_applications(
+    vacancy_id:int,
+    current_user: dict = Depends(get_current_user),
+    hh_controller:HHController = Depends(Factory.get_hh_controller)
+):
+    return await hh_controller.get_vacancy_applicants(current_user.get('sub'),vacancy_id)
+
+@hh_router.post("/vacancy/{vacancy_id}/analyze")
+async def analyze_vacancy(
+    vacancy_id:int,
+    session_id: str = Form(...),
+    current_user: dict = Depends(get_current_user),
+    hh_controller:HHController = Depends(Factory.get_hh_controller)
+):
+    return await hh_controller.analyze_vacancy_applicants(session_id,current_user.get('sub'),vacancy_id)
