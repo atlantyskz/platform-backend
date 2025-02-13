@@ -416,4 +416,4 @@ class HHController:
                 DramatiqWorker.process_resume.send(task_id, vacancy_text, resume_text,user_id, user_organization.id, balance.id,resume_text)
                 all_task_ids.append(task_id)
 
-            return all_task_ids
+            return {"session_id": session_id, "tasks": all_task_ids, "tasks_count": len(all_task_ids)}
