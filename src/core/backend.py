@@ -7,7 +7,7 @@ from sqlalchemy import Integer, case, cast, func, insert,select
 from src.core.databases import get_session
 from sqlalchemy import desc, case, cast, Integer
 from sqlalchemy.dialects.postgresql import JSONB
-
+from sqlalchemy.orm import joinedload
 class BackgroundTasksBackend:
 
     def __init__ (self,session: AsyncSession):
@@ -86,6 +86,9 @@ class BackgroundTasksBackend:
     
 
     async def get_by_task_id(self,task_id:str):
-        stmt = select(HRTask).where(HRTask.task_id == task_id)
+        stmt = select(HRTask).where(HRTask.task_id == task_id).options(
+            joinedload(HRTask.session)
+        )
         result = await self.session.execute(stmt)
         return result.scalars().first()    
+

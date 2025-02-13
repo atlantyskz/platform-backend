@@ -10,6 +10,7 @@ from datetime import datetime, timedelta
 import pprint
 import json
 
+import httpx
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
 from reportlab.lib.utils import simpleSplit
@@ -20,6 +21,8 @@ from typing import List, Optional
 import uuid
 from fastapi import  HTTPException, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.responses import StreamingResponse
+from src.controllers.hh import HHController
+from src.repositories.hh import HHAccountRepository
 from src.repositories.balance import BalanceRepository
 from src.repositories.balance_usage import BalanceUsageRepository
 from src.services.email import EmailService
@@ -65,6 +68,10 @@ class HRAgentController:
         self.email_service = EmailService()
         self.balance_repo = BalanceRepository(session)
         self.balance_usage_repo = BalanceUsageRepository(session)
+        self.hh_account_repository = HHAccountRepository(session)
+        self.headhunter_service = HHController()
+        
+
         self.minio_service = MinioUploader(
         host="minio:9000",  
         access_key="admin",
@@ -315,21 +322,42 @@ class HRAgentController:
     
     async def preview_cv(self,task_id):
         cv_task = await self.bg_backend.get_by_task_id(task_id)
-        print(cv_task)
-        if cv_task and cv_task.file_key is None:
-            raise NotFoundException('File not found')
-        file_stream = self.minio_service.get_file(cv_task.file_key)
-        if not file_stream:
-            raise HTTPException(status_code=404, detail="Файл не найден")
-        
-        return  StreamingResponse(
-            file_stream,
-            media_type="application/pdf",
-            headers={
-                "Content-Disposition": f"inline; filename={cv_task.task_id}.pdf"
-            }
-        )
+        user_id = cv_task.session.user_id
+        if cv_task and cv_task.file_key:
+            file_stream = self.minio_service.get_file(cv_task.file_key)
+            if not file_stream:
+                raise HTTPException(status_code=404, detail="Файл не найден")
+            
+            return  StreamingResponse(
+                file_stream,
+                media_type="application/pdf",
+                headers={
+                    "Content-Disposition": f"inline; filename={cv_task.task_id}.pdf"
+                }
+            )
+        if cv_task and cv_task.hh_file_url:
+            hh_account = await self.hh_account_repository.get_hh_account_by_user_id(user_id)
+            if hh_account is None:
+                raise NotFoundException("HH account not found")
 
+            if datetime.utcnow() >= hh_account.expires_at - timedelta(minutes=5):
+                hh_account = await self.headhunter_service.refresh_token(user_id)
+            
+            headers = {"Authorization":f"Bearer {hh_account.access_token}"}
+            async with httpx.AsyncClient() as client:
+                response = await client.get(cv_task.hh_file_url, headers=headers)
+                if response.status_code == 200:
+                    return StreamingResponse(
+                        BytesIO(response.content),
+                        media_type="application/pdf",
+                        headers={
+                            "Content-Disposition": f"inline; filename={cv_task.task_id}.pdf"
+                        }
+                    )
+                else:
+                    raise BadRequestException("Error getting file from HH")
+        else:
+            raise NotFoundException("File not found")
 
 
 

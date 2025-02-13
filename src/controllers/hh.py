@@ -152,7 +152,7 @@ class HHController:
         if not (new_attributes["access_token"] and new_attributes["refresh_token"]):
             raise BadRequestException("Incomplete token data received during refresh")
 
-        updated_hh_account = await self.hh_account_repository.update_hh_account(user_id, new_attributes)
+        await self.hh_account_repository.update_hh_account(user_id, new_attributes)
         await self.session.commit()
         return {
             "message": "Token refreshed",
@@ -394,11 +394,6 @@ class HHController:
             vacancy_text = extract_vacancy_summary(await self.get_vacancy_by_id(user_id, vacancy_id))
             # 1. Собираем все resume_id
             resume_ids = await self.get_all_applicant_resume_ids(user_id, vacancy_id)
-            # resume_ids = [
-            #     "b0161c9d000d97ceee00ae6f58687654663244",
-            #     "d65928e6000df1cfe400ae6f58514870617056",
-            #     "7ccf54e80009a5483a00ae6f58446f43323152",
-            # ]
             all_task_ids = []
 
             for resume_id in resume_ids[:11]:
@@ -415,6 +410,7 @@ class HHController:
                     "session_id": session_id,
                     "task_type": "hh cv analyze",
                     "task_status": "pending",
+                    "hh_file_url":resume_data.get("download",None).get("pdf",None).get("url",None),
                 })
 
                 DramatiqWorker.process_resume.send(task_id, vacancy_text, resume_text,user_id, user_organization.id, balance.id,resume_text)
