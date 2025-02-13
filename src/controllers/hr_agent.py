@@ -69,7 +69,7 @@ class HRAgentController:
         self.balance_repo = BalanceRepository(session)
         self.balance_usage_repo = BalanceUsageRepository(session)
         self.hh_account_repository = HHAccountRepository(session)
-        self.headhunter_service = HHController()
+        self.headhunter_service = HHController(session)
         
 
         self.minio_service = MinioUploader(
