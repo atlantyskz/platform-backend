@@ -440,8 +440,8 @@ class HHController:
                     DramatiqWorker.process_resume.send(task_id, vacancy_text, resume_text, user_id, user_organization.id, balance.id, resume_text)
                     all_task_ids.append(task_id)
                 # send message to websocket about progress like "analyzed 100 resumes out of 500"
-                
-                await asyncio.sleep(2)
+
+                await asyncio.sleep(1)
 
             return {"session_id": session_id, "tasks": all_task_ids, "tasks_count": len(all_task_ids)}
 
