@@ -418,12 +418,15 @@ class HHController:
             resume_ids = await self.get_all_applicant_resume_ids(user_id, vacancy_id)
             all_task_ids = []
             chunk_size = 100  
-            for chunk in self.chunked(resume_ids, chunk_size):
-                for resume_id in chunk:
-                    balance = await self.balance_repo.get_balance(user_organization.id)
-                    if balance.atl_tokens < 5:
-                        raise BadRequestException("Not enough tokens")
+            chunks = list(self.chunked(resume_ids, chunk_size))  
+            skipped_resumes = []
+            balance = await self.balance_repo.get_balance(user_organization.id)
 
+            for chunk in chunks:
+                for resume_id in chunk:
+                    if balance.atl_tokens < 5:
+                        skipped_resumes.append(resume_id)
+                        continue 
                     resume_data = await self.fetch_resume_details(user_id, resume_id)
                     candidate_info = extract_full_candidate_info(resume_data)
                     resume_text = assemble_candidate_summary(candidate_info)
@@ -439,11 +442,11 @@ class HHController:
 
                     DramatiqWorker.process_resume.send(task_id, vacancy_text, resume_text, user_id, user_organization.id, balance.id, resume_text)
                     all_task_ids.append(task_id)
+                    balance.atl_tokens -= 5
                 # send message to websocket about progress like "analyzed 100 resumes out of 500"
 
-                await asyncio.sleep(1)
 
-            return {"session_id": session_id, "tasks": all_task_ids, "tasks_count": len(all_task_ids)}
+            return {"session_id": session_id, "tasks": all_task_ids, "tasks_count": len(all_task_ids),"skipped_resumes":skipped_resumes}
 
     async def websocket_endpoint(self,websocket: WebSocket, vacancy_id: str,message_from_server:dict):
         await websocket.accept()
