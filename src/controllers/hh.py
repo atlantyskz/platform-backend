@@ -3,6 +3,7 @@ from datetime import datetime, timedelta
 from typing import List
 from urllib.parse import urlencode
 import uuid
+from fastapi import WebSocket
 from fastapi.responses import RedirectResponse
 import httpx
 
@@ -438,7 +439,14 @@ class HHController:
 
                     DramatiqWorker.process_resume.send(task_id, vacancy_text, resume_text, user_id, user_organization.id, balance.id, resume_text)
                     all_task_ids.append(task_id)
-            
+                # send message to websocket about progress like "analyzed 100 resumes out of 500"
+                
                 await asyncio.sleep(2)
 
             return {"session_id": session_id, "tasks": all_task_ids, "tasks_count": len(all_task_ids)}
+
+    async def websocket_endpoint(self,websocket: WebSocket, vacancy_id: str,message_from_server:dict):
+        await websocket.accept()
+        
+        while True:
+            await websocket.send_text(message_from_server)

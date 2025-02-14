@@ -1,4 +1,4 @@
-from fastapi import Depends, FastAPI,APIRouter, Form
+from fastapi import Depends, FastAPI,APIRouter, Form, WebSocket
 from src.core.middlewares.auth_middleware import get_current_user
 from src.core.factory import Factory
 from src.controllers.hh import HHController 
@@ -76,3 +76,13 @@ async def logout(
     hh_controller:HHController = Depends(Factory.get_hh_controller)
 ):
     return await hh_controller.logout(current_user.get('sub'))
+
+
+@hh_router.websocket("/ws/{vacancy_id}/progress")
+async def websocket_endpoint(
+    vacancy_id:str,
+    websocket: WebSocket,
+    current_user: dict = Depends(get_current_user),
+    hh_controller:HHController = Depends(Factory.get_hh_controller)
+):
+    await hh_controller.websocket_endpoint(vacancy_id,websocket,current_user.get('sub'))

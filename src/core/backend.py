@@ -34,13 +34,19 @@ class BackgroundTasksBackend:
         if task:
             task.result_data = result_data
             task.task_status = status
-            task.tokens_spent = tokens_spent            
-    async def get_results_by_session_id(self, session_id: str, user_id: int, offset: int = 0, limit: int = 10) -> List[HRTask]:
+            task.tokens_spent = tokens_spent        
+
+
+    async def get_results_by_session_id(self, session_id: str, user_id: int, offset: int = 0, limit: int = 10):
         favorite_subquery = (
             select(FavoriteResume.resume_id)
             .where(FavoriteResume.user_id == user_id)
             .subquery()
         )
+
+        # Подсчет общего количества записей
+        total_query = select(func.count()).where(HRTask.session_id == session_id)
+        total_results = await self.session.scalar(total_query)  # Получаем общее количество
 
         query = (
             select(
@@ -60,15 +66,15 @@ class BackgroundTasksBackend:
         sorted_tasks = sorted(
             tasks,
             key=lambda task: (
-                task[0].task_status == "completed",                 
-            int(task[0].result_data.get("analysis", {}).get("matching_percentage", 0)) if task[0].result_data else 0            ),
+                task[0].task_status == "completed",
+                int(task[0].result_data.get("analysis", {}).get("matching_percentage", 0)) if task[0].result_data else 0
+            ),
             reverse=True
         )
 
         paginated_tasks = sorted_tasks[offset:offset + limit]
 
-        return paginated_tasks
-    
+        return paginated_tasks, total_results  
 
     async def get_results_by_session_id_ws(self,session_id:int)-> List[HRTask]:
 

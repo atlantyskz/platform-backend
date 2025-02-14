@@ -604,18 +604,25 @@ class HRAgentController:
     
 
     async def get_cv_analyzer_result_by_session_id(self, session_id: str, user_id: int, offset: Optional[int], limit: Optional[int]):
-        results = await self.bg_backend.get_results_by_session_id(session_id, user_id, offset, limit)
+        results, total_results = await self.bg_backend.get_results_by_session_id(session_id, user_id, offset, limit)
+        
         return {
             "session_id": session_id,
             "results": [
                 {
-                    "id": res[0].id, 
-                    "task_id":res[0].task_id,
+                    "id": res[0].id,
+                    "task_id": res[0].task_id,
                     "result_data": res[0].result_data,
-                    "is_favorite": res[1] 
+                    "is_favorite": res[1]
                 }
                 for res in results
-            ]
+            ],
+            "meta": {
+                "total_results": total_results, 
+                "offset": offset,
+                "limit": limit,
+                "total_pages": (total_results + limit - 1) // limit if limit else 1
+            }
         }
     async def add_resume_to_favorites(self,user_id: int, resume_id: int):
         try:
