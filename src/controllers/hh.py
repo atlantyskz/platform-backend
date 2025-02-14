@@ -109,6 +109,30 @@ class HHController:
         return {
             "message": "Authorization successful",
         }
+    
+    async def logout(self, user_id: int) -> dict:
+        hh_account = await self.hh_account_repository.get_hh_account_by_user_id(user_id)
+        if hh_account is None:
+            raise NotFoundException("HH account not found")
+        headers = {"Authorization": f"Bearer {hh_account.access_token}"}
+        async with httpx.AsyncClient() as client:
+            try:
+                response = await client.delete(
+                    "https://api.hh.ru/oauth/token",
+                    headers=headers,
+                    timeout=10.0,
+                )
+            except httpx.RequestError as exc:
+                raise BadRequestException(f"HTTP error during logout: {exc}") from exc
+        if response.status_code == 204:
+            await self.hh_account_repository.delete_hh_account(user_id)
+            await self.session.commit()
+            return {
+                "message": "Logged out",
+            }
+        else:
+            raise BadRequestException(f"Error during logout: {response.text}")
+
 
     async def refresh_token(self, user_id: int):
         """
@@ -348,7 +372,7 @@ class HHController:
             page += 1
 
         return resume_ids
-
+    
 
     async def fetch_resume_details(self,user_id:int,resume_id:str,):
         url = f"https://api.hh.ru/resumes/{resume_id}"
@@ -371,18 +395,12 @@ class HHController:
 
 
     async def analyze_vacancy_applicants(self,session_id:str, user_id: int, vacancy_id: int) -> List[str]:
-        """
-        Собирает все резюме по вакансии, формирует для каждого текстовый summary и отправляет их в LLM-сервис.
-        Возвращает список ответов от LLM-сервиса.
-        """
         async with self.session.begin() as session:
 
-            # Получаем актуальный access token
             session = await self.assistant_session_repo.get_by_session_id(session_id)
             if session is None:
                 raise NotFoundException("Session not found")
             hh_account = await self.hh_account_repository.get_hh_account_by_user_id(user_id)
-            print(hh_account)
             if hh_account is None:
                 raise NotFoundException("HH account not found")
 
@@ -390,9 +408,7 @@ class HHController:
 
             if datetime.utcnow() >= hh_account.expires_at - timedelta(minutes=5):
                 hh_account = await self.refresh_token(user_id)
-            headers = {"Authorization": f"Bearer {hh_account.access_token}"}
             vacancy_text = extract_vacancy_summary(await self.get_vacancy_by_id(user_id, vacancy_id))
-            # 1. Собираем все resume_id
             resume_ids = await self.get_all_applicant_resume_ids(user_id, vacancy_id)
             all_task_ids = []
 

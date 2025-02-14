@@ -69,3 +69,10 @@ async def analyze_vacancy(
     hh_controller:HHController = Depends(Factory.get_hh_controller)
 ):
     return await hh_controller.analyze_vacancy_applicants(session_id,current_user.get('sub'),vacancy_id)
+
+@hh_router.post("/logout")
+async def logout(
+    current_user: dict = Depends(get_current_user),
+    hh_controller:HHController = Depends(Factory.get_hh_controller)
+):
+    return await hh_controller.logout(current_user.get('sub'))
