@@ -89,7 +89,7 @@ class DramatiqWorker:
                     await bg_session.update_task_result(
                         task_id=task_id,
                         result_data={"error": str(e)},
-                        tokens_spent=0,
+                        tokens_spent=0, 
                         status="failed"
                     )
                     raise  # Re-raise the exception to ensure the transaction is rolled back

@@ -1,6 +1,6 @@
 import asyncio
 from datetime import datetime, timedelta
-from typing import List
+from typing import AsyncGenerator, List
 from urllib.parse import urlencode
 import uuid
 from fastapi import WebSocket
@@ -331,20 +331,19 @@ class HHController:
                 raise BadRequestException(f"HTTP error during applicants retrieval: {exc}") from exc
 
 
-    async def get_all_applicant_resume_ids(self, user_id: int, vacancy_id: int, per_page: int = 50) -> List[str]:
-        """
-        Собирает все resume_id со всех страниц откликов по заданной вакансии.
-        """
+    async def get_all_applicant_resume_ids(self, user_id: int, vacancy_id: int, per_page: int = 50, chunk_size: int = 50) -> AsyncGenerator[list, None]:
         hh_account = await self.hh_account_repository.get_hh_account_by_user_id(user_id)
         if hh_account is None:
             raise NotFoundException("HH account not found")
+
         # Обновляем токен, если требуется
         if datetime.utcnow() >= hh_account.expires_at - timedelta(minutes=5):
             hh_account = await self.refresh_token(user_id)
 
         headers = {"Authorization": f"Bearer {hh_account.access_token}"}
-        resume_ids = []
         page = 0
+        current_chunk = []
+
         while True:
             url = f"https://api.hh.ru/negotiations/response?vacancy_id={vacancy_id}&page={page}&per_page={per_page}"
             async with httpx.AsyncClient() as client:
@@ -362,19 +361,22 @@ class HHController:
                 break
 
             for item in items:
-                # Предполагается, что в каждом элементе отклика есть поле resume с resume_id
                 resume = item.get("resume", {})
                 resume_id = resume.get("id")
                 if resume_id:
-                    resume_ids.append(resume_id)
+                    current_chunk.append(resume_id)
 
-            # Если количество полученных элементов меньше per_page, значит страницы закончились
+                if len(current_chunk) >= chunk_size:
+                    yield current_chunk
+                    current_chunk = []
+
             if len(items) < per_page:
-                break
+                break  # Все страницы обработаны
             page += 1
 
-        return resume_ids
-    
+        # Если остались несданные резюме, отправляем их последним чанком
+        if current_chunk:
+            yield current_chunk    
 
     async def fetch_resume_details(self,user_id:int,resume_id:str,):
         url = f"https://api.hh.ru/resumes/{resume_id}"
@@ -400,37 +402,46 @@ class HHController:
             yield iterable[i:i + size]
 
 
-    async def analyze_vacancy_applicants(self,session_id:str, user_id: int, vacancy_id: int) -> List[str]:
-        async with self.session.begin() as session:
-
+    async def analyze_vacancy_applicants(self, session_id: str, user_id: int, vacancy_id: int) -> dict:
+        """
+        Анализирует отклики на вакансию. Запускает анализ резюме в фоновом режиме и возвращает список задач.
+        """
+        async with self.session.begin():
             session = await self.assistant_session_repo.get_by_session_id(session_id)
             if session is None:
                 raise NotFoundException("Session not found")
+
             hh_account = await self.hh_account_repository.get_hh_account_by_user_id(user_id)
             if hh_account is None:
                 raise NotFoundException("HH account not found")
 
             user_organization = await self.organization_repo.get_user_organization(user_id)
 
+            # Обновление токена
             if datetime.utcnow() >= hh_account.expires_at - timedelta(minutes=5):
                 hh_account = await self.refresh_token(user_id)
-            vacancy_text = extract_vacancy_summary(await self.get_vacancy_by_id(user_id, vacancy_id))
-            resume_ids = await self.get_all_applicant_resume_ids(user_id, vacancy_id)
-            all_task_ids = []
-            chunk_size = 100  
-            chunks = list(self.chunked(resume_ids, chunk_size))  
-            skipped_resumes = []
-            balance = await self.balance_repo.get_balance(user_organization.id)
 
-            for chunk in chunks:
+            # Получаем текст вакансии
+            vacancy_text = extract_vacancy_summary(await self.get_vacancy_by_id(user_id, vacancy_id))
+
+            # Получаем баланс токенов
+            balance = await self.balance_repo.get_balance(user_organization.id)
+            skipped_resumes = []
+            all_task_ids = []
+
+            # Потоковый сбор резюме и обработка чанков
+            async for chunk in self.get_all_applicant_resume_ids(user_id, vacancy_id, chunk_size=50):
                 for resume_id in chunk:
                     if balance.atl_tokens < 5:
                         skipped_resumes.append(resume_id)
-                        continue 
+                        continue  
+
+                    # Получение деталей резюме
                     resume_data = await self.fetch_resume_details(user_id, resume_id)
                     candidate_info = extract_full_candidate_info(resume_data)
                     resume_text = assemble_candidate_summary(candidate_info)
 
+                    # Создание задачи анализа
                     task_id = str(uuid.uuid4())
                     await self.bg_backend.create_task({
                         "task_id": task_id,
@@ -440,13 +451,12 @@ class HHController:
                         "hh_file_url": resume_data.get("download", {}).get("pdf", {}).get("url", None),
                     })
 
+                    # Запуск фонового анализа
                     DramatiqWorker.process_resume.send(task_id, vacancy_text, resume_text, user_id, user_organization.id, balance.id, resume_text)
                     all_task_ids.append(task_id)
-                    balance.atl_tokens -= 5
-                # send message to websocket about progress like "analyzed 100 resumes out of 500"
+                    
 
-
-            return {"session_id": session_id, "tasks": all_task_ids, "tasks_count": len(all_task_ids),"skipped_resumes":skipped_resumes}
+            return {"session_id": session_id, "tasks": all_task_ids}
 
     async def websocket_endpoint(self,websocket: WebSocket, vacancy_id: str,message_from_server:dict):
         await websocket.accept()
