@@ -1,3 +1,4 @@
+import asyncio
 from datetime import datetime, timedelta
 from typing import List
 from urllib.parse import urlencode
@@ -392,6 +393,10 @@ class HHController:
         if response.status_code != 200:
             raise BadRequestException(f"Error retrieving resume {resume_id}: {response.text}")
         return response.json()
+    
+    def chunked(self,iterable, size):
+        for i in range(0, len(iterable), size):
+            yield iterable[i:i + size]
 
 
     async def analyze_vacancy_applicants(self,session_id:str, user_id: int, vacancy_id: int) -> List[str]:
@@ -411,25 +416,29 @@ class HHController:
             vacancy_text = extract_vacancy_summary(await self.get_vacancy_by_id(user_id, vacancy_id))
             resume_ids = await self.get_all_applicant_resume_ids(user_id, vacancy_id)
             all_task_ids = []
+            chunk_size = 100  
+            for chunk in self.chunked(resume_ids, chunk_size):
+                for resume_id in chunk:
+                    balance = await self.balance_repo.get_balance(user_organization.id)
+                    if balance.atl_tokens < 5:
+                        raise BadRequestException("Not enough tokens")
 
-            for resume_id in resume_ids[:11]:
-                balance = await self.balance_repo.get_balance(user_organization.id)
-                if balance.atl_tokens < 5:
-                    raise BadRequestException("Not enough tokens")
-                resume_data = await self.fetch_resume_details(user_id,resume_id)
-                candidate_info = extract_full_candidate_info(resume_data)
-                resume_text = assemble_candidate_summary(candidate_info)
+                    resume_data = await self.fetch_resume_details(user_id, resume_id)
+                    candidate_info = extract_full_candidate_info(resume_data)
+                    resume_text = assemble_candidate_summary(candidate_info)
 
-                task_id = str(uuid.uuid4())
-                await self.bg_backend.create_task({
-                    "task_id": task_id,
-                    "session_id": session_id,
-                    "task_type": "hh cv analyze",
-                    "task_status": "pending",
-                    "hh_file_url":resume_data.get("download",None).get("pdf",None).get("url",None),
-                })
+                    task_id = str(uuid.uuid4())
+                    await self.bg_backend.create_task({
+                        "task_id": task_id,
+                        "session_id": session_id,
+                        "task_type": "hh cv analyze",
+                        "task_status": "pending",
+                        "hh_file_url": resume_data.get("download", {}).get("pdf", {}).get("url", None),
+                    })
 
-                DramatiqWorker.process_resume.send(task_id, vacancy_text, resume_text,user_id, user_organization.id, balance.id,resume_text)
-                all_task_ids.append(task_id)
+                    DramatiqWorker.process_resume.send(task_id, vacancy_text, resume_text, user_id, user_organization.id, balance.id, resume_text)
+                    all_task_ids.append(task_id)
+            
+                await asyncio.sleep(2)
 
             return {"session_id": session_id, "tasks": all_task_ids, "tasks_count": len(all_task_ids)}
