@@ -413,49 +413,44 @@ class HHController:
 
             user_organization = await self.organization_repo.get_user_organization(user_id)
 
-            # Обновление токена
             if datetime.utcnow() >= hh_account.expires_at - timedelta(minutes=5):
                 hh_account = await self.refresh_token(user_id)
 
-            # Получаем текст вакансии
             vacancy_text = extract_vacancy_summary(await self.get_vacancy_by_id(user_id, vacancy_id))
 
-            # Получаем баланс токенов
             balance = await self.balance_repo.get_balance(user_organization.id)
             skipped_resumes = []
             all_task_ids = []
             if balance.atl_tokens < 5:
                 raise BadRequestException("Insufficient balance")
 
-            # Потоковый сбор резюме и обработка чанков
             async for chunk in self.get_all_applicant_resume_ids(user_id, vacancy_id, chunk_size=50):
                 for resume_id in chunk:
                     if balance.atl_tokens < 5:
                         skipped_resumes.append(resume_id)
                         continue  
 
-                    # Получение деталей резюме
                     resume_data = await self.fetch_resume_details(user_id, resume_id)
                     candidate_info = extract_full_candidate_info(resume_data)
                     resume_text = assemble_candidate_summary(candidate_info)
 
-                    # Создание задачи анализа
-                    task_id = str(uuid.uuid4())
-                    await self.bg_backend.create_task({
-                        "task_id": task_id,
-                        "session_id": session_id,
-                        "task_type": "hh cv analyze",
-                        "task_status": "pending",
-                        "hh_file_url": resume_data.get("download", {}).get("pdf", {}).get("url", None),
-                    })
-
-                    # Запуск фонового анализа
-                    DramatiqWorker.process_resume.send(task_id, vacancy_text, resume_text, user_id, user_organization.id, balance.id, resume_text)
-                    print(f"Processing resume {resume_id} for user {user_id}")
-                    all_task_ids.append(task_id)
+                    task_status = 'pending'
+                    if not resume_text: 
+                        task_status = 'error parsing'
+                    else:
+                        task_id = str(uuid.uuid4())
+                        await self.bg_backend.create_task({
+                            "task_id": task_id,
+                            "session_id": session_id,
+                            "task_type": "hh cv analyze",
+                            "task_status": task_status,
+                            "hh_file_url": resume_data.get("download", {}).get("pdf", {}).get("url", None),
+                        })
+                        if resume_text:
+                            DramatiqWorker.process_resume.send(task_id, vacancy_text, resume_text, user_id, user_organization.id, balance.id, resume_text)
+                            print(f"Processing resume {resume_id} for user {user_id}")
+                            all_task_ids.append(task_id)
                     print(len(all_task_ids))
-                    
-
             return {"session_id": session_id, "tasks": all_task_ids, "skipped_resumes": skipped_resumes,'task_count':len(all_task_ids)}
 
     async def websocket_endpoint(self,websocket: WebSocket, vacancy_id: str,message_from_server:dict):
