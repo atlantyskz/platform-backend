@@ -23,6 +23,7 @@ class DatabaseSessionManager:
             bind=self._engine,
             autoflush=False,
             autocommit=False,
+            expire_on_commit=False,
         )
 
     async def close(self):

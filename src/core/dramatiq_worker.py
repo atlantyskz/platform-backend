@@ -53,7 +53,7 @@ class DramatiqWorker:
                     atl_tokens_spent = round(llm_tokens / 3000, 2)
                     assistant = await assistant_repo.get_assistant_by_name("ИИ Рекрутер")
                     print("TOKENS SPENT",atl_tokens_spent)
-                    balance_usage = await balance_usage_repo.create({
+                    await balance_usage_repo.create({
                         'user_id': user_id,
                         "assistant_id": assistant.id,
                         "type": "resume analysis",
@@ -66,23 +66,19 @@ class DramatiqWorker:
                         'file_size': file.size if file else None,
                         'atl_token_spent': atl_tokens_spent
                     })
-                    print(balance_usage)
                     # Withdraw balance
                     withdraw_result = await balance_repo.withdraw_balance(organization_id, atl_tokens_spent)
-                    print(withdraw_result)
                     if not withdraw_result:
                         raise ValueError("Failed to withdraw balance: insufficient funds or other issue")
                     
                     # Update task result
                     await bg_session.update_task_result(
                         task_id=task_id,
-                        result_data=response.get('llm_response'),
-                        tokens_spent=llm_tokens,
-                        status="completed"
+                        result_data=response.get('llm_response') if response else {"error": "Unknown error"},
+                        tokens_spent=llm_tokens if llm_tokens else 0,
+                        status="completed" if response else "failed"
                     )
-                    
-                    # The transaction will be automatically committed here if no exceptions occurred
-                    
+
                 except Exception as e:
                     logging.error(f"Task failed: {str(e)}")
                     # The transaction will be automatically rolled back
