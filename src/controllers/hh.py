@@ -269,7 +269,7 @@ class HHController:
                 except httpx.RequestError as exc:
                     raise BadRequestException(f"HTTP error during vacancies retrieval: {exc}") from exc
 
-        return {"vacancies": vacancies}
+        return {"vacancies": vacancies,**meta}
 
     async def get_vacancy_by_id(self, user_id: int, vacancy_id: int) -> dict:
         """
