@@ -2,8 +2,16 @@ from fastapi import Depends, FastAPI,APIRouter, Form, WebSocket
 from src.core.middlewares.auth_middleware import get_current_user
 from src.core.factory import Factory
 from src.controllers.hh import HHController 
+from enum import Enum
 
 hh_router = APIRouter(prefix='/api/v1/hh',tags=['HH'])
+
+
+# Определяем Enum для статусов
+class VacancyStatus(str, Enum):
+    active = "active"
+    archived = "archived"
+
 
 @hh_router.get("/get_auth_url")
 async def get_auth_url(
@@ -34,17 +42,10 @@ async def hh_account_info(
 ):
     return await hh_controller.get_hh_account_info(current_user.get('sub'))
 
-from fastapi import Query
-from enum import Enum
-
-# Определяем Enum для статусов
-class VacancyStatus(str, Enum):
-    active = "active"
-    archived = "archived"
 
 @hh_router.get("/user_vacancies")
 async def get_user_vacancies(
-    status: VacancyStatus = Query("active", enum=VacancyStatus), 
+    status: VacancyStatus, 
     page: int = 0,
     current_user: dict = Depends(get_current_user),
     hh_controller: HHController = Depends(Factory.get_hh_controller)
