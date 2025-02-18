@@ -261,7 +261,7 @@ class HHController:
                         timeout=10.0,
                     )
                     vacancies_response.raise_for_status()
-                    vacancies.extend(vacancies_response.json().get("items", []))
+                    vacancies.extend(vacancies_response.json())
                 except httpx.RequestError as exc:
                     raise BadRequestException(f"HTTP error during vacancies retrieval: {exc}") from exc
 
