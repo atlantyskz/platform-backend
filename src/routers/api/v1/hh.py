@@ -8,7 +8,7 @@ hh_router = APIRouter(prefix='/api/v1/hh',tags=['HH'])
 
 
 # Определяем Enum для статусов
-class VacancyStatus(str, Enum):
+class VacancyStatus(Enum):
     active = "active"
     archived = "archived"
 
@@ -45,7 +45,7 @@ async def hh_account_info(
 
 @hh_router.get("/user_vacancies")
 async def get_user_vacancies(
-    status: VacancyStatus, 
+    status: str, 
     page: int = 0,
     current_user: dict = Depends(get_current_user),
     hh_controller: HHController = Depends(Factory.get_hh_controller)
