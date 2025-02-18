@@ -34,10 +34,28 @@ async def hh_account_info(
 ):
     return await hh_controller.get_hh_account_info(current_user.get('sub'))
 
+from fastapi import Query
+from enum import Enum
+
+# Определяем Enum для статусов
+class VacancyStatus(str, Enum):
+    active = "active"
+    archived = "archived"
 
 @hh_router.get("/user_vacancies")
 async def get_user_vacancies(
-    status:str|None = None,
+    status: VacancyStatus = Query("active", enum=VacancyStatus), 
+    page: int = 0,
+    current_user: dict = Depends(get_current_user),
+    hh_controller: HHController = Depends(Factory.get_hh_controller)
+):
+    # Передаем статус в контроллер
+    return await hh_controller.get_user_vacancies(current_user.get('sub'), status, page)
+
+
+@hh_router.get("/user_vacancies")
+async def get_user_vacancies(
+    status:str = ['active','archived'],
     page:int = 0,
     current_user: dict = Depends(get_current_user),
     hh_controller:HHController = Depends(Factory.get_hh_controller)
