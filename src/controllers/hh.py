@@ -251,6 +251,7 @@ class HHController:
                 raise BadRequestException(f"HTTP error during managers retrieval: {exc}") from exc
 
         vacancies = []
+        meta={}
         async with httpx.AsyncClient() as client:
             for manager in managers:
                 manager_id = manager.get("id")
@@ -262,8 +263,9 @@ class HHController:
                         timeout=10.0,
                     )
                     vacancies_response.raise_for_status()
-                    print(vacancies_response.json())
                     vacancies.extend(vacancies_response.json().get("items", []))
+                    pages = vacancies_response.json().get("pages", {})
+                    meta.update({'pages':pages})
                 except httpx.RequestError as exc:
                     raise BadRequestException(f"HTTP error during vacancies retrieval: {exc}") from exc
 
