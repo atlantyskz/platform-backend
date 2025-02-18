@@ -106,7 +106,6 @@ class AuthController:
         except Exception:
             raise
 
-        
 
     async def request_to_reset_password(self, email: str):
         try:
@@ -123,7 +122,6 @@ class AuthController:
             <p>Ссылка будет действительна в течение 1 часа.</p>
             <p>Если вы не запрашивали сброс пароля, просто проигнорируйте это письмо.</p>
             """
-
             await self.email_service.send_email(
                 to_email=email,
                 subject="Password Reset Request",

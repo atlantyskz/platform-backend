@@ -223,7 +223,8 @@ class HHController:
 
         return response.json()
     
-    async def get_user_vacancies(self, user_id: int,status:str|None) -> dict:
+
+    async def get_user_vacancies(self, user_id: int, status: str | None) -> dict:
         """
         Получение списка вакансий пользователя на HH.
         """
@@ -237,28 +238,34 @@ class HHController:
         headers = {"Authorization": f"Bearer {hh_account.access_token}"}
         employer_data = await self.get_hh_account_info(user_id)
         emp_id = employer_data.get("employer", {}).get("id")
+        print(emp_id)
+        # Получаем список менеджеров
         async with httpx.AsyncClient() as client:
             try:
-                if status == 'archived':
-                    response = await client.get(
-                        f"https://api.hh.ru/employers/{emp_id}/vacancies/archived",
-                        headers=headers,
-                        timeout=10.0,
-                    )
-                else:
-                    response = await client.get(
-                        f"https://api.hh.ru/employers/{emp_id}/vacancies/active",
-                        headers=headers,
-                        timeout=10.0,
-                    )
+                managers_response = await client.get(
+                    f"https://api.hh.ru/employers/{emp_id}/managers", headers=headers, timeout=10.0
+                )
+                managers_response.raise_for_status()
+                managers = managers_response.json().get("items", [])
             except httpx.RequestError as exc:
-                raise BadRequestException(f"HTTP error during vacancies retrieval: {exc}") from exc
+                raise BadRequestException(f"HTTP error during managers retrieval: {exc}") from exc
 
-        if response.status_code != 200:
-            raise BadRequestException(f"Error retrieving user vacancies: {response.text}")
+        vacancies = []
+        async with httpx.AsyncClient() as client:
+            for manager in managers:
+                manager_id = manager.get("id")
+                try:
+                    vacancies_response = await client.get(
+                        f"https://api.hh.ru/employers/{emp_id}/vacancies/{status or 'active'}?manager_id={manager_id}",
+                        headers=headers,
+                        timeout=10.0,
+                    )
+                    vacancies_response.raise_for_status()
+                    vacancies.extend(vacancies_response.json().get("items", []))
+                except httpx.RequestError as exc:
+                    raise BadRequestException(f"HTTP error during vacancies retrieval: {exc}") from exc
 
-        return response.json()
-
+        return {"vacancies": vacancies}
 
     async def get_vacancy_by_id(self, user_id: int, vacancy_id: int) -> dict:
         """
