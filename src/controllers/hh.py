@@ -224,7 +224,7 @@ class HHController:
         return response.json()
     
 
-    async def get_user_vacancies(self, user_id: int, status: str | None) -> dict:
+    async def get_user_vacancies(self, user_id: int, status: str | None,page:int) -> dict:
         """
         Получение списка вакансий пользователя на HH.
         """
@@ -256,7 +256,7 @@ class HHController:
                 manager_id = manager.get("id")
                 try:
                     vacancies_response = await client.get(
-                        f"https://api.hh.ru/employers/{emp_id}/vacancies/{status or 'active'}?manager_id={manager_id}",
+                        f"https://api.hh.ru/employers/{emp_id}/vacancies/{status or 'active'}?manager_id={manager_id}?page={page}",
                         headers=headers,
                         timeout=10.0,
                     )

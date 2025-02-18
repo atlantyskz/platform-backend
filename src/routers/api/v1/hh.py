@@ -38,10 +38,11 @@ async def hh_account_info(
 @hh_router.get("/user_vacancies")
 async def get_user_vacancies(
     status:str|None = None,
+    page:int = 0,
     current_user: dict = Depends(get_current_user),
     hh_controller:HHController = Depends(Factory.get_hh_controller)
 ):
-    return await hh_controller.get_user_vacancies(current_user.get('sub'),status)
+    return await hh_controller.get_user_vacancies(current_user.get('sub'),status,page)
 
 
 @hh_router.get("/vacancy/{vacancy_id}")
