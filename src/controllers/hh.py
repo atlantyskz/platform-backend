@@ -224,10 +224,10 @@ class HHController:
 
         return response.json()
     
-    def paginate_vacancies(self,vacancies: list, page: int = 1, page_size: int = 10) -> dict:
+    def paginate_vacancies(self,vacancies: list, page: int = 0, page_size: int = 10) -> dict:
         total_vacancies = len(vacancies)
         total_pages = (total_vacancies + page_size - 1) // page_size 
-        if page < 1 or page > total_pages:
+        if page < 0 or page > total_pages:
             return {
                 "page": page,
                 "total_pages": total_pages,
@@ -292,8 +292,8 @@ class HHController:
                 except httpx.RequestError as exc:
                     raise BadRequestException(f"HTTP error during vacancies retrieval: {exc}") from exc
         all_vacancies = vacancies 
-        paginated_result = self.paginate_vacancies(all_vacancies, page=page, page_size=10)
-        return paginated_result
+        # paginated_result = self.paginate_vacancies(all_vacancies, page=page, page_size=10)
+        return all_vacancies
 
 
     async def get_vacancy_by_id(self, user_id: int, vacancy_id: int) -> dict:
