@@ -343,13 +343,10 @@ class HHController:
 
 
 
-    async def get_all_applicant_resume_ids(self, user_id: int, vacancy_id: int, per_page: int = 50) -> list:
+    async def get_all_applicant_resume_ids(self, user_id: int, vacancy_id: int, per_page: int = 25) -> list:
         hh_account = await self.hh_account_repository.get_hh_account_by_user_id(user_id)
         if hh_account is None:
-            raise NotFoundException("HH account not found")
-
-        if datetime.utcnow() >= hh_account.expires_at - timedelta(minutes=5):
-            hh_account = await self.refresh_token(user_id)
+            raise Exception("HH account not found")
 
         headers = {"Authorization": f"Bearer {hh_account.access_token}"}
         all_resume_ids = []
@@ -358,102 +355,115 @@ class HHController:
         async with httpx.AsyncClient() as client:
             while True:
                 url = f"https://api.hh.ru/negotiations/response?vacancy_id={vacancy_id}&page={page}&per_page={per_page}"
-                try:
-                    response = await client.get(url, headers=headers, timeout=10.0)
-                except httpx.RequestError as exc:
-                    raise BadRequestException(f"HTTP error during applicants retrieval: {exc}") from exc
-
+                response = await client.get(url, headers=headers, timeout=10.0)
                 if response.status_code != 200:
-                    raise BadRequestException(f"Error retrieving applicants: {response.text}")
-
+                    break
                 data = response.json()
                 items = data.get("items", [])
                 if not items:
-                    break  
-                
-                all_resume_ids.extend([item.get("resume", {}).get("id", "") for item in items])
+                    break 
+
+                resume_ids = [
+                    item.get("resume", {}).get("id")
+                    for item in items
+                    if item.get("resume", {}).get("id")
+                ]
+                all_resume_ids.extend(resume_ids)
                 page += 1
 
         return all_resume_ids
 
-    async def fetch_resume_details(self, user_id: int, resume_id: str):
-        url = f"https://api.hh.ru/resumes/{resume_id}"
+    async def fetch_resume_details(self, user_id: int, resume_id: str) -> dict:
         hh_account = await self.hh_account_repository.get_hh_account_by_user_id(user_id)
         if hh_account is None:
-            raise NotFoundException("HH account not found")
-
-        if datetime.utcnow() >= hh_account.expires_at - timedelta(minutes=5):
-            hh_account = await self.refresh_token(user_id)
-
+            raise Exception("HH account not found")
         headers = {"Authorization": f"Bearer {hh_account.access_token}"}
-
+        url = f"https://api.hh.ru/resumes/{resume_id}"
         async with httpx.AsyncClient() as client:
-            try:
-                response = await client.get(url, headers=headers, timeout=10.0)
-            except httpx.RequestError as exc:
-                raise BadRequestException(f"HTTP error during resume retrieval: {exc}") from exc
-
+            response = await client.get(url, headers=headers, timeout=10.0)
         if response.status_code != 200:
-            raise BadRequestException(f"Error retrieving resume {resume_id}: {response.text}")
-        
+            raise Exception(f"Error retrieving resume {resume_id}: {response.text}")
         return response.json()
+    
 
     async def analyze_vacancy_applicants(self, session_id: str, user_id: int, vacancy_id: int) -> dict:
         async with self.session.begin():
+            # Проверка сессии
             session = await self.assistant_session_repo.get_by_session_id(session_id)
             if session is None:
                 raise NotFoundException("Session not found")
 
+            # Получение HH аккаунта
             hh_account = await self.hh_account_repository.get_hh_account_by_user_id(user_id)
             if hh_account is None:
                 raise NotFoundException("HH account not found")
 
+            # Получаем организацию пользователя
             user_organization = await self.organization_repo.get_user_organization(user_id)
 
+            # Обновляем токен, если он скоро истекает
             if datetime.utcnow() >= hh_account.expires_at - timedelta(minutes=5):
                 hh_account = await self.refresh_token(user_id)
 
+            # Получаем текст вакансии
             vacancy_text = extract_vacancy_summary(await self.get_vacancy_by_id(user_id, vacancy_id))
 
+            # Получаем баланс
             balance = await self.balance_repo.get_balance(user_organization.id)
-            skipped_resumes = []
-            all_task_ids = []
             if balance.atl_tokens < 5:
                 raise BadRequestException("Insufficient balance")
 
-            all_resume_ids = await self.get_all_applicant_resume_ids(user_id, vacancy_id, per_page=50)
+            skipped_resumes = []
+            all_task_ids = []
 
-            semaphore = asyncio.Semaphore(5) 
+            # Получаем ID резюме кандидатов
+            resume_ids = await self.get_all_applicant_resume_ids(user_id, vacancy_id)
+            if not resume_ids:
+                print("Нет резюме для обработки")
+                return {
+                    "session_id": session_id,
+                    "tasks": [],
+                    "skipped_resumes": [],
+                    "task_count": 0
+                }
 
-            async def process_resume(resume_id):
-                async with semaphore:
-                    if balance.atl_tokens < 5:
-                        skipped_resumes.append(resume_id)
-                        return None
+            # Параллельно получаем детали каждого резюме
+            tasks = [self.fetch_resume_details(user_id, resume_id) for resume_id in resume_ids]
+            resumes_data = await asyncio.gather(*tasks, return_exceptions=True)
 
-                    resume_data = await self.fetch_resume_details(user_id, resume_id)
-                    candidate_info = extract_full_candidate_info(resume_data)
-                    resume_text = assemble_candidate_summary(candidate_info)
-                    
-                    if not resume_text:
-                        return None
-                    
-                    task_id = str(uuid.uuid4())
-                    await self.bg_backend.create_task({
-                        "task_id": task_id,
-                        "session_id": session_id,
-                        "task_type": "hh cv analyze",
-                        "task_status": "pending",
-                        "hh_file_url": resume_data.get("download", {}).get("pdf", {}).get("url", None),
-                    })
+            # Обрабатываем каждое резюме
+            for resume_id, resume_data in zip(resume_ids, resumes_data):
+                if isinstance(resume_data, Exception):
+                    print(f"Ошибка при получении резюме {resume_id}: {resume_data}")
+                    skipped_resumes.append(resume_id)
+                    continue
 
-                    DramatiqWorker.process_resume.send(
-                        task_id, vacancy_text, resume_text, user_id, user_organization.id, balance.id, resume_text
-                    )
-                    all_task_ids.append(task_id)
-                    print(f"Processing resume {resume_id} for user {user_id}")
+                candidate_info = extract_full_candidate_info(resume_data)
+                candidate_resume_text = assemble_candidate_summary(candidate_info)
+                if not candidate_resume_text:
+                    skipped_resumes.append(resume_id)
+                    continue
 
-            await asyncio.gather(*[process_resume(resume_id) for resume_id in all_resume_ids])
+                task_id = str(uuid.uuid4())
+                await self.bg_backend.create_task({
+                    "task_id": task_id,
+                    "session_id": session_id,
+                    "task_type": "hh cv analyze",
+                    "task_status": "pending",
+                    "hh_file_url": resume_data.get("download", {}).get("pdf", {}).get("url", None),
+                })
+
+                DramatiqWorker.process_resume.send(
+                    task_id,
+                    vacancy_text,
+                    candidate_resume_text,
+                    user_id,
+                    user_organization.id,
+                    balance.id,
+                    candidate_resume_text
+                )
+                all_task_ids.append(task_id)
+                print(f"Processing resume {resume_id} for user {user_id}")
 
             return {
                 "session_id": session_id,
@@ -461,8 +471,6 @@ class HHController:
                 "skipped_resumes": skipped_resumes,
                 "task_count": len(all_task_ids)
             }
-        
-
     async def websocket_endpoint(self,websocket: WebSocket, vacancy_id: str,message_from_server:dict):
         await websocket.accept()
         
