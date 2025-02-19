@@ -271,6 +271,7 @@ class HHController:
                 )
                 managers_response.raise_for_status()
                 managers = managers_response.json().get("items", [])
+                print('MAN',managers)
             except httpx.RequestError as exc:
                 raise BadRequestException(f"HTTP error during managers retrieval: {exc}") from exc
 
