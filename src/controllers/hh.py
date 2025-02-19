@@ -7,6 +7,7 @@ import uuid
 from fastapi import WebSocket
 from fastapi.responses import RedirectResponse
 import httpx
+import math
 
 from src.repositories.balance import BalanceRepository
 from src.repositories.balance_usage import BalanceUsageRepository
@@ -274,7 +275,6 @@ class HHController:
                 raise BadRequestException(f"HTTP error during managers retrieval: {exc}") from exc
 
         vacancies = []
-        meta={}
         async with httpx.AsyncClient() as client:
             for manager in managers:
                 manager_id = manager.get("id")
@@ -287,13 +287,30 @@ class HHController:
                     )
                     vacancies_response.raise_for_status()
                     vacancies.extend(vacancies_response.json().get("items", []))
-                    pages = vacancies_response.json().get("pages", {})
-                    meta.update({'pages':pages})
                 except httpx.RequestError as exc:
                     raise BadRequestException(f"HTTP error during vacancies retrieval: {exc}") from exc
         all_vacancies = vacancies 
-        # paginated_result = self.paginate_vacancies(all_vacancies, page=page, page_size=10)
-        return all_vacancies
+
+        items_per_page = 10  
+        total_items = len(all_vacancies)
+        total_pages = math.ceil(total_items / items_per_page)
+
+        # Вычисляем индексы для среза
+        start_index = (page - 1) * items_per_page
+        end_index = start_index + items_per_page
+
+        # Получаем вакансии для текущей страницы
+        paginated_vacancies = all_vacancies[start_index:end_index]
+
+        # Можно вернуть результат с информацией о пагинации
+        result = {
+            "vacancies": paginated_vacancies,
+            "total_items": total_items,
+            "total_pages": total_pages,
+            "current_page": page,
+        }
+        return result
+
 
 
     async def get_vacancy_by_id(self, user_id: int, vacancy_id: int) -> dict:
