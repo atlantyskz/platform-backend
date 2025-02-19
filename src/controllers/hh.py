@@ -1,5 +1,6 @@
 import asyncio
 from datetime import datetime, timedelta
+import logging
 from typing import AsyncGenerator, List
 from urllib.parse import urlencode
 import uuid
@@ -25,7 +26,7 @@ from src.repositories.hh import HHAccountRepository
 from src.core.settings import settings
 from sqlalchemy.ext.asyncio import AsyncSession
 
-
+logging.basicConfig(level=logging.DEBUG, format="%(asctime)s - %(levelname)s - %(message)s")
 class HHController:
     def __init__(self, session: AsyncSession):
         self.session = session
@@ -223,6 +224,28 @@ class HHController:
 
         return response.json()
     
+    def paginate_vacancies(self,vacancies: list, page: int = 1, page_size: int = 10) -> dict:
+        total_vacancies = len(vacancies)
+        total_pages = (total_vacancies + page_size - 1) // page_size 
+        if page < 1 or page > total_pages:
+            return {
+                "page": page,
+                "total_pages": total_pages,
+                "total_vacancies": total_vacancies,
+                "vacancies": []
+            }
+        
+        start = (page - 1) * page_size
+        end = start + page_size
+        paginated_items = vacancies[start:end]
+        
+        return {
+            "page": page,
+            "total_pages": total_pages,
+            "total_vacancies": total_vacancies,
+            "vacancies": paginated_items
+        }
+
 
     async def get_user_vacancies(self, user_id: int, status: str , page: int) -> dict:
         """
@@ -268,8 +291,10 @@ class HHController:
                     meta.update({'pages':pages})
                 except httpx.RequestError as exc:
                     raise BadRequestException(f"HTTP error during vacancies retrieval: {exc}") from exc
+        all_vacancies = vacancies 
+        paginated_result = self.paginate_vacancies(all_vacancies, page=page, page_size=10)
+        return paginated_result
 
-        return {"vacancies": vacancies,**meta}
 
     async def get_vacancy_by_id(self, user_id: int, vacancy_id: int) -> dict:
         """
@@ -386,40 +411,58 @@ class HHController:
         return response.json()
     
 
+    # Пример функции analyze_vacancy_applicants с подробным логированием
     async def analyze_vacancy_applicants(self, session_id: str, user_id: int, vacancy_id: int) -> dict:
+        logging.info(f"Запуск анализа вакансии. session_id={session_id}, user_id={user_id}, vacancy_id={vacancy_id}")
         async with self.session.begin():
             # Проверка сессии
             session = await self.assistant_session_repo.get_by_session_id(session_id)
             if session is None:
+                logging.error(f"Сессия не найдена: session_id={session_id}")
                 raise NotFoundException("Session not found")
+            logging.debug(f"Найдена сессия: {session}")
 
             # Получение HH аккаунта
             hh_account = await self.hh_account_repository.get_hh_account_by_user_id(user_id)
             if hh_account is None:
+                logging.error(f"HH аккаунт не найден для user_id={user_id}")
                 raise NotFoundException("HH account not found")
+            logging.debug(f"Получен HH аккаунт: {hh_account}")
 
             # Получаем организацию пользователя
             user_organization = await self.organization_repo.get_user_organization(user_id)
+            logging.debug(f"Организация пользователя: {user_organization}")
 
             # Обновляем токен, если он скоро истекает
-            if datetime.utcnow() >= hh_account.expires_at - timedelta(minutes=5):
+            now = datetime.utcnow()
+            if now >= hh_account.expires_at - timedelta(minutes=5):
+                logging.info(f"Токен скоро истекает, обновление для user_id={user_id}")
                 hh_account = await self.refresh_token(user_id)
+                logging.debug(f"Токен обновлён: {hh_account}")
+            else:
+                logging.debug("Токен еще действителен")
 
             # Получаем текст вакансии
-            vacancy_text = extract_vacancy_summary(await self.get_vacancy_by_id(user_id, vacancy_id))
+            vacancy_raw = await self.get_vacancy_by_id(user_id, vacancy_id)
+            vacancy_text = extract_vacancy_summary(vacancy_raw)
+            logging.info(f"Извлечён текст вакансии (первые 100 символов): {vacancy_text[:100]}")
 
             # Получаем баланс
             balance = await self.balance_repo.get_balance(user_organization.id)
+            logging.debug(f"Баланс пользователя: {balance}")
             if balance.atl_tokens < 5:
+                logging.error(f"Недостаточно средств: имеется {balance.atl_tokens} токенов, требуется минимум 5")
                 raise BadRequestException("Insufficient balance")
+            logging.info(f"Баланс достаточен: {balance.atl_tokens} токенов")
 
             skipped_resumes = []
             all_task_ids = []
 
             # Получаем ID резюме кандидатов
             resume_ids = await self.get_all_applicant_resume_ids(user_id, vacancy_id)
+            logging.info(f"Найдено {len(resume_ids)} ID резюме")
             if not resume_ids:
-                print("Нет резюме для обработки")
+                logging.warning("Нет резюме для обработки")
                 return {
                     "session_id": session_id,
                     "tasks": [],
@@ -428,23 +471,27 @@ class HHController:
                 }
 
             # Параллельно получаем детали каждого резюме
+            logging.info("Запуск параллельного получения деталей резюме")
             tasks = [self.fetch_resume_details(user_id, resume_id) for resume_id in resume_ids]
             resumes_data = await asyncio.gather(*tasks, return_exceptions=True)
+            logging.debug("Детали резюме получены")
 
             # Обрабатываем каждое резюме
             for resume_id, resume_data in zip(resume_ids, resumes_data):
                 if isinstance(resume_data, Exception):
-                    print(f"Ошибка при получении резюме {resume_id}: {resume_data}")
+                    logging.error(f"Ошибка при получении резюме {resume_id}: {resume_data}")
                     skipped_resumes.append(resume_id)
                     continue
 
                 candidate_info = extract_full_candidate_info(resume_data)
                 candidate_resume_text = assemble_candidate_summary(candidate_info)
                 if not candidate_resume_text:
+                    logging.warning(f"Пустой текст резюме кандидата для resume_id={resume_id}")
                     skipped_resumes.append(resume_id)
                     continue
 
                 task_id = str(uuid.uuid4())
+                logging.info(f"Создание фоновой задачи с id={task_id} для resume_id={resume_id}")
                 await self.bg_backend.create_task({
                     "task_id": task_id,
                     "session_id": session_id,
@@ -453,6 +500,7 @@ class HHController:
                     "hh_file_url": resume_data.get("download", {}).get("pdf", {}).get("url", None),
                 })
 
+                logging.info(f"Отправка задачи {task_id} на обработку через DramatiqWorker")
                 DramatiqWorker.process_resume.send(
                     task_id,
                     vacancy_text,
@@ -460,11 +508,12 @@ class HHController:
                     user_id,
                     user_organization.id,
                     balance.id,
-                    candidate_resume_text
+                    candidate_resume_text  # Здесь передаем user_message, в данном примере это тот же текст резюме
                 )
                 all_task_ids.append(task_id)
-                print(f"Processing resume {resume_id} for user {user_id}")
+                logging.info(f"Обработка резюме {resume_id} для user_id={user_id}")
 
+            logging.info(f"Завершено создание задач: создано {len(all_task_ids)} задач, пропущено {len(skipped_resumes)} резюме")
             return {
                 "session_id": session_id,
                 "tasks": all_task_ids,
