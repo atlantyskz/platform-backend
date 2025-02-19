@@ -279,6 +279,7 @@ class HHController:
             for manager in managers:
                 manager_id = manager.get("id")
                 hh_page = page_from -1 
+                print('MANAGER ID', manager_id)
                 try:
                     # Исправляем URL с пагинацией
                     vacancies_response = await client.get(
@@ -307,7 +308,6 @@ class HHController:
         # Можно вернуть результат с информацией о пагинации
         result = {
             "vacancies": paginated_vacancies,
-            "total_items": total_items,
             "total_pages": total_pages,
             "current_page": page_from,
         }
