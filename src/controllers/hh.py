@@ -248,7 +248,7 @@ class HHController:
         }
 
 
-    async def get_user_vacancies(self, user_id: int, status: str , page: int) -> dict:
+    async def get_user_vacancies(self, user_id: int, status: str , page_from: int) -> dict:
         """
         Получение списка вакансий пользователя на HH.
         """
@@ -278,10 +278,11 @@ class HHController:
         async with httpx.AsyncClient() as client:
             for manager in managers:
                 manager_id = manager.get("id")
+                hh_page = page_from -1 
                 try:
                     # Исправляем URL с пагинацией
                     vacancies_response = await client.get(
-                        f"https://api.hh.ru/employers/{emp_id}/vacancies/{status}?page={page}&manager_id={manager_id}",
+                        f"https://api.hh.ru/employers/{emp_id}/vacancies/{status}?page={hh_page}&manager_id={manager_id}",
                         headers=headers,
                         timeout=10.0,
                     )
@@ -290,13 +291,14 @@ class HHController:
                 except httpx.RequestError as exc:
                     raise BadRequestException(f"HTTP error during vacancies retrieval: {exc}") from exc
         all_vacancies = vacancies 
+        print(vacancies)
 
         items_per_page = 10  
         total_items = len(all_vacancies)
         total_pages = math.ceil(total_items / items_per_page)
 
         # Вычисляем индексы для среза
-        start_index = (page - 1) * items_per_page
+        start_index = (page_from - 1) * items_per_page
         end_index = start_index + items_per_page
 
         # Получаем вакансии для текущей страницы
@@ -307,7 +309,7 @@ class HHController:
             "vacancies": paginated_vacancies,
             "total_items": total_items,
             "total_pages": total_pages,
-            "current_page": page,
+            "current_page": page_from,
         }
         return result
 
