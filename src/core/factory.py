@@ -1,4 +1,5 @@
 from fastapi import Depends
+from src.controllers.clone import CloneController
 from src.controllers.hh import HHController
 from src.controllers.billing import BillingController
 from src.controllers.balance import BalanceController
@@ -69,5 +70,10 @@ class Factory:
 
     def get_hh_controller(session: AsyncSession = Depends(get_session))->HHController:
         return HHController(
+            session
+        )
+    
+    def get_clone_controller(session: AsyncSession = Depends(get_session))->CloneController:
+        return CloneController(
             session
         )

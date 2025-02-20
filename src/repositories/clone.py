@@ -11,14 +11,20 @@ class CloneRepository:
         self.session = session
 
     async def create_clone(self, attributes: dict) -> Clone:
-        stmt = insert(Clone).values(**attributes).returning(Clone)
-        result = await self.session.execute(stmt)
-        return result.scalars().first()
+        clone  = Clone(**attributes)
+        self.session.add(clone)
+        await self.session.flush()
+        return clone
 
     async def get_clone_by_id(self, clone_id: int) -> Optional[Clone]:
         stmt = select(Clone).where(Clone.id == clone_id)
         result = await self.session.execute(stmt)
         return result.scalars().first()
+    
+    async def get_all(self,):
+        stmt = select(Clone)
+        result = await self.session.execute(stmt)
+        return result.scalars().all()
 
     async def update_status(self, clone_id: int, status: str) -> Optional[Clone]:
         clone = await self.get_clone_by_id(clone_id)

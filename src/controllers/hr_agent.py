@@ -73,10 +73,10 @@ class HRAgentController:
         
 
         self.minio_service = MinioUploader(
-        host="minio:9000",  
-        access_key="admin",
-        secret_key="admin123",
-        bucket_name="analyze-resumes"
+            host="minio:9000",  
+            access_key="admin",
+            secret_key="admin123",
+            bucket_name="analyze-resumes"
     )
         self.manager = manager
         self.upload_progress = {}

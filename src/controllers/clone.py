@@ -5,6 +5,7 @@ from uuid import uuid4
 from typing import List, Optional
 
 from fastapi import UploadFile
+from src.services.helpers import generate_clone_filekey
 from src.core.exceptions import BadRequestException,NotFoundException
 from src.repositories.assistant_session import AssistantSessionRepository
 from src.repositories.assistant import AssistantRepository
@@ -23,7 +24,7 @@ class CloneController:
             host="minio:9000",  
             access_key="admin",
             secret_key="admin123",
-            bucket_name="clone_files"
+            bucket_name="clone-files"
         )
         self.user_repo = UserRepository(session)
         self.assistant_session_repo = AssistantSessionRepository(session)
@@ -32,26 +33,62 @@ class CloneController:
         self.clone_repo = CloneRepository(session)
 
 
-    async def create_clone(self, user_id: int, lipsynch_text: str, agreement_video: UploadFile, sample_video: UploadFile) -> dict:
-        try:
-            # Генерация уникального идентификатора для сессии
-            session_id = f"{user_id}_{lipsynch_text}"
+    async def create_clone(
+            self,
+            user_id: int,
+            lipsynch_text: str,
+            agreement_video: UploadFile,
+            sample_video: UploadFile
+        ) -> dict:
+            async with self.session.begin():
+                try:
+                    # Генерация уникального идентификатора сессии
+                    session_id = str(uuid4())
 
-            # Загружаем видеофайлы в MinIO
-            agreement_video_path, _ = await self.minio_uploader.upload_single_file(await agreement_video.read(), f"{session_id}_agreement.mp4")
-            sample_video_path, _ = await self.minio_uploader.upload_single_file(await sample_video.read(), f"{session_id}_sample.mp4")
+                    # Чтение данных файлов
+                    agreement_video_data = await agreement_video.read()
+                    sample_video_data = await sample_video.read()
 
-            # Создаем запись в базе данных
-            clone = await self.clone_repo.create_clone({
-                'user_id': user_id,
-                'agreement_video_path': agreement_video_path,
-                'sample_video_path': sample_video_path,
-                'lipsynch_text': lipsynch_text,
-                'status': 'pending'
-            })
-            return {
-                'message':"Successfully uploaded",
-                'status':'pending'
-            }
-        except Exception as e:
-            raise BadRequestException(f"Error creating clone: {str(e)}")
+                    # Генерация уникальных ключей для каждого файла
+                    agreement_video_key = generate_clone_filekey(session_id, agreement_video.filename)
+                    sample_video_key = generate_clone_filekey(session_id, sample_video.filename)
+
+                    # Загрузка файлов в MinIO через upload_single_file
+                    agreement_uploaded = await self.minio_uploader.upload_single_file(agreement_video_data, agreement_video_key)
+                    sample_uploaded = await self.minio_uploader.upload_single_file(sample_video_data, sample_video_key)
+
+                    # Извлечение относительных путей (например, "clone-files/filename.mp4")
+                    agreement_video_path = agreement_uploaded[0]
+                    sample_video_path = sample_uploaded[0]
+
+                    # Создание записи клона в базе данных
+                    await self.clone_repo.create_clone({
+                        'user_id': user_id,
+                        'agreement_video_path': agreement_video_key,
+                        'sample_video_path': sample_video_key,
+                        'lipsynch_text': lipsynch_text,
+                        'status': 'pending'
+                    })
+
+                    return {
+                        'message': "Successfully uploaded",
+                        'status': 'pending'
+                    }
+
+                except Exception as e:
+                    raise BadRequestException(f"Error creating clone: {str(e)}")
+    
+
+    async def get_all_clone_requests(self,):
+        async with self.session.begin():
+            all = await self.clone_repo.get_all()
+            return all
+        
+    async def get_request_by_id(self,id):
+        async with self.session.begin():
+            request = await self.clone_repo.get_clone_by_id(id)
+            return request
+
+    async def get_video_by_id(self,id,type_v):
+        if type_v =='agreement':
+            

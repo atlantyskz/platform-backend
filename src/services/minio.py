@@ -7,7 +7,7 @@ from typing import List, Tuple
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
 import urllib.parse
-from src.services.helpers import generate_file_key
+from src.services.helpers import generate_file_key,generate_clone_filekey
 import json
 from io import BytesIO
 
@@ -94,12 +94,28 @@ class MinioUploader:
         for file in files:
             try:
                 file_data = await file.read()
-                file_key = generate_file_key(session_id, file.filename)  # Генерация file key
+                file_key = generate_file_key(session_id, file.filename)  
                 upload_tasks.append(self.upload_single_file(file_data, file_key))
             except Exception as e:
                 raise BadRequestException(f"Error reading file {file.filename}: {str(e)}")
 
         return await asyncio.gather(*upload_tasks)
+    
+    async def save_clone_files_in_minio(self, files: List[UploadFile], session_id: str) -> List[Tuple[str, str]]:
+        """Параллельная загрузка множества файлов"""
+        await self.ensure_bucket_exists()
+
+        upload_tasks = []
+        for file in files:
+            try:
+                file_data = await file.read()
+                file_key = generate_clone_filekey(session_id, file.filename)  
+                upload_tasks.append(self.upload_single_file(file_data, file_key))
+            except Exception as e:
+                raise BadRequestException(f"Error reading file {file.filename}: {str(e)}")
+
+        return await asyncio.gather(*upload_tasks)
+
 
 
     def get_file(self, object_key: str) -> BytesIO:
