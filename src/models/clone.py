@@ -5,7 +5,7 @@ from src.models import Base,TimestampMixin
 
 class Clone(Base,TimestampMixin):
 
-    __tablename__ = 'assistants'
+    __tablename__ = 'ai_clones'
 
     id: so.Mapped[int] = so.mapped_column(sa.Integer,primary_key=True,autoincrement=True,index=True)
     user_id: so.Mapped[int] = so.mapped_column(sa.ForeignKey('users.id',ondelete='CASCADE'))

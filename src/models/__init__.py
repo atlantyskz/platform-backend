@@ -39,6 +39,7 @@ from .discount import Discount
 from .balance_usage import BalanceUsage
 from .refund_application import RefundApplication
 from .hh import HHAccount
+from .clone import Clone
 
 sql_admin_models_list = [
     User,
@@ -58,6 +59,7 @@ sql_admin_models_list = [
     Discount,
     BalanceUsage,
     RefundApplication,
-    HHAccount
+    HHAccount,
+    Clone
 ]
 
