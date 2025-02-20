@@ -1,4 +1,4 @@
-from fastapi import Depends, FastAPI,APIRouter, Form, WebSocket
+from fastapi import Depends, FastAPI,APIRouter, Form, Query, WebSocket
 from src.core.middlewares.auth_middleware import get_current_user
 from src.core.factory import Factory
 from src.controllers.hh import HHController 
@@ -38,7 +38,7 @@ async def hh_account_info(
 @hh_router.get("/user_vacancies")
 async def get_user_vacancies(
     status:str,
-    page:int = 0,
+    page:int = Query(ge=1),
     current_user: dict = Depends(get_current_user),
     hh_controller:HHController = Depends(Factory.get_hh_controller)
 ):
