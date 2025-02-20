@@ -303,6 +303,7 @@ class HHController:
             "total_items": total_items,
             "total_pages": total_pages,
             "current_page": page_from,
+            'items_per_page':len(paginated_vacancies)
         }
         return result
 
