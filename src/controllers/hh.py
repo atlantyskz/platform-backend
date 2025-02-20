@@ -225,9 +225,7 @@ class HHController:
 
         return response.json()
     
-
-
-    async def get_user_vacancies(self, user_id: int, status: str , page_from: int) -> dict:
+    async def get_user_vacancies(self, user_id: int, status: str, page_from: int) -> dict:
         """
         Получение списка вакансий пользователя на HH.
         """
@@ -241,7 +239,7 @@ class HHController:
         headers = {"Authorization": f"Bearer {hh_account.access_token}"}
         employer_data = await self.get_hh_account_info(user_id)
         emp_id = employer_data.get("employer", {}).get("id")
-        print(emp_id)
+        
         # Получаем список менеджеров
         async with httpx.AsyncClient() as client:
             try:
@@ -250,31 +248,46 @@ class HHController:
                 )
                 managers_response.raise_for_status()
                 managers = managers_response.json().get("items", [])
-                print('MAN',managers)
             except httpx.RequestError as exc:
                 raise BadRequestException(f"HTTP error during managers retrieval: {exc}") from exc
 
-        vacancies = []
+        # Собираем все вакансии всех менеджеров в один список
+        all_vacancies = []
         async with httpx.AsyncClient() as client:
             for manager in managers:
                 manager_id = manager.get("id")
-                hh_page = page_from -1 
-                print('MANAGER ID', manager_id)
-                try:
-                    # Исправляем URL с пагинацией
-                    vacancies_response = await client.get(
-                        f"https://api.hh.ru/employers/{emp_id}/vacancies/{status}?page={hh_page}&manager_id={manager_id}",
-                        headers=headers,
-                        timeout=10.0,
-                    )
-                    vacancies_response.raise_for_status()
-                    vacancies.extend(vacancies_response.json().get("items", []))
-                    print(f'MANAGER - {manager_id}',vacancies)
-                except httpx.RequestError as exc:
-                    raise BadRequestException(f"HTTP error during vacancies retrieval: {exc}") from exc
-        all_vacancies = vacancies 
+                page_number = 0  # Начинаем с первой страницы для каждого менеджера
+                
+                while True:
+                    try:
+                        # Получаем вакансии для текущей страницы менеджера
+                        vacancies_response = await client.get(
+                            f"https://api.hh.ru/employers/{emp_id}/vacancies/{status}?page={page_number}&manager_id={manager_id}",
+                            headers=headers,
+                            timeout=10.0,
+                        )
+                        vacancies_response.raise_for_status()
+                        vacancies_data = vacancies_response.json()
+                        vacancies = vacancies_data.get("items", [])
+                        
+                        # Если вакансий нет, выходим из цикла
+                        if not vacancies:
+                            break
 
-        items_per_page = 10  
+                        # Добавляем вакансии текущей страницы в общий список
+                        all_vacancies.extend(vacancies)
+
+                        # Если на текущей странице меньше вакансий, чем на максимальной, выходим из цикла
+                        if len(vacancies) < vacancies_data.get("per_page", 10):
+                            break
+
+                        # Переходим на следующую страницу
+                        page_number += 1
+                    except httpx.RequestError as exc:
+                        raise BadRequestException(f"HTTP error during vacancies retrieval for manager {manager_id}: {exc}") from exc
+
+        # Пагинация для всех вакансий
+        items_per_page = 10
         total_items = len(all_vacancies)
         total_pages = math.ceil(total_items / items_per_page)
 
@@ -287,7 +300,7 @@ class HHController:
 
         result = {
             "vacancies": paginated_vacancies,
-            "total_items":len(vacancies),
+            "total_items": total_items,
             "total_pages": total_pages,
             "current_page": page_from,
         }
