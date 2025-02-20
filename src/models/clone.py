@@ -1,0 +1,18 @@
+import sqlalchemy as sa
+import sqlalchemy.orm as so
+from src.models import Base,TimestampMixin
+
+
+class Clone(Base,TimestampMixin):
+
+    __tablename__ = 'assistants'
+
+    id: so.Mapped[int] = so.mapped_column(sa.Integer,primary_key=True,autoincrement=True,index=True)
+    user_id: so.Mapped[int] = so.mapped_column(sa.ForeignKey('users.id',ondelete='CASCADE'))
+    agreement_video_path: so.Mapped[str] = so.mapped_column(sa.String,nullable=False)
+    sample_video_path: so.Mapped[str] = so.mapped_column(sa.String,nullable=False)
+    lipsynch_text:so.Mapped[str] = so.mapped_column(sa.Text(3000),nullable=False)
+    
+
+    def __str__(self):
+        return self.id

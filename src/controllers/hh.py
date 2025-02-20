@@ -225,27 +225,6 @@ class HHController:
 
         return response.json()
     
-    def paginate_vacancies(self,vacancies: list, page: int = 0, page_size: int = 10) -> dict:
-        total_vacancies = len(vacancies)
-        total_pages = (total_vacancies + page_size - 1) // page_size 
-        if page < 0 or page > total_pages:
-            return {
-                "page": page,
-                "total_pages": total_pages,
-                "total_vacancies": total_vacancies,
-                "vacancies": []
-            }
-        
-        start = (page - 1) * page_size
-        end = start + page_size
-        paginated_items = vacancies[start:end]
-        
-        return {
-            "page": page,
-            "total_pages": total_pages,
-            "total_vacancies": total_vacancies,
-            "vacancies": paginated_items
-        }
 
 
     async def get_user_vacancies(self, user_id: int, status: str , page_from: int) -> dict:
@@ -290,10 +269,10 @@ class HHController:
                     )
                     vacancies_response.raise_for_status()
                     vacancies.extend(vacancies_response.json().get("items", []))
+                    print(f'MANAGER - {manager_id}',vacancies)
                 except httpx.RequestError as exc:
                     raise BadRequestException(f"HTTP error during vacancies retrieval: {exc}") from exc
         all_vacancies = vacancies 
-        print(vacancies)
 
         items_per_page = 10  
         total_items = len(all_vacancies)
@@ -306,9 +285,9 @@ class HHController:
         # Получаем вакансии для текущей страницы
         paginated_vacancies = all_vacancies[start_index:end_index]
 
-        # Можно вернуть результат с информацией о пагинации
         result = {
             "vacancies": paginated_vacancies,
+            "total_items":len(vacancies),
             "total_pages": total_pages,
             "current_page": page_from,
         }
