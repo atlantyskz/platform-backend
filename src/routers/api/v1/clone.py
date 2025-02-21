@@ -33,7 +33,7 @@ async def get_all(
 
 
 @clone_router.get('/get_by_id/{clone_id}')
-async def get_vidde_by_id(
+async def get_video_by_id(
     clone_id:int,
     video_type:str,
     current_user: dict = Depends(get_current_user),
