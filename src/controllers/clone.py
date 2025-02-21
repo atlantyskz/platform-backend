@@ -36,6 +36,8 @@ class CloneController:
 
     async def create_clone(
             self,
+            gender:str,
+            name:str,
             user_id: int,
             lipsynch_text: str,
             agreement_video: UploadFile,
@@ -59,6 +61,8 @@ class CloneController:
 
                 await self.clone_repo.create_clone({
                     'user_id': user_id,
+                    'gender':gender,
+                    'name':name,
                     'agreement_video_path': agreement_video_key,
                     'sample_video_path': sample_video_key,
                     'lipsynch_text': lipsynch_text,
@@ -78,12 +82,21 @@ class CloneController:
             all_requests = await self.clone_repo.get_all()
             return all_requests
         
-    async def get_request_by_id(self, id):
+    async def get_request_by_id(self,user_id:int, id):
         async with self.session.begin():
             request = await self.clone_repo.get_clone_by_id(id)
+            if request.user_id != user_id:
+                raise BadRequestException('User not found')
+            
             return request
+    
+    async def get_clone_requests_by_user(self, user_id: int):
+        async with self.session.begin():
+            user_requests = await self.clone_repo.get_by_user(user_id)
+            return user_requests
+    
 
-    async def stream_clone_video(self, clone_id: int, video_type: str) -> StreamingResponse:
+    async def stream_clone_video(self, user_id:int,clone_id: int, video_type: str) -> StreamingResponse:
         async with self.session.begin():
             clone_request = await self.clone_repo.get_clone_by_id(clone_id)
             if not clone_request:
@@ -102,6 +115,16 @@ class CloneController:
 
             return StreamingResponse(video_stream, media_type="video/mp4")
 
-
-    async def update_clone_request_status(self,):
-        pass
+    async def update_clone_request_status(self, clone_id: int, new_status: str, is_admin: bool) -> dict:
+        
+        async with self.session.begin():
+            
+            updated_clone = await self.clone_repo.update_status(clone_id, new_status)
+            if not updated_clone:
+                raise NotFoundException("Clone request not found")
+            
+            return {
+                'message': "Status updated successfully",
+                'clone_id': clone_id,
+                'new_status': new_status
+            }

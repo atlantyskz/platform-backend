@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy import insert
 from src.models.clone import Clone
-from typing import Optional
+from typing import List, Optional
 
 class CloneRepository:
     def __init__(self, session: AsyncSession):
@@ -30,6 +30,10 @@ class CloneRepository:
         clone = await self.get_clone_by_id(clone_id)
         if clone:
             clone.status = status
-            await self.session.commit()
             return clone
         return None
+
+    async def get_by_user(self, user_id: int) -> List[Clone]:
+        stmt = select(Clone).where(Clone.user_id == user_id)
+        result = await self.session.execute(stmt)
+        return result.scalars().all()
