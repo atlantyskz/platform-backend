@@ -26,9 +26,10 @@ async def get_all(
     return await clone_service.get_all_clone_requests()
 
 
-@clone_router.get('/get_by_id/{id}')
+@clone_router.get('/get_by_id/{clone_id}')
 async def get_by_id(
-    id:int,
+    clone_id:int,
+    video_type:str,
     clone_service: CloneController = Depends(Factory.get_clone_controller)
 ):
-    return await clone_service.
+    return await clone_service.stream_clone_video(clone_id,video_type)
