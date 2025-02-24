@@ -359,13 +359,13 @@ class BillingController:
         data = {
             "grant_type": "client_credentials",
             "scope": "webapi usermanagement email_send verification statement statistics payment",
-            "client_id": "test",
-            "client_secret": "yF587AV9Ms94qN2QShFzVR3vFnWkhjbAK3sG",
+            "client_id": "ATLANTYS.KZ",
+            "client_secret": "p475l5oMEImwOd5X",
             "invoiceID": unique_invoice_id,
             "secret_hash": "HelloWorld123#",
             "amount": str(discounted_price),
             "currency": "KZT",
-            "terminal": "67e34d63-102f-4bd1-898e-370781d0074d",
+            "terminal": "5739a558-48e2-49cc-a65b-8f131cd75ed1",
             "postLink": "https://api.atlantys.kz/api/v1/balance/billing-status",
             "failurePostLink": "https://platform.atlantys.kz/payment/failure",
         }
