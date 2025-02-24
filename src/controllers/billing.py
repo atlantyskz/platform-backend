@@ -143,7 +143,7 @@ class BillingController:
                     billing_transaction = await self.billing_transaction_repository.get_by_invoice_id(invoice_id)
 
                     bank_transaction_response = await client.get(
-                        f"https://testepay.homebank.kz/api/check-status/payment/transaction/{invoice_id}",
+                        f"https://epay-api.homebank.kz/check-status/payment/transaction/{invoice_id}",
                         headers={"Authorization": f"Bearer {billing_transaction.access_token}"},
                     )
                     bank_transaction_response.raise_for_status() 
@@ -161,7 +161,7 @@ class BillingController:
                     if status_name == "AUTH":
                         print("Charging...")
                         charge_payment = await client.post(
-                            f"https://testepay.homebank.kz/api/operation/{transaction_id}/charge",
+                            f"https://epay-api.homebank.kz/operation/{transaction_id}/charge",
                             headers={"Authorization": f"Bearer {billing_transaction.access_token}"},
                         )
                         charge_payment.raise_for_status()
@@ -226,7 +226,7 @@ class BillingController:
 
             async with httpx.AsyncClient() as client:
                 try:
-                    url = f"https://testepay.homebank.kz/api/operation/{billing_transaction.bank_transaction_id}/refund"
+                    url = f"https://epay-api.homebank.kz/operation/{billing_transaction.bank_transaction_id}/refund"
 
                     refund_response = await client.post(
                         url,
@@ -326,6 +326,7 @@ class BillingController:
 
                 try:
                     response = await self.fetch_halyk_token(invoice_id, amount)
+                    
                     access_token = response.get("access_token")
                     if not access_token:
                         raise Exception("Failed to get access_token from Halyk")
@@ -354,7 +355,7 @@ class BillingController:
 
           
     async def fetch_halyk_token(self,unique_invoice_id: str, discounted_price: float):
-        url = "https://testoauth.homebank.kz/epay2/oauth2/token"
+        url = "https://epay-oauth.homebank.kz/oauth2/token"
         data = {
             "grant_type": "client_credentials",
             "scope": "webapi usermanagement email_send verification statement statistics payment",
