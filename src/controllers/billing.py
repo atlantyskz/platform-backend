@@ -14,6 +14,10 @@ from src.schemas.requests.billing import TopUpBillingRequest
 from src.repositories.refund_application import RefundApplicationRepository
 import httpx
 
+import logging
+import httpx
+
+logger = logging.getLogger(__name__)
 
 
 
@@ -200,62 +204,87 @@ class BillingController:
                     print(f"Unexpected error: {str(e)}")
                     return {"error": "Unexpected error", "details": str(e)}
 
+
     async def refund_billing_transaction(self, access_token: str, user_id: int, transaction_id: int):
-
-            user = await self.user_repository.get_by_user_id(user_id)
-            if user is None:
-                raise NotFoundException("User not found")
-            
-            organization = await self.organization_repository.get_user_organization(user_id)
-            if organization is None:
-                raise NotFoundException("Organization not found")
-            
-            billing_transaction = await self.billing_transaction_repository.get_transaction(transaction_id, user.id, organization.id)
-            if billing_transaction is None:
-                raise NotFoundException("Transaction not found")
-            
-            if billing_transaction.organization_id != organization.id:
-                raise BadRequestException("Transaction does not belong to your organization")
+        logger.info(f"Starting refund process for user_id={user_id}, transaction_id={transaction_id}")
         
-            if billing_transaction.status == "pending":
-                raise BadRequestException("Transaction is pending")
+        # Retrieve the user
+        user = await self.user_repository.get_by_user_id(user_id)
+        logger.info(f"User fetched: {user}")
+        if user is None:
+            logger.error("User not found")
+            raise NotFoundException("User not found")
+        
+        # Retrieve the organization
+        organization = await self.organization_repository.get_user_organization(user_id)
+        logger.info(f"Organization fetched: {organization}")
+        if organization is None:
+            logger.error("Organization not found")
+            raise NotFoundException("Organization not found")
+        
+        # Retrieve the billing transaction
+        billing_transaction = await self.billing_transaction_repository.get_transaction(transaction_id, user.id, organization.id)
+        logger.info(f"Billing transaction fetched: {billing_transaction}")
+        if billing_transaction is None:
+            logger.error("Transaction not found")
+            raise NotFoundException("Transaction not found")
+        
+        # Verify the transaction belongs to the organization
+        if billing_transaction.organization_id != organization.id:
+            logger.error("Transaction does not belong to your organization")
+            raise BadRequestException("Transaction does not belong to your organization")
+        
+        # Check if transaction status is pending
+        if billing_transaction.status == "pending":
+            logger.error("Transaction is pending and cannot be refunded")
+            raise BadRequestException("Transaction is pending")
+        
+        # Check if transaction is already refunded
+        if billing_transaction.status == "refunded":
+            logger.error("Transaction already fully refunded")
+            raise BadRequestException("Transaction already fully refunded")
+        
+        # Attempt to process the refund via external API
+        async with httpx.AsyncClient() as client:
+            try:
+                url = f"https://epay-api.homebank.kz/operation/{billing_transaction.bank_transaction_id}/refund"
+                logger.info(f"Sending refund request to URL: {url}")
+                
+                refund_response = await client.post(
+                    url,
+                    headers={"Authorization": f"Bearer {access_token}"},
+                )
+                logger.info(f"Refund response received: {refund_response}")
+                refund_response.raise_for_status()
+                logger.info("Refund API call successful")
+                
+                # Log refund details before updating internal records
+                amount = billing_transaction.amount
+                atl_tokens_to_refund = billing_transaction.atl_tokens
+                logger.info(f"Refund details - Amount: {amount}, ATL Tokens: {atl_tokens_to_refund}")
+                
+                # Update the billing transaction status to refunded
+                await self.billing_transaction_repository.update(
+                    billing_transaction.id, {"status": "refunded"}
+                )
+                logger.info(f"Billing transaction {billing_transaction.id} updated to 'refunded'")
+                
+                # Withdraw the tokens from the organization's balance
+                await self.balance_repository.withdraw_balance(
+                    billing_transaction.organization_id, atl_tokens_to_refund
+                )
+                logger.info(f"Withdrew {atl_tokens_to_refund} tokens from organization {billing_transaction.organization_id}")
+                
+                logger.info("Refund process completed successfully")
+                return {"status": "refunded", "refund_transaction_id": transaction_id}
             
-
-            if billing_transaction.status == "refunded":
-                raise BadRequestException("Transaction already fully refunded")
-
-            async with httpx.AsyncClient() as client:
-                try:
-                    url = f"https://epay-api.homebank.kz/operation/{billing_transaction.bank_transaction_id}/refund"
-
-                    refund_response = await client.post(
-                        url,
-                        headers={"Authorization": f"Bearer {access_token}"},
-                    )
-                    print(refund_response)
-                    refund_response.raise_for_status()
-
-                    amount = billing_transaction.amount
-                    atl_tokens_to_refund = billing_transaction.atl_tokens
-
-
-                    await self.billing_transaction_repository.update(
-                        billing_transaction.id, {"status": "refunded"}
-                    )
-
-                    await self.balance_repository.withdraw_balance(
-                        billing_transaction.organization_id, atl_tokens_to_refund
-                    )
-
-                    return {"status": "refunded", "refund_transaction_id": transaction_id}
-
-                except httpx.HTTPStatusError as e:
-                    print(f"HTTP Error: {e.response.status_code} - {e.response.text}")
-                    raise HTTPException(status_code=400, detail=f"HTTP Error: {e.response.status_code} - {e.response.text}")
-
-                except Exception as e:
-                    print(f"Unexpected error: {str(e)}")
-                    raise HTTPException(status_code=400, detail=f"Unexpected error: {str(e)}")
+            except httpx.HTTPStatusError as e:
+                logger.error(f"HTTP Error: {e.response.status_code} - {e.response.text}")
+                raise HTTPException(status_code=400, detail=f"HTTP Error: {e.response.status_code} - {e.response.text}")
+            
+            except Exception as e:
+                logger.error(f"Unexpected error: {str(e)}")
+                raise HTTPException(status_code=400, detail=f"Unexpected error: {str(e)}")
 
 
     async def get_all_billing_transactions_by_organization_id(self, user_id: int, status: str, limit: int, offset: int):
