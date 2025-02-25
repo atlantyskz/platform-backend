@@ -337,34 +337,36 @@ class HHController:
                 raise BadRequestException(f"HTTP error during vacancy retrieval: {exc}") from exc            
 
         return response.json()
-    
-    async def get_vacancy_applicants(self, user_id: int, vacancy_id: int) -> dict:
+        
+    async def fetch_with_retry(client: httpx.AsyncClient, url: str, headers: dict, max_retries: int = 5) -> dict:
         """
-        Получение списка соискателей на вакансию.
+        Выполняет GET-запрос к указанному URL с заданными заголовками, используя semaphore для ограничения
+        одновременных запросов. При получении ошибки 429 (rate limit) ждет указанное время (Retry-After или экспоненциальный бэкофф)
+        и повторяет запрос до max_retries раз.
         """
-        hh_account = await self.hh_account_repository.get_hh_account_by_user_id(user_id)
-        if hh_account is None:
-            raise NotFoundException("HH account not found")
-        if datetime.utcnow() >= hh_account.expires_at - timedelta(minutes=5):
-            hh_account = await self.refresh_token(user_id)
-        headers = {"Authorization": f"Bearer {hh_account.access_token}"}
-        async with httpx.AsyncClient() as client:
-            try:
-                response = await client.get(
-                    f"https://api.hh.ru/negotiations/response?vacancy_id={vacancy_id}&page=2&per_page=50&age_to=25",
-                    headers=headers,
-                    timeout=10.0,
-                )
-            except httpx.RequestError as exc:
-                raise BadRequestException(f"HTTP error during applicants retrieval: {exc}") from exc
-        if response.status_code != 200:
-            raise BadRequestException(f"Error retrieving applicants: {response.text}")
-        return response.json()
+        retry_count = 0
+        while retry_count < max_retries:
+            async with semaphore:
+                response = await client.get(url, headers=headers, timeout=10.0)
+            if response.status_code == 200:
+                return response.json()
+            elif response.status_code == 429:
+                retry_after = response.headers.get("Retry-After")
+                # Если в заголовке Retry-After пришло число, используем его, иначе экспоненциальный бэкофф
+                delay = int(retry_after) if retry_after and retry_after.isdigit() else (2 ** retry_count)
+                print(f"Ошибка 429 для URL: {url}. Ретрай через {delay} секунд (попытка {retry_count+1}/{max_retries})")
+                await asyncio.sleep(delay)
+                retry_count += 1
+            else:
+                print(f"Ошибка {response.status_code} для URL: {url}. Текст ошибки: {response.text}")
+                break
+        return {}  # Если все попытки исчерпаны или произошла другая ошибка
 
     async def get_all_applicant_resume_ids(self, user_id: int, vacancy_id: int, per_page: int = 25) -> list:
         """
-        Получение ID резюме всех кандидатов, откликнувшихся на вакансию, с использованием semaphore
-        и обходом rate limiting (429) через экспоненциальный бэкофф.
+        Получение ID резюме всех кандидатов, откликнувшихся на вакансию,
+        с использованием семафора для ограничения одновременных запросов и
+        обходом rate limiting через функцию fetch_with_retry.
         """
         hh_account = await self.hh_account_repository.get_hh_account_by_user_id(user_id)
         if hh_account is None:
@@ -376,7 +378,7 @@ class HHController:
         async with httpx.AsyncClient() as client:
             while True:
                 url = f"https://api.hh.ru/negotiations/response?vacancy_id={vacancy_id}&page={page}&per_page={per_page}"
-                data = await self.fetch_with_retry(client, url, headers)
+                data = await self.fetch_with_retry(client, url, headers, max_retries=5)
                 if not data:
                     break
                 items = data.get("items", [])
@@ -393,31 +395,8 @@ class HHController:
                     break
                 page += 1
         return all_resume_ids
-
-    async def fetch_with_retry(client: httpx.AsyncClient, url: str, headers: dict, max_retries: int = 5) -> dict:
-        """
-        Выполняет GET-запрос к указанному URL с заданными заголовками, используя semaphore для ограничения
-        одновременных запросов. При получении ошибки 429 (rate limit) функция ждет указанное время (Retry-After
-        или экспоненциальный бэкофф) и повторяет запрос до max_retries раз.
-        """
-        retry_count = 0
-        while retry_count < max_retries:
-            async with semaphore:
-                response = await client.get(url, headers=headers, timeout=10.0)
-            if response.status_code == 200:
-                return response.json()
-            elif response.status_code == 429:
-                retry_after = response.headers.get("Retry-After")
-                delay = int(retry_after) if retry_after and retry_after.isdigit() else (2 ** retry_count)
-                print(f"Ошибка 429 для URL: {url}. Ретрай через {delay} секунд (попытка {retry_count+1}/{max_retries})")
-                await asyncio.sleep(delay)
-                retry_count += 1
-            else:
-                # Если статус отличный от 200 и 429, выходим из цикла
-                print(f"Ошибка {response.status_code} для URL: {url}. Текст ошибки: {response.text}")
-                break
-        return {}
-
+    
+    
     async def fetch_resume_details(self, user_id: int, resume_id: str) -> dict:
         """
         Получение полного резюме кандидата по его resume_id с обработкой rate limiting.
