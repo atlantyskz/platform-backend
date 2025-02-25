@@ -62,3 +62,7 @@ class OrganizationRepository(BaseRepository):
         organization = result.scalar_one_or_none()  #
         return organization
 
+    async def get_organization_by_name(self, name:str):
+        stmt = select(Organization).where(Organization.name == name)
+        result = await self.session.execute(stmt)
+        return result.scalars().first()

@@ -186,7 +186,6 @@ class HRAgentController:
                     'session_id':vacancy.session_id,
                     'title':vacancy.title,
                     'vacancy_text':vacancy.vacancy_text.get('llm_response')
-
                 }
             except Exception as e:
                 await session.rollback()

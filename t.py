@@ -62,18 +62,6 @@ def format_languages(languages: List[Dict[str, Any]]) -> str:
         lang_lines.append(f"{name} ({level})")
     return ", ".join(lang_lines)
 
-def format_portfolio(portfolio: List[Dict[str, Any]]) -> str:
-    if not portfolio:
-        return "Портфолио не указано."
-    lines = []
-    for idx, item in enumerate(portfolio, start=1):
-        url = item.get("medium") or item.get("small") or ""
-        description = item.get("description") or ""
-        line = f"Проект {idx}: URL: {url}"
-        if description:
-            line += f". Описание: {description}"
-        lines.append(line)
-    return "\n".join(lines)
 
 def format_recommendations(recommendations: List[Dict[str, Any]]) -> str:
     if not recommendations:
@@ -99,10 +87,7 @@ def assemble_candidate_summary(candidate: Dict[str, Any]) -> str:
     gender = candidate.get("gender", {}).get("name", "Не указано")
     salary = candidate.get("salary")
     salary_text = f"{salary.get('amount')} {salary.get('currency')}" if salary else "Не указана"
-    
-    photo = candidate.get("photo", {})
-    photo_url = photo.get("medium") or photo.get("small") or "Нет фото"
-    
+        
     experience_text = format_experience(candidate.get("experience", []))
     education_text = format_education(candidate.get("education", {}))
     
@@ -115,7 +100,6 @@ def assemble_candidate_summary(candidate: Dict[str, Any]) -> str:
     contacts_text = ", ".join(f"{c.get('type', {}).get('name')}: {c.get('value')}" for c in contacts) or "Не указаны"
     
     languages = format_languages(candidate.get("language", []))
-    portfolio = format_portfolio(candidate.get("portfolio", []))
     recommendations = format_recommendations(candidate.get("recommendation", []))
     
     # Готовность к переезду и командировкам
@@ -130,13 +114,11 @@ def assemble_candidate_summary(candidate: Dict[str, Any]) -> str:
         f"Возраст: {age}\n"
         f"Пол: {gender}\n"
         f"Ожидаемая зарплата: {salary_text}\n"
-        f"Фото: {photo_url}\n\n"
         f"Опыт работы:\n{experience_text}\n\n"
         f"Образование:\n{education_text}\n\n"
         f"Навыки: {skills}\n\n"
         f"Контактные данные: {contacts_text}\n\n"
         f"Языковые навыки: {languages}\n\n"
-        f"Портфолио и проекты:\n{portfolio}\n\n"
         f"Рекомендации и отзывы: {recommendations}\n\n"
         f"Готовность к переезду: {relocation_type}\n"
         f"Готовность к командировкам: {business_trip}\n"
