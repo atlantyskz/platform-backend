@@ -56,25 +56,28 @@ class AuthController:
                 )
                 # await self.balance_repo.create_balance({'organization_id':organization.id,'atl_tokens':10})
                 
-                verification_token = JWTHandler.encode_email_token(
-                    payload={"sub": email, "type": "verification"}
+                # verification_token = JWTHandler.encode_email_token(
+                #     payload={"sub": email, "type": "verification"}
+                # )
+                # verification_link = f"{self.email_service.frontend_url}/verify-email?token={verification_token}"
+                # html_content = f"""
+                # <h2>Добро пожаловать на нашу платформу!</h2>
+                # <p>Пожалуйста, подтвердите свой адрес электронной почты, кликнув по ссылке ниже:</p>
+                # <a href="{verification_link}">Подтвердить email</a>
+                # <p>Ссылка будет действительна в течение 1 часа.</p>
+
+                # """
+
+                # await self.email_service.send_email(
+                #     to_email=email,
+                #     subject="Verify Your Email",
+                #     html_content=html_content
+                # )
+
+                return Token(
+                    access_token=JWTHandler.encode_access_token(payload={"sub": user.id,"role":user.role.name}),
+                    refresh_token=JWTHandler.encode_refresh_token(payload={"sub": user.id,"role":user.role.name}),
                 )
-                verification_link = f"{self.email_service.frontend_url}/verify-email?token={verification_token}"
-                html_content = f"""
-                <h2>Добро пожаловать на нашу платформу!</h2>
-                <p>Пожалуйста, подтвердите свой адрес электронной почты, кликнув по ссылке ниже:</p>
-                <a href="{verification_link}">Подтвердить email</a>
-                <p>Ссылка будет действительна в течение 1 часа.</p>
-
-                """
-
-                await self.email_service.send_email(
-                    to_email=email,
-                    subject="Verify Your Email",
-                    html_content=html_content
-                )
-
-                return {"message": "Verification has been sent to your email, please check it out"}
             except Exception as e:
                 raise e            
 

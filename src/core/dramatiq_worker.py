@@ -22,7 +22,7 @@ dramatiq.set_broker(redis_broker)
 class DramatiqWorker:
     @dramatiq.actor
     async def process_resume(task_id: str, vacancy_text: str, resume_text: str, user_id: int, 
-                              organization_id: int, balance_id: int, user_message: str, file=None):
+                            organization_id: int, balance_id: int, user_message: str, file=None):
         logging.info(f"Начало обработки задачи task_id={task_id} для user_id={user_id}")
         from src.core.backend import BackgroundTasksBackend
         from src.repositories.assistant import AssistantRepository
