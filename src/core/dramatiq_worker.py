@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 import dramatiq
@@ -22,7 +23,7 @@ dramatiq.set_broker(redis_broker)
 class DramatiqWorker:
     @dramatiq.actor
     async def process_resume(task_id: str, vacancy_text: str, resume_text: str, user_id: int, 
-                            organization_id: int, balance_id: int, user_message: str, file=None):
+                              organization_id: int, balance_id: int, user_message: str, file=None):
         logging.info(f"Начало обработки задачи task_id={task_id} для user_id={user_id}")
         from src.core.backend import BackgroundTasksBackend
         from src.repositories.assistant import AssistantRepository
@@ -53,10 +54,28 @@ class DramatiqWorker:
                         "role": "user",
                         "content": f"vacancy_text:{vacancy_text} resume_text:{resume_text}"
                     }]
-                    logging.info("Отправка запроса к LLM сервису")
-                    response = await llm_service._send_request(data={'messages': messages})
-                    logging.debug(f"Ответ от LLM сервиса: {response}")
-                    llm_tokens = response.get('tokens_spent', 0)
+                    
+                    # Реализация retry механизма
+                    max_attempts = 3
+                    attempt = 0
+                    response_data = None
+                    while attempt < max_attempts:
+                        logging.info("Отправка запроса к LLM сервису, попытка %s", attempt + 1)
+                        response_data = await llm_service._send_request(data={'messages': messages})
+                        logging.debug(f"Ответ от LLM сервиса: {response_data}")
+                        # Проверяем, что ответ содержит ключ "llm_response" и не содержит ключ "error"
+                        if isinstance(response_data, dict) and "llm_response" in response_data and not response_data.get("error"):
+                            break
+                        else:
+                            logging.warning("Получен невалидный ответ от LLM сервиса, повторная отправка запроса")
+                            attempt += 1
+                            await asyncio.sleep(1)  # ожидание перед повторной попыткой
+                    if attempt == max_attempts and (not response_data or "llm_response" not in response_data):
+                        error_msg = "Не удалось получить валидный ответ от LLM сервиса после нескольких попыток"
+                        logging.error(error_msg)
+                        raise Exception(error_msg)
+                    
+                    llm_tokens = response_data.get('tokens_spent', 0)
                     atl_tokens_spent = round(llm_tokens / 3000, 2)
                     
                     assistant = await assistant_repo.get_assistant_by_name("ИИ Рекрутер")
@@ -88,9 +107,9 @@ class DramatiqWorker:
                     logging.info("Обновление результата задачи как 'completed'")
                     await bg_session.update_task_result(
                         task_id=task_id,
-                        result_data=response.get('llm_response') if response else {"error": "Unknown error"},
+                        result_data=response_data.get('llm_response'),
                         tokens_spent=llm_tokens,
-                        status="completed" if response else "failed"
+                        status="completed"
                     )
                     logging.info(f"Задача {task_id} успешно завершена")
 
