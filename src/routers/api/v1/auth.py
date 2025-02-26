@@ -12,7 +12,7 @@ auth_router = APIRouter(prefix='/api/v1/auth',tags=['AUTH'])
 async def register(
     register_user_request: RegisterUserRequest,
     auth_controller: AuthController = Depends(Factory.get_auth_controller)
-)-> dict:
+)-> Token:
     return await auth_controller.create_user(email=register_user_request.email,password=register_user_request.password)
 
 @auth_router.post("/login")

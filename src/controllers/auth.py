@@ -32,7 +32,7 @@ class AuthController:
         self.organization_member_repo = OrganizationMemberRepository(session)
         self.email_service = EmailService()
 
-    async def create_user(self, email: EmailStr, password: str) -> dict:
+    async def create_user(self, email: EmailStr, password: str) -> Token:
         async with self.session.begin():
             try:
                 # Проверяем существующего пользователя
@@ -77,7 +77,7 @@ class AuthController:
                 return Token(
                     access_token=JWTHandler.encode_access_token(payload={"sub": user.id,"role":user.role.name}),
                     refresh_token=JWTHandler.encode_refresh_token(payload={"sub": user.id,"role":user.role.name}),
-                ).model_dump_json()
+                )
             except Exception as e:
                 raise e            
 
