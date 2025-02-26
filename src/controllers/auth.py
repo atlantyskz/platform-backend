@@ -77,7 +77,7 @@ class AuthController:
                 return Token(
                     access_token=JWTHandler.encode_access_token(payload={"sub": user.id,"role":user.role.name}),
                     refresh_token=JWTHandler.encode_refresh_token(payload={"sub": user.id,"role":user.role.name}),
-                )
+                ).model_dump_json()
             except Exception as e:
                 raise e            
 
