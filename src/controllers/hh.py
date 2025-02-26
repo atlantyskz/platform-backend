@@ -1,4 +1,5 @@
 import asyncio
+import time
 import httpx
 import logging
 import uuid
@@ -388,6 +389,7 @@ class HHController:
         raise Exception(f"Превышено число попыток для resume {resume_id}")
 
     async def analyze_vacancy_applicants(self, session_id: str, user_id: int, vacancy_id: int) -> dict:
+        start_time = time.time()
         logging.info(f"Запуск анализа вакансии. session_id={session_id}, user_id={user_id}, vacancy_id={vacancy_id}")
         async with self.session.begin():
             session = await self.assistant_session_repo.get_by_session_id(session_id)
@@ -480,6 +482,8 @@ class HHController:
                 logging.info(f"Обработка резюме {resume_id} для user_id={user_id}")
 
             logging.info(f"Завершено создание задач: создано {len(all_task_ids)} задач, пропущено {len(skipped_resumes)} резюме")
+            finish_time = time.time()
+            print("TIME DIFF: ", finish_time - start_time)
             return {
                 "session_id": session_id,
                 "tasks": all_task_ids,
