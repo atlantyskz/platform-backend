@@ -31,3 +31,7 @@ minio
 starlette-admin==0.14.1
 sqladmin
 itsdangerous
+google-api-python-client
+google-auth
+google-auth-oauthlib
+google-auth-httplib2

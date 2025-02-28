@@ -30,7 +30,6 @@ from src.repositories.hh import HHAccountRepository
 from src.core.settings import settings
 from sqlalchemy.ext.asyncio import AsyncSession
 
-# Глобальный кэш для резюме
 _resume_cache: Dict[str, dict] = {}
 
 # Ограничитель одновременных запросов – максимум 5 параллельных запросов

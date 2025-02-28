@@ -1,7 +1,10 @@
 
 
 from datetime import timedelta
-from fastapi import HTTPException
+import os
+from uuid import uuid4
+from fastapi import HTTPException, Request
+from fastapi.responses import RedirectResponse
 from pydantic import EmailStr
 from sqlalchemy import select
 from src.repositories.organization_member import OrganizationMemberRepository
@@ -20,6 +23,14 @@ from src.repositories.user import UserRepository
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.models.role import RoleEnum
 
+from google_auth_oauthlib.flow import Flow
+from googleapiclient.discovery import build
+
+GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
+GOOGLE_CLIENT_SECRET =os.getenv("GOOGLE_CLIENT_SECRET")
+GOOGLE_REDIRECT_URI = "http://localhost:9000/api/v1/auth/google/callback"
+
+CLIENT_SECRETS_FILE = "client_secret.json"
 
 class AuthController:
 
@@ -211,3 +222,85 @@ class AuthController:
         except Exception as e:
             await self.session.rollback()
             raise BadRequestException(str(e))
+        
+    async def google_auth(self,request:Request):
+        """
+        Инициализирует OAuth2 поток и перенаправляет пользователя на страницу авторизации Google.
+        """
+        # Используем полные URL для скоупов
+        scopes = [
+            "openid",
+            "https://www.googleapis.com/auth/userinfo.profile",
+            "https://www.googleapis.com/auth/userinfo.email"
+        ]
+        flow = Flow.from_client_secrets_file(
+            CLIENT_SECRETS_FILE,
+            scopes=scopes,
+            redirect_uri=GOOGLE_REDIRECT_URI
+        )
+        authorization_url, state = flow.authorization_url(
+            access_type="offline",
+            prompt="consent"
+        )
+        # Рекомендуется сохранить state для проверки в callback (например, в сессии)
+        return RedirectResponse(url=authorization_url)
+
+
+    async def google_auth_callback(self,params: dict):
+        query_params = params
+        if "error" in query_params:
+            raise HTTPException(status_code=400, detail=f"Auth error: {query_params['error']}")
+        code = query_params.get("code")
+        state = query_params.get("state")
+        if not code:
+            raise HTTPException(status_code=400, detail="Auth code is not valid")
+
+        scopes = [
+            "openid",
+            "https://www.googleapis.com/auth/userinfo.profile",
+            "https://www.googleapis.com/auth/userinfo.email"
+        ]
+        flow = Flow.from_client_secrets_file(
+            CLIENT_SECRETS_FILE,
+            scopes=scopes,
+            redirect_uri=GOOGLE_REDIRECT_URI,
+            state=state
+        )
+        try:
+            flow.fetch_token(code=code)
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Auth code is not valid: {str(e)}")
+        
+        credentials = flow.credentials
+
+        try:
+            oauth2_client = build("oauth2", "v2", credentials=credentials)
+            user_info = oauth2_client.userinfo().get().execute()
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Error during receiving user info : {str(e)}")
+
+        if not user_info.get("email"):
+            raise HTTPException(status_code=400, detail="Email not found")
+        async with self.session.begin():
+            user = await self.user_repo.get_by_email(user_info.get("email"))
+            if user is None:
+                role = await self.role_repo.get_role_by_name(RoleEnum.ADMIN)
+                password_hash = PasswordHandler.hash(str(uuid4()))
+                user = await self.user_repo.create_user({
+                    'email': user_info.get("email"),
+                    'password': password_hash,
+                    'role_id': role.id
+                })
+                organization = await self.organization_repo.get_organization(1)
+                await self.organization_member_repo.add(
+                    organization.id,
+                    'admin',
+                    user.id,
+                )
+            user_role = user.role if user.role is not None else await self.role_repo.get_role_by_name(RoleEnum.ADMIN)
+            access_token = JWTHandler.encode_access_token(payload={"sub": user.id, "role": user_role.name})
+            refresh_token = JWTHandler.encode_refresh_token(payload={"sub": user.id, "role": user_role.name})
+        return {
+            'access_token':access_token,
+            'refresh_token':refresh_token
+        }

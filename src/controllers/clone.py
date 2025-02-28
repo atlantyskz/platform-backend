@@ -1,11 +1,13 @@
 import csv
 import json
-from io import StringIO
+from io import BytesIO, StringIO
+import os
 from uuid import uuid4
 from typing import List, Optional
 
 from fastapi import UploadFile
 from fastapi.responses import StreamingResponse
+import requests
 from src.services.helpers import generate_clone_filekey
 from src.core.exceptions import BadRequestException, NotFoundException
 from src.repositories.assistant_session import AssistantSessionRepository
@@ -117,9 +119,27 @@ class CloneController:
 
     async def update_clone_request_status(self, clone_id: int, new_status: str, is_admin: bool) -> dict:
         
-        async with self.session.begin():
-            
+        async with self.session.begin():                
             updated_clone = await self.clone_repo.update_status(clone_id, new_status)
+
+            if new_status.lower() == 'processing':
+                # Скачиваем видео из MinIO
+                agreement_video_data = self.minio_uploader.get_file(updated_clone.agreement_video_path)
+                sample_video_data = self.minio_uploader.get_file(updated_clone.sample_video_path)
+                headers = {
+                    'X-API-SECRETID':os.getenv("X-API-SECRETID"),
+                    'X-API-KEY':os.getenv("X-API-KEY")
+                }
+                files = {
+                    "name": (None, updated_clone.name),
+                    "gender": (None, updated_clone.gender),
+                    "lipsynch_text": (None, updated_clone.lipsynch_text),
+                    "agreement_video": ("agreement.mp4", BytesIO(agreement_video_data), "video/mp4"),
+                    "sample_video": ("sample.mp4", BytesIO(sample_video_data), "video/mp4"),
+                }
+
+                return files
+
             if not updated_clone:
                 raise NotFoundException("Clone request not found")
             

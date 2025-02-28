@@ -1,12 +1,35 @@
-from fastapi import APIRouter,Depends
+from fastapi import APIRouter,Depends, HTTPException, Query
+from fastapi.responses import RedirectResponse
+import httpx
 from src.controllers.auth import AuthController
 from src.core.factory import Factory
 from src.schemas.requests.users import *
 from src.schemas.responses.auth import *
 from src.core.middlewares.auth_middleware import get_current_user
 
+from fastapi import FastAPI, APIRouter, Request, HTTPException
+from fastapi.responses import RedirectResponse
 
-auth_router = APIRouter(prefix='/api/v1/auth',tags=['AUTH'])
+auth_router = APIRouter(prefix="/api/v1/auth", tags=["AUTH"])
+
+@auth_router.get("/google")
+async def google_login(
+    request: Request,
+    auth_controller: AuthController = Depends(Factory.get_auth_controller)
+):
+    return await auth_controller.google_auth(request)
+
+@auth_router.get("/google/callback")
+async def google_callback(
+    code: str = Query(...),
+    state: str = Query(...),
+    auth_controller: AuthController = Depends(Factory.get_auth_controller)
+):
+    params = {
+        "code":code,
+        "state":state
+    }
+    return await auth_controller.google_auth_callback(params)
 
 @auth_router.post('/register')
 async def register(
@@ -23,7 +46,6 @@ async def login_user(
     return await auth_controller.login(
         email=login_user_request.email, password=login_user_request.password
     )
-
 
 @auth_router.post("/refresh_token")
 async def refresh_token(
