@@ -28,7 +28,7 @@ from googleapiclient.discovery import build
 
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
 GOOGLE_CLIENT_SECRET =os.getenv("GOOGLE_CLIENT_SECRET")
-GOOGLE_REDIRECT_URI = "http://localhost:3000/google-auth"
+GOOGLE_REDIRECT_URI = "https://platform.atlantys.kz/google-auth"
 
 CLIENT_SECRETS_FILE = "client_secret.json"
 
