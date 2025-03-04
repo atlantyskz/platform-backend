@@ -626,20 +626,36 @@ class HRAgentController:
     async def add_resume_to_favorites(self,user_id: int, resume_id: int):
         try:
             exist_resume = await self.favorite_repo.get_favorite_resumes_by_resume_id(resume_id)
+            session = await self.bg_backend.get_by_id(resume_id)
             if exist_resume:
                 raise BadRequestException('Already exist')
             if await self.favorite_repo.get_resume(resume_id) is None:
                 raise BadRequestException('Not Found')
             favorite_resume = await self.favorite_repo.add({
                 "user_id":user_id,
-                "resume_id":resume_id
+                "resume_id":resume_id,
+                "session_id":session.session_id
             })
             await self.session.commit()
             await self.session.refresh(favorite_resume)
             return favorite_resume
         except Exception:
             raise
-    
+
+    async def generate_questions_for_candidate(self,resume_id:int):
+        resume = await self.favorite_repo.get_result_data_by_resume_id(resume_id)
+        messages = []  
+        messages.append({
+            "role": "user",
+            "content": f"Candidate Resume: {resume}"
+        })
+
+        llm_response = await self.request_sender._send_request(
+                    llm_url=f'http://llm_service:8001/hr/generate_questions_for_candidate',
+                    data={"messages": messages}
+                )    
+        # updated_resume = await self.favorite_repo.update_questions_for_candidate(resume_id,llm_response.get('llm_response'))
+        return llm_response
     
     async def delete_from_favorites(self, user_id: int,resume_id: int):
         try:
@@ -659,6 +675,12 @@ class HRAgentController:
         favorite_resumes = await self.favorite_repo.get_favorite_resumes_by_user_id(user_id, session_id)
         return favorite_resumes
 
+
+    async def fetch_result_data(self, resume_id: int) -> dict:
+        result_data = await self.favorite_repo.get_result_data_by_resume_id(resume_id)
+        if result_data is None:
+            raise HTTPException(status_code=404, detail="Result data not found")
+        return result_data
 
 
 

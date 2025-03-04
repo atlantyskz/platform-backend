@@ -12,7 +12,7 @@ class BackgroundTasksBackend:
 
     def __init__ (self,session: AsyncSession):
         self.session = session
-
+    
     
 
     async def create_task(self, attributes: dict) -> HRTask:
@@ -98,3 +98,9 @@ class BackgroundTasksBackend:
         result = await self.session.execute(stmt)
         return result.scalars().first()    
 
+    async def get_by_id(self,id:int):
+        stmt = select(HRTask).where(HRTask.id == id).options(
+            joinedload(HRTask.session)
+        )
+        result = await self.session.execute(stmt)
+        return result.scalars().first()    

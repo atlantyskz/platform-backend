@@ -102,6 +102,24 @@ async def get_favorites_candidates_by_session_id(
 ):
     return await hr_agent_controller.get_favorite_resumes(current_user.get('sub'),session_id)
 
+@hr_agent_router.get("/result/{resume_id}", tags=["HR FAVORITE CANDIDATES"])
+async def get_result_data(
+    resume_id: int,
+    current_user: dict = Depends(get_current_user),
+    hr_agent_controller: HRAgentController = Depends(Factory.get_hr_agent_controller),
+
+):
+    result_data = await hr_agent_controller.fetch_result_data(resume_id)
+    return {"resume_id": resume_id, "result_data": result_data}
+
+@hr_agent_router.patch("/generate_questions/{resume_id}", tags=["HR FAVORITE CANDIDATES"])
+async def generate_questions(
+    resume_id: int,
+    current_user: dict = Depends(get_current_user),
+    hr_agent_controller: HRAgentController = Depends(Factory.get_hr_agent_controller),
+):
+    return await hr_agent_controller.generate_questions_for_candidate(resume_id)
+
 @hr_agent_router.post('/resume_analyze/add_to_favorites/{resume_id}',tags=["HR FAVORITE CANDIDATES"])
 async def add_resume_to_favorites(
     resume_id:int,
