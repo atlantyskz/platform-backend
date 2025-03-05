@@ -461,6 +461,8 @@ class HHController:
                 logging.info(f"Создание фоновой задачи с id={task_id} для resume_id={resume_id}")
                 await self.bg_backend.create_task({
                     "task_id": task_id,
+                    "resume_id":resume_id,
+                    "vacancy_id":vacancy_id,
                     "session_id": session_id,
                     "task_type": "hh cv analyze",
                     "task_status": "pending",

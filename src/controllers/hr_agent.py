@@ -623,6 +623,8 @@ class HRAgentController:
                 "total_pages": (total_results + limit - 1) // limit if limit else 1
             }
         }
+    
+
     async def add_resume_to_favorites(self,user_id: int, resume_id: int):
         try:
             exist_resume = await self.favorite_repo.get_favorite_resumes_by_resume_id(resume_id)
@@ -636,11 +638,14 @@ class HRAgentController:
                 "resume_id":resume_id,
                 "session_id":session.session_id
             })
+            async with httpx.AsyncClient() as client:
+                url = f'https://api.hh.ru/negotiations/phone_interview?resume_id={session.resume_id}&vacancy_id={}'
+                res = client.post()
             await self.session.commit()
             await self.session.refresh(favorite_resume)
             return favorite_resume
-        except Exception:
-            raise
+        except Exception as e:
+            raise e
 
     async def generate_questions_for_candidate(self,resume_id:int):
         resume = await self.favorite_repo.get_result_data_by_resume_id(resume_id)
@@ -654,7 +659,7 @@ class HRAgentController:
                     llm_url=f'http://llm_service:8001/hr/generate_questions_for_candidate',
                     data={"messages": messages}
                 )    
-        # updated_resume = await self.favorite_repo.update_questions_for_candidate(resume_id,llm_response.get('llm_response'))
+        updated_resume =     await self.favorite_repo.update_questions_for_candidate(resume_id,llm_response.get('llm_response'))
         return llm_response
     
     async def delete_from_favorites(self, user_id: int,resume_id: int):

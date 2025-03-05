@@ -18,5 +18,5 @@ class FavoriteResume(Base,TimestampMixin):
     task = so.relationship("HRTask", back_populates="favorites") 
 
 
-    def __str__(self):
+    def __str__(self):  
         return f"{self.id}"
