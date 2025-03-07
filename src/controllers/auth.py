@@ -59,32 +59,15 @@ class AuthController:
                     'password': password_hash,
                     'role_id': role.id
                 })
-                organization = await self.organization_repo.get_organization(1)
+                organization = await self.organization_repo.add({'name':'Top Company','email':email})
                 await self.organization_member_repo.add(
                     organization.id,
                     'admin',
                     user.id,
                 )
-                # await self.balance_repo.create_balance({'organization_id':organization.id,'atl_tokens':10})
+                await self.balance_repo.create_balance({'organization_id':organization.id,'atl_tokens':100})
                 
-                # verification_token = JWTHandler.encode_email_token(
-                #     payload={"sub": email, "type": "verification"}
-                # )
-                # verification_link = f"{self.email_service.frontend_url}/verify-email?token={verification_token}"
-                # html_content = f"""
-                # <h2>Добро пожаловать на нашу платформу!</h2>
-                # <p>Пожалуйста, подтвердите свой адрес электронной почты, кликнув по ссылке ниже:</p>
-                # <a href="{verification_link}">Подтвердить email</a>
-                # <p>Ссылка будет действительна в течение 1 часа.</p>
-
-                # """
-
-                # await self.email_service.send_email(
-                #     to_email=email,
-                #     subject="Verify Your Email",
-                #     html_content=html_content
-                # )
-
+         
                 return Token(
                     access_token=JWTHandler.encode_access_token(payload={"sub": user.id,"role":user.role.name}),
                     refresh_token=JWTHandler.encode_refresh_token(payload={"sub": user.id,"role":user.role.name}),
@@ -291,12 +274,13 @@ class AuthController:
                     'password': password_hash,
                     'role_id': role.id
                 })
-                organization = await self.organization_repo.get_organization(1)
+                organization = await self.organization_repo.add({'name':'Top Company','email':user_info.get("email")})
                 await self.organization_member_repo.add(
                     organization.id,
                     'admin',
                     user.id,
                 )
+                await self.balance_repo.create_balance({'organization_id':organization.id,'atl_tokens':100})
             user_role = user.role if user.role is not None else await self.role_repo.get_role_by_name(RoleEnum.ADMIN)
             access_token = JWTHandler.encode_access_token(payload={"sub": user.id, "role": user_role.name})
             refresh_token = JWTHandler.encode_refresh_token(payload={"sub": user.id, "role": user_role.name})
