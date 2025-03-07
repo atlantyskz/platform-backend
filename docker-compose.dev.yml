@@ -65,6 +65,39 @@ services:
       networks:
         - app_network
 
+  celery-worker:
+      build: .
+      command: celery -A src.core.celery_config worker --loglevel=info
+      env_file:
+      - .env
+
+      volumes:
+        - .:/app
+      depends_on:
+        - postgres
+        - redis
+      environment:
+        - PYTHONPATH=/app/src
+      networks:
+        - app_network
+  celery-beat:
+    build: .
+    command: celery -A src.core.celery_config worker --loglevel=info    
+    environment:
+      - PYTHONPATH=/app/src
+    env_file:
+      - .env
+    volumes:
+      - .:/app
+    depends_on:
+      - postgres
+      - redis
+      - celery-worker
+    networks:
+        - app_network
+
+
+
 networks:
   app_network:
     external: true

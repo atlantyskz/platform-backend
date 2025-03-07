@@ -10,6 +10,9 @@ from dramatiq.brokers.redis import RedisBroker
 
 from src.repositories.balance import BalanceRepository
 from src.repositories.balance_usage import BalanceUsageRepository
+import dramatiq
+from sqlalchemy.future import select
+from src.models.balance import Balance
 
 
 redis_broker = RedisBroker(host="redis", port=6379)
@@ -21,6 +24,8 @@ redis_broker.add_middleware(time_limit.TimeLimit())
 dramatiq.set_broker(redis_broker)
 
 class DramatiqWorker:
+
+
     @dramatiq.actor
     async def process_resume(task_id: str, vacancy_text: str, resume_text: str, user_id: int, 
                               organization_id: int, balance_id: int, user_message: str, file=None):

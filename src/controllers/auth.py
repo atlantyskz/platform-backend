@@ -60,14 +60,20 @@ class AuthController:
                     'role_id': role.id
                 })
                 organization = await self.organization_repo.add({'name':'Top Company','email':email})
+                await self.session.flush()
                 await self.organization_member_repo.add(
                     organization.id,
                     'admin',
                     user.id,
                 )
-                await self.balance_repo.create_balance({'organization_id':organization.id,'atl_tokens':100})
-                
-         
+                await self.session.flush()
+
+                await self.balance_repo.create_balance({
+                    'organization_id': organization.id,
+                    'atl_tokens': 100,
+                    'free_trial': True
+                })
+                # call cron job ...
                 return Token(
                     access_token=JWTHandler.encode_access_token(payload={"sub": user.id,"role":user.role.name}),
                     refresh_token=JWTHandler.encode_refresh_token(payload={"sub": user.id,"role":user.role.name}),
@@ -275,12 +281,19 @@ class AuthController:
                     'role_id': role.id
                 })
                 organization = await self.organization_repo.add({'name':'Top Company','email':user_info.get("email")})
+                await self.session.flush()
                 await self.organization_member_repo.add(
                     organization.id,
                     'admin',
                     user.id,
                 )
-                await self.balance_repo.create_balance({'organization_id':organization.id,'atl_tokens':100})
+                await self.session.flush()
+
+                await self.balance_repo.create_balance({
+                    'organization_id': organization.id,
+                    'atl_tokens': 100,
+                    'free_trial': True
+                })
             user_role = user.role if user.role is not None else await self.role_repo.get_role_by_name(RoleEnum.ADMIN)
             access_token = JWTHandler.encode_access_token(payload={"sub": user.id, "role": user_role.name})
             refresh_token = JWTHandler.encode_refresh_token(payload={"sub": user.id, "role": user_role.name})
