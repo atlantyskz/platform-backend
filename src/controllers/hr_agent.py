@@ -49,8 +49,30 @@ from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
+import os
+import json
+import asyncio
+import base64
+import time
+import requests
+import websockets
+from fastapi import FastAPI, WebSocket, Request, Form
+from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.websockets import WebSocketDisconnect
+from twilio.twiml.voice_response import VoiceResponse, Connect, Say, Stream
+from dotenv import load_dotenv
+from twilio.rest import Client
 
 class HRAgentController:
+    TWILIO_PHONE_NUMBER = '+19159759046'
+    OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
+    VOICE = 'alloy'
+    LOG_EVENT_TYPES = [
+        'error', 'response.content.done', 'rate_limits.updated',
+        'response.done', 'input_audio_buffer.committed',
+        'input_audio_buffer.speech_stopped', 'input_audio_buffer.speech_started',
+        'session.created'
+    ]
 
     def __init__(self,session:AsyncSession,text_extractor:AsyncTextExtractor):
         self.session = session
@@ -70,7 +92,21 @@ class HRAgentController:
         self.balance_usage_repo = BalanceUsageRepository(session)
         self.hh_account_repository = HHAccountRepository(session)
         self.headhunter_service = HHController(session)
-        
+        self.TWILIO_ACCOUNT_SID = os.getenv("TWILIO_ACCOUNT_SID")
+        self.TWILIO_SECRET= os.getenv("TWILIO_SECRET")
+        self.client = Client(username=self.TWILIO_ACCOUNT_SID, password=self.TWILIO_SECRET)
+        self.TWILIO_PHONE_NUMBER = '+19159759046'
+        self.OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
+        self.VOICE = 'alloy'
+        self.LOG_EVENT_TYPES = [
+            'error', 'response.content.done', 'rate_limits.updated',
+            'response.done', 'input_audio_buffer.committed',
+            'input_audio_buffer.speech_stopped', 'input_audio_buffer.speech_started',
+            'session.created'
+        ]
+        self.SHOW_TIMING_MATH = False
+
+
 
         self.minio_service = MinioUploader(
             host="minio:9000",  
@@ -1009,3 +1045,263 @@ class HRAgentController:
             }
         except Exception as e:
             raise
+
+    async def media_stream(self, websocket: WebSocket):
+        resume_id = websocket.query_params.get('resume_id')
+        questions_for_candidate = await self.favorite_repo.get_favorite_resumes_by_resume_id(resume_id)
+        instructions = f"""
+        Ты – ИИ-рекрутер, который проводит первичный телефонный звонок кандидатам. Твоя задача — задать кандидату только те вопросы, которые указаны в списке questions_for_candidate, и ничего больше.
+        questions_for_candidate: {questions_for_candidate.question_for_candidate}
+        Твои инструкции:
+
+            Приветствие и представление:
+            Приветсвиие уже сказано, юзер должен тоже сказать привествике и начни задавать вопросы
+            
+            Задание вопросов:
+            Используя список вопросов из questions_for_candidate, задай их по порядку. Не добавляй никаких дополнительных вопросов, комментариев или пояснений. Если кандидат начинает говорить отклоняясь от темы, вежливо верни разговор к заданным вопросам.
+
+            Фиксация ответов:
+            Слушай ответы кандидата и, если необходимо, уточняй их только в пределах каждого вопроса, чтобы получить максимально точную информацию.
+
+            Поддержание профессионализма:
+            Используй деловой, уверенный и вежливый тон. Если кандидат задаёт вопросы, не связанные с текущим интервью, аккуратно перенаправь его обратно к списку вопросов.
+
+            Завершение звонка:
+            После того как все вопросы заданы, вежливо поблагодари кандидата за уделённое время и сообщи, что с ним свяжутся для дальнейшей коммуникации.
+
+        Следуй строго списку вопросов из questions_for_candidate и не задавай никаких вопросов, помимо них.
+        """
+        await websocket.accept()
+
+        # Буферы для аудио клиента и ИИ
+        client_audio_buffer = bytearray()
+        ai_audio_buffer = bytearray()
+
+        async with websockets.connect(
+            'wss://api.openai.com/v1/realtime?model=gpt-4o-mini-realtime-preview',
+            extra_headers={
+                "Authorization": f"Bearer {self.OPENAI_API_KEY}",
+                "OpenAI-Beta": "realtime=v1",
+            }
+        ) as openai_ws:
+            await self.initialize_session(openai_ws,instructions)
+            await self.send_initial_conversation_item(openai_ws)
+            stream_sid = None
+            latest_media_timestamp = 0
+            last_assistant_item = None
+            mark_queue = []
+            response_start_timestamp_twilio = None
+
+            async def receive_from_twilio():
+                nonlocal stream_sid, latest_media_timestamp
+                try:
+                    async for message in websocket.iter_text():
+                        data = json.loads(message)
+                        # Если получено аудио от клиента – сохраняем в буфер и пересылаем в OpenAI
+                        if data['event'] == 'media' and openai_ws.open:
+                            latest_media_timestamp = int(data['media']['timestamp'])
+                            payload = data['media']['payload']
+                            decoded_audio = base64.b64decode(payload)
+                            client_audio_buffer.extend(decoded_audio)
+                            audio_append = {
+                                "type": "input_audio_buffer.append",
+                                "audio": payload
+                            }
+                            await openai_ws.send(json.dumps(audio_append))
+                        elif data['event'] == 'start':
+                            stream_sid = data['start']['streamSid']
+                            print(f"Incoming stream has started {stream_sid}")
+                            response_start_timestamp_twilio = None
+                            latest_media_timestamp = 0
+                            last_assistant_item = None
+                        elif data['event'] == 'mark':
+                            if mark_queue:
+                                mark_queue.pop(0)
+                except WebSocketDisconnect:
+                    print("Client disconnected.")
+                    if openai_ws.open:
+                        await openai_ws.close()
+
+            async def send_to_twilio():
+                nonlocal stream_sid, last_assistant_item, response_start_timestamp_twilio
+                try:
+                    async for openai_message in openai_ws:
+                        response_data = json.loads(openai_message)
+                        if response_data['type'] in self.LOG_EVENT_TYPES:
+                            print(f"Received event: {response_data['type']}", response_data)
+
+                        # При получении аудио-дельты от ИИ – сохраняем в буфер и пересылаем в Twilio
+                        if response_data.get('type') == 'response.audio.delta' and 'delta' in response_data:
+                            delta_payload = response_data['delta']
+                            delta_decoded = base64.b64decode(delta_payload)
+                            ai_audio_buffer.extend(delta_decoded)
+                            audio_payload = base64.b64encode(delta_decoded).decode('utf-8')
+                            audio_delta = {
+                                "event": "media",
+                                "streamSid": stream_sid,
+                                "media": {"payload": audio_payload}
+                            }
+                            await websocket.send_json(audio_delta)
+
+                            if response_start_timestamp_twilio is None:
+                                response_start_timestamp_twilio = latest_media_timestamp
+                                if self.SHOW_TIMING_MATH:
+                                    print(
+                                        f"Setting start timestamp for new response: {response_start_timestamp_twilio}ms"
+                                    )
+
+                            if response_data.get('item_id'):
+                                last_assistant_item = response_data['item_id']
+
+                            await send_mark(websocket, stream_sid)
+
+                        if response_data.get('type') == 'input_audio_buffer.speech_started':
+                            print("Speech started detected.")
+                            if last_assistant_item:
+                                print(f"Interrupting response with id: {last_assistant_item}")
+                                await handle_speech_started_event()
+                except Exception as e:
+                    print(f"Error in send_to_twilio: {e}")
+
+            async def handle_speech_started_event():
+                nonlocal response_start_timestamp_twilio, last_assistant_item
+                print("Handling speech started event.")
+                if mark_queue and response_start_timestamp_twilio is not None:
+                    elapsed_time = latest_media_timestamp - response_start_timestamp_twilio
+                    if self.SHOW_TIMING_MATH:
+                        print(
+                            f"Calculating elapsed time for truncation: {latest_media_timestamp} - {response_start_timestamp_twilio} = {elapsed_time}ms"
+                        )
+                    if last_assistant_item:
+                        if self.SHOW_TIMING_MATH:
+                            print(
+                                f"Truncating item with ID: {last_assistant_item}, Truncated at: {elapsed_time}ms"
+                            )
+                        truncate_event = {
+                            "type": "conversation.item.truncate",
+                            "item_id": last_assistant_item,
+                            "content_index": 0,
+                            "audio_end_ms": elapsed_time
+                        }
+                        await openai_ws.send(json.dumps(truncate_event))
+                    await websocket.send_json({
+                        "event": "clear",
+                        "streamSid": stream_sid
+                    })
+                    mark_queue.clear()
+                    last_assistant_item = None
+                    response_start_timestamp_twilio = None
+
+            async def send_mark(connection, stream_sid):
+                if stream_sid:
+                    mark_event = {
+                        "event": "mark",
+                        "streamSid": stream_sid,
+                        "mark": {"name": "responsePart"}
+                    }
+                    await connection.send_json(mark_event)
+                    mark_queue.append('responsePart')
+
+            await asyncio.gather(receive_from_twilio(), send_to_twilio())
+
+
+
+    async def send_initial_conversation_item(self, openai_ws):
+        """Отправляет начальный элемент диалога, чтобы ИИ мог начать разговор."""
+        initial_conversation_item = {
+            "type": "conversation.item.create",
+            "item": {
+                "type": "message",
+                "role": "user",
+                "content": [
+                    {
+                        "type": "input_text",
+                        "text": "Привет! Я голосовой AI-ассистент от Atlantys AI. Чем могу помочь?"
+                    }
+                ]
+            }
+        }
+        await openai_ws.send(json.dumps(initial_conversation_item))
+        await openai_ws.send(json.dumps({"type": "response.create"}))
+
+    async def initialize_session(self, openai_ws, instructions):
+        """Инициализирует сессию с OpenAI, отправляя настройки сессии."""
+        session_update = {
+            "type": "session.update",
+            "session": {
+                "turn_detection": {"type": "server_vad"},
+                "input_audio_format": "g711_ulaw",
+                "output_audio_format": "g711_ulaw",
+                "voice": self.VOICE,
+                "instructions": instructions,
+                "modalities": ["text", "audio"],
+                "temperature": 0.8,
+            }
+        }
+        print('Sending session update:', json.dumps(session_update))
+        await openai_ws.send(json.dumps(session_update))
+
+
+    async def recording_status(self,request: Request):
+        """
+        Получает статус записи звонка от Twilio и скачивает запись, 
+        когда она готова.
+        """
+        form_data = await request.form()
+        print("FORM_DATA", form_data)
+        recording_status = form_data.get("RecordingStatus")
+        recording_sid = form_data.get("RecordingSid")
+        recording_url = form_data.get("RecordingUrl")
+        call_sid = form_data.get("CallSid")
+        duration = form_data.get("RecordingDuration")
+        
+        print(f"Recording status update: {recording_status}")
+        print(f"Recording SID: {recording_sid}")
+        print(f"Call SID: {call_sid}")
+        print(f"Duration: {duration} seconds")
+        
+        if recording_status == "completed" and recording_url:
+            print(f"Recording URL: {recording_url}")
+            
+            try:
+                
+                if "?auth_token=" in recording_url:
+                    recording_url = recording_url.split("?auth_token=")[0]
+                
+                response = requests.get(url=recording_url, auth=(self.TWILIO_ACCOUNT_SID, self.TWILIO_SECRET))
+                print(f"Response status code: {response.status_code}")
+                print(f"Response content: {response.content[:100]}")  # Первые 100 байт ответа
+                
+                if response.status_code == 200:
+                    file_data = response.content
+                    file_key = f"recordings/{call_sid}_{recording_sid}.mp3"
+                    permanent_url, _ = await self.minio_service.upload_single_file(file_data,file_key)
+                    await self.favorite_repo.update_favorite_resume(call_sid=call_sid, upd_data={"recording_file":file_key,"is_responded":True,"is_called":True})
+                else:
+                    print(f"Failed to download recording. Status code: {response.status_code}")
+                
+            except Exception as e:
+                print(f"Error downloading recording: {e}")
+                
+        return HTMLResponse(content="Recording status received", status_code=200)
+
+
+    async def make_call(self,resume_id:int, ):
+        """Инициирует звонок на указанный номер и включает запись разговора."""
+        result_data = await self.favorite_repo.get_result_data_by_resume_id(int(id))
+        phone_number:str = result_data.get('candidate_info',{}).get('contacts').get('phone_number')
+        if phone_number is not None:
+            phone_number.replace('-','').replace('(','').replace(')','').replace(" ",'')
+            call = self.client.calls.create( 
+            to=phone_number,
+            from_=self.TWILIO_PHONE_NUMBER,
+            url=f"https://api.atlantys.kz/api/v1/incoming-call?resume_id={resume_id}",
+            record=True,  
+            recording_status_callback=f"https://api.atlantys.kz/api/v1/recording-status",
+            recording_status_callback_method="POST",
+            recording_channels="mono",
+            )   
+            await self.favorite_repo.update_favorite_resume(resume_id=resume_id, upd_data={"call_sid":call.sid, "is_called":True})
+            return {"success":True}
+        else:
+            raise BadRequestException(message='Invalid Request')

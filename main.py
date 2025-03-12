@@ -6,6 +6,7 @@ from fastapi import staticfiles
 from fastapi.exceptions import RequestValidationError
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
+from src.routers.api.v1.phone_interview import phone_interview_router
 from src.models import sql_admin_models_list,User
 from src.routers.api.v1.auth import auth_router
 from src.routers.api.v1.hr_agent import hr_agent_router
@@ -94,6 +95,7 @@ def create_app(create_custom_static_urls: bool = False) -> FastAPI:
     app.include_router(billing_router)
     app.include_router(balance_router)
     app.include_router(clone_router)
+    app.include_router(phone_interview_router)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["*"], 

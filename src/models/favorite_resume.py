@@ -14,6 +14,11 @@ class FavoriteResume(Base,TimestampMixin):
     resume_id: so.Mapped[int] = so.mapped_column(sa.ForeignKey('hr_assistant_tasks.id', ondelete="CASCADE"), nullable=False)
     question_for_candidate: so.Mapped[dict] = so.mapped_column(sa.JSON(),nullable=True)
     stage: so.Mapped[str]  = so.mapped_column(sa.String,nullable=True,default='phone interview')
+    phone_number: so.Mapped[str]  = so.mapped_column(sa.String,nullable=True,)
+    recording_file: so.Mapped[str] = so.mapped_column(sa.String, nullable=True)
+    is_responded: so.Mapped[bool] = so.mapped_column(sa.Boolean,default=False,nullable=True)
+    call_sid: so.Mapped[str]  = so.mapped_column(sa.String,nullable=True,)
+    is_called: so.Mapped[bool] = so.mapped_column(sa.Boolean,default=False,nullable=True)
     user = so.relationship("User", back_populates="favorite_resumes")
     task = so.relationship("HRTask", back_populates="favorites") 
 

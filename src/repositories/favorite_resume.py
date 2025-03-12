@@ -1,10 +1,10 @@
 from typing import Optional
-from sqlalchemy import select, delete
+from sqlalchemy import String, cast, func, or_, select, delete, update
 from src.repositories import BaseRepository
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.models.favorite_resume import FavoriteResume
 from src.models.hr_assistant_task import HRTask
-
+from sqlalchemy.orm import aliased
 
 class FavoriteResumeRepository(BaseRepository):
     
@@ -59,4 +59,27 @@ class FavoriteResumeRepository(BaseRepository):
             favorite_resume.question_for_candidate = questions
             await self.session.commit()
         return favorite_resume
+    
+    async def update_favorite_resume(self, resume_id: int | None, call_sid: str | None, upd_data: dict):
+        query = (
+            update(FavoriteResume)
+            .where(
+                or_(
+                    FavoriteResume.id == resume_id if resume_id is not None else False,
+                    FavoriteResume.call_sid == call_sid if call_sid is not None else False
+                )
+            )
+            .values(**upd_data)
+        )
+        await self.session.execute(query)
+        await self.session.commit()
 
+    async def get_result_data_by_resume_id(self, resume_id: int) -> Optional[dict]:
+        query = (
+            select(HRTask.result_data)
+            .join(FavoriteResume, HRTask.id == FavoriteResume.resume_id)
+            .where(FavoriteResume.resume_id == resume_id)
+        )
+        result = await self.session.execute(query)
+        hr_task = result.scalar()
+        return hr_task

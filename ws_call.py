@@ -3,6 +3,7 @@ import json
 import asyncio
 import base64
 import time
+import requests
 import websockets
 from fastapi import FastAPI, WebSocket, Request, Form
 from fastapi.responses import HTMLResponse, JSONResponse
@@ -13,14 +14,9 @@ from twilio.rest import Client
 
 load_dotenv()
 
-TWILIO_PHONE_NUMBER = '+15862041488'
+TWILIO_PHONE_NUMBER = '+19159759046'
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
 PORT = 8000
-
-TWILIO_ACCOUNT_SID = os.getenv('TWILIO_ACCOUNT_SID')
-TWILIO_SECRET =  os.getenv('TWILIO_SECRET')
-TWILIO_AUTH_TOKEN =  os.getenv('TWILIO_AUTH_TOKEN')
-
 SYSTEM_MESSAGE = (
     "You are a helpful and bubbly AI assistant who loves to chat about "
     "anything the user is interested in and is prepared to offer them facts. "
@@ -36,7 +32,6 @@ LOG_EVENT_TYPES = [
 ]
 SHOW_TIMING_MATH = False
 
-NGROK_URL = "1815-79-142-54-219.ngrok-free.app"
 
 app = FastAPI()
 
@@ -53,25 +48,33 @@ async def index_page():
 async def handle_incoming_call(request: Request):
     """
     Обрабатывает входящий звонок и возвращает TwiML для подключения
-    к media stream.
+    к media stream с включенной транскрипцией.
     """
+    user_id = request.query_params.get('user_id')
     response = VoiceResponse()
     response.say("Подождите пока мы настраиваем подключение")
     response.pause(length=1)
     response.say("Отлично, соединение настроено, вы можете говорить")
+    response.record(transcribe=True)
+    response.hangup()
     connect = Connect()
-    connect.stream(url=f'wss://{NGROK_URL}/media-stream')
+    stream = Stream(url=f'wss://{NGROK_URL}/media-stream?user_id={user_id}')
+    connect.append(stream)
     response.append(connect)
+    
     return HTMLResponse(content=str(response), media_type="application/xml")
 
+
 @app.websocket("/media-stream")
-async def handle_media_stream(websocket: WebSocket):
+async def handle_media_stream(websocket: WebSocket,):
     """
     Обрабатывает соединение WebSocket между Twilio и OpenAI.
     Аудио от клиента и ИИ буферизуется и, по завершению сегмента,
     сохраняется в отдельные аудио файлы.
     """
     print("Client connected")
+    user_id = await websocket.query_params.get('user_id')
+    custum_prompt = await self.user_repo.fetch_prompt_by_userid(user_id)
     await websocket.accept()
 
     # Буферы для аудио клиента и ИИ
@@ -85,7 +88,7 @@ async def handle_media_stream(websocket: WebSocket):
             "OpenAI-Beta": "realtime=v1",
         }
     ) as openai_ws:
-        await initialize_session(openai_ws)
+        await initialize_session(openai_ws,custum_prompt)
         await send_initial_conversation_item(openai_ws)
         stream_sid = None
         latest_media_timestamp = 0
@@ -118,14 +121,6 @@ async def handle_media_stream(websocket: WebSocket):
                     elif data['event'] == 'mark':
                         if mark_queue:
                             mark_queue.pop(0)
-                    # По окончании речи клиента – сохраняем буфер в аудиофайл
-                    elif data['event'] == 'input_audio_buffer.speech_stopped':
-                        timestamp = int(time.time() * 1000)
-                        filename = f"client_audio_{timestamp}.ulaw"
-                        with open(filename, "wb") as f:
-                            f.write(client_audio_buffer)
-                        print(f"Saved client audio to {filename}")
-                        client_audio_buffer.clear()
             except WebSocketDisconnect:
                 print("Client disconnected.")
                 if openai_ws.open:
@@ -222,6 +217,56 @@ async def handle_media_stream(websocket: WebSocket):
 
         await asyncio.gather(receive_from_twilio(), send_to_twilio())
 
+@app.post("/recording-status")
+async def recording_status(request: Request):
+    """
+    Получает статус записи звонка от Twilio и скачивает запись, 
+    когда она готова.
+    """
+    form_data = await request.form()
+    print("FORM_DATA", form_data)
+    recording_status = form_data.get("RecordingStatus")
+    recording_sid = form_data.get("RecordingSid")
+    recording_url = form_data.get("RecordingUrl")
+    call_sid = form_data.get("CallSid")
+    duration = form_data.get("RecordingDuration")
+    
+    print(f"Recording status update: {recording_status}")
+    print(f"Recording SID: {recording_sid}")
+    print(f"Call SID: {call_sid}")
+    print(f"Duration: {duration} seconds")
+    
+    if recording_status == "completed" and recording_url:
+        print(f"Recording URL: {recording_url}")
+        
+        # Скачиваем запись
+        timestamp = int(time.time())
+        RECORDINGS_FOLDER = 'recordings'
+        file_path = f"{RECORDINGS_FOLDER}/call_{call_sid}_{timestamp}.mp3"
+        
+        try:
+            
+            # Убедимся, что recording_url не содержит auth_token
+            if "?auth_token=" in recording_url:
+                recording_url = recording_url.split("?auth_token=")[0]
+            
+            response = requests.get(url=recording_url, auth=(TWILIO_ACCOUNT_SID, TWILIO_SECRET))
+            print(f"Response status code: {response.status_code}")
+            print(f"Response content: {response.content[:100]}")  # Первые 100 байт ответа
+            
+            if response.status_code == 200:
+                with open(file_path, 'wb') as f:
+                    f.write(response.content)
+                print(f"Successfully downloaded recording to {file_path}")
+            else:
+                print(f"Failed to download recording. Status code: {response.status_code}")
+            
+        except Exception as e:
+            print(f"Error downloading recording: {e}")
+            
+    return HTMLResponse(content="Recording status received", status_code=200)
+
+
 async def send_initial_conversation_item(openai_ws):
     """Отправляет начальный элемент диалога, чтобы ИИ мог начать разговор."""
     initial_conversation_item = {
@@ -240,7 +285,7 @@ async def send_initial_conversation_item(openai_ws):
     await openai_ws.send(json.dumps(initial_conversation_item))
     await openai_ws.send(json.dumps({"type": "response.create"}))
 
-async def initialize_session(openai_ws):
+async def initialize_session(openai_ws,custum_prompt):
     """Инициализирует сессию с OpenAI, отправляя настройки сессии."""
     session_update = {
         "type": "session.update",
@@ -249,7 +294,7 @@ async def initialize_session(openai_ws):
             "input_audio_format": "g711_ulaw",
             "output_audio_format": "g711_ulaw",
             "voice": VOICE,
-            "instructions": SYSTEM_MESSAGE,
+            "instructions": custum_prompt,
             "modalities": ["text", "audio"],
             "temperature": 0.8,
         }
@@ -258,51 +303,20 @@ async def initialize_session(openai_ws):
     await openai_ws.send(json.dumps(session_update))
 
 @app.post("/make-call")
-async def make_call(phone_number: str = Form(...)):
+async def make_call(phone_number: str = Form(...),user_id:str = Form(...)):
     """Инициирует звонок на указанный номер и включает запись разговора."""
-    recording_status_callback_url = f"https://{NGROK_URL}/recording-status"
     
     call = client.calls.create(
         to=phone_number,
         from_=TWILIO_PHONE_NUMBER,
-        url=f"https://{NGROK_URL}/incoming-call",
-        record=True,  # Включаем запись разговора
-        recording_status_callback=recording_status_callback_url,  # Указываем URL обратного вызова
-        recording_status_callback_method="POST"  # Метод для обратного вызова
-    )
-    
+        url=f"https://{NGROK_URL}/incoming-call?user_id={user_id}",
+        record=True,  
+        recording_status_callback=f"https://{NGROK_URL}/recording-status",
+        recording_status_callback_method="POST",
+        recording_channels="mono",
+    )   
     return {"message": "Call initiated", "call_sid": call.sid}
 
-@app.post("/recording-status")
-async def handle_recording_status(request: Request):
-    """
-    Обрабатывает обратный вызов от Twilio по статусу записи.
-    Различает тип контента и сохраняет детали записи в файл recordings.txt.
-    """
-    try:
-        content_type = request.headers.get("Content-Type", "")
-        if "application/x-www-form-urlencoded" in content_type:
-            data = await request.form()
-        else:
-            data = await request.json()
-
-        print("Recording status callback data:", data)
-
-        recording_url = data.get("RecordingUrl") or data.get("recordingurl")
-        recording_sid = data.get("RecordingSid") or data.get("recordingsid")
-        recording_status = data.get("RecordingStatus") or data.get("recordingstatus")
-
-        print(f"Recording status: {recording_status}")
-
-        if recording_url:
-            with open('recordings.txt', 'a') as f:
-                f.write(f"Recording SID: {recording_sid}, URL: {recording_url}\n")
-
-        return {"status": "success"}
-
-    except Exception as e:
-        print(f"Error processing recording status: {e}")
-        return {"status": "error", "message": str(e)}
 
 if __name__ == '__main__':
     import uvicorn
