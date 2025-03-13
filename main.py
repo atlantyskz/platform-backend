@@ -1,4 +1,5 @@
 from contextlib import asynccontextmanager
+import os
 from typing import Dict, List
 from fastapi import FastAPI, HTTPException, Request,status
 from pathlib import Path
@@ -30,10 +31,7 @@ from fastapi.openapi.docs import (
 )
 from fastapi.openapi.utils import get_openapi
 from sqladmin import Admin, ModelView
-origins = [
-    "http://localhost",  
-    "http://localhost:3000",  
-]
+
 
 def custom_openapi():
     if app.openapi_schema:

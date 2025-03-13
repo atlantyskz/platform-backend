@@ -396,7 +396,6 @@ class HHController:
                 logging.error(f"Сессия не найдена: session_id={session_id}")
                 raise NotFoundException("Session not found")
             logging.debug(f"Найдена сессия: {session}")
-
             hh_account = await self.hh_account_repository.get_hh_account_by_user_id(user_id)
             if hh_account is None:
                 logging.error(f"HH аккаунт не найден для user_id={user_id}")
