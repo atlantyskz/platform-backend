@@ -25,7 +25,7 @@ from dotenv import load_dotenv
 from twilio.rest import Client
 
 
-phone_interview_router = APIRouter(prefix='/api/v1/phone_interview',tags=['USER FEEDBACK'])
+phone_interview_router = APIRouter(prefix='/api/v1/phone_interview',tags=['PHONE INTERVIEW'])
 
 
 
@@ -42,7 +42,8 @@ async def handle_incoming_call(request: Request):
     response.say("Отлично, соединение настроено, вы можете говорить")
     host = request.url.hostname
     connect = Connect()
-    stream = Stream(url=f'wss://{host}/media-stream?resume_id={resume_id}')
+    stream = Stream(url=f'wss://71dc-79-142-54-219.ngrok-free.app/api/v1/phone_interview/media-stream/{resume_id}')
+
     connect.append(stream)
     response.append(connect)
     
@@ -59,11 +60,12 @@ async def make_call(
     res = await hr_agent_controller.make_call(resume_id)
     return res
 
-@phone_interview_router.websocket('/media-stream')
-async def media_stream(websocket: WebSocket,    hr_agent_controller: HRAgentController = Depends(Factory.get_hr_agent_controller),
-):
-    return await hr_agent_controller.media_stream(websocket)
+@phone_interview_router.websocket('/media-stream/{resume_id}')
+async def media_stream(websocket: WebSocket,resume_id:int, hr_agent_controller: HRAgentController = Depends(Factory.get_hr_agent_controller),
+):  
 
+    # Ваш основной обработчик
+    await hr_agent_controller.media_stream(websocket, (resume_id))
 
 @phone_interview_router.post("/recording-status")
 async def make_call(
