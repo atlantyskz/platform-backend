@@ -54,6 +54,7 @@ class UserRepository(BaseRepository):
                 "lastname": user.lastname,
                 "role": user.role.name if user.role else None,
                 "organization": organization_name if organization_name else None,
+                "created_at": user.created_at,
             }
         return None
         
