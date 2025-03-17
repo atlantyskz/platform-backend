@@ -1280,6 +1280,9 @@ class HRAgentController:
         """Инициирует звонок на указанный номер и включает запись разговора."""
         try:
             result_data = await self.favorite_repo.get_result_data_by_resume_id((resume_id))
+            if not result_data:
+                raise BadRequestException("Resume not found")
+
             phone_number:str = result_data.get('candidate_info',{}).get('contacts').get('phone_number')
 
             if phone_number is not None:
