@@ -74,7 +74,7 @@ class AuthController:
                 await self.session.flush()
                 # call cron job ...
                 free_trial_tracker.apply_async(kwargs={"balance_id": balance.id},
-                                               eta=balance.created_at + timedelta(minutes=1))
+                                               eta=balance.created_at + timedelta(days=1))
                 return Token(
                     access_token=JWTHandler.encode_access_token(payload={"sub": user.id, "role": user.role.name}),
                     refresh_token=JWTHandler.encode_refresh_token(payload={"sub": user.id, "role": user.role.name}),
