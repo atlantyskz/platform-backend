@@ -1,16 +1,12 @@
 name: CI/CD Pipeline
 
 on:
-#  push:
-#    branches:
-#      - main
   workflow_dispatch:
 
 jobs:
   deploy:
     name: Deploy && Pull images to server
-    runs-on:
-      ubuntu-latest
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
@@ -19,15 +15,17 @@ jobs:
       - name: Set up SSH
         run: | 
           mkdir -p ~/.ssh
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -H ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts
+          ssh-keyscan -p 22 -H ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts
 
       - name: Deploy to server
         run: |
           ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
             cd /home/almalinux/platform-backend/git_code/platform-backend || exit 1
-            git pull origin main
+            git fetch --all
+            git reset --hard origin/main
+            docker compose -f docker-compose.prod.yml down
             docker compose -f docker-compose.prod.yml up -d --build
+            sleep 5
             sudo systemctl restart nginx
           EOF
