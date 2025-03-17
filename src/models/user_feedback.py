@@ -8,8 +8,6 @@ from src.models import Base,TimestampMixin
 class UserFeedback(Base,TimestampMixin):
     __tablename__  = 'user_feedbacks'
 
-    id: so.Mapped[int] = so.mapped_column(sa.Integer,primary_key=True,autoincrement=True)
-    
     id: so.Mapped[int] = so.mapped_column(sa.Integer, primary_key=True, index=True)
     user_id: so.Mapped[int] = so.mapped_column(sa.ForeignKey('users.id'),nullable=False)
     user_email: so.Mapped[str] = so.mapped_column(sa.String,nullable=False)
