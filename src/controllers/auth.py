@@ -1,44 +1,42 @@
-
-
-from datetime import timedelta
 import os
+from datetime import timedelta
 from uuid import uuid4
+
 from fastapi import HTTPException, Request
 from fastapi.responses import RedirectResponse
-from pydantic import EmailStr
-from sqlalchemy import select
-from src.repositories.organization_member import OrganizationMemberRepository
-from src.repositories.balance import BalanceRepository
-from src.services.email import EmailService
-from src.repositories.role import RoleRepository
-from src.repositories.user import UserRepository
-from src.repositories.organization import OrganizationRepository
-from src.controllers import BaseController
-from src.models import User
-from src.core.security import JWTHandler
-from src.core.password import PasswordHandler
-from src.core.exceptions import BadRequestException,UnauthorizedException
-from src.schemas.responses.auth import Token
-from src.repositories.user import UserRepository
-from sqlalchemy.ext.asyncio import AsyncSession
-from src.models.role import RoleEnum
-
 from google_auth_oauthlib.flow import Flow
 from googleapiclient.discovery import build
+from pydantic import EmailStr
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from src.core.exceptions import BadRequestException, UnauthorizedException
+from src.core.password import PasswordHandler
+from src.core.security import JWTHandler
+from src.core.tasks import free_trial_tracker
+from src.models import User
+from src.models.role import RoleEnum
+from src.repositories.balance import BalanceRepository
+from src.repositories.organization import OrganizationRepository
+from src.repositories.organization_member import OrganizationMemberRepository
+from src.repositories.role import RoleRepository
+from src.repositories.user import UserRepository
+from src.schemas.responses.auth import Token
+from src.services.email import EmailService
 
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
-GOOGLE_CLIENT_SECRET =os.getenv("GOOGLE_CLIENT_SECRET")
+GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
 GOOGLE_REDIRECT_URI = "https://platform.atlantys.kz/google-auth"
 
 CLIENT_SECRETS_FILE = "client_secret.json"
 
+
 class AuthController:
 
-    def __init__(self,session:AsyncSession):
+    def __init__(self, session: AsyncSession):
         self.session = session
         self.user_repo = UserRepository(session)
         self.role_repo = RoleRepository(session)
-        self.organization_repo = OrganizationRepository(session)   
+        self.organization_repo = OrganizationRepository(session)
         self.balance_repo = BalanceRepository(session)
         self.organization_member_repo = OrganizationMemberRepository(session)
         self.email_service = EmailService()
@@ -50,7 +48,7 @@ class AuthController:
                 user = await self.user_repo.get_by_email(email)
                 if user is not None:
                     raise HTTPException(status_code=400, detail="User already exists")
-                
+
                 # Получаем роль и создаем пользователя
                 role = await self.role_repo.get_role_by_name(RoleEnum.ADMIN)
                 password_hash = PasswordHandler.hash(password)
@@ -59,7 +57,7 @@ class AuthController:
                     'password': password_hash,
                     'role_id': role.id
                 })
-                organization = await self.organization_repo.add({'name':'Top Company','email':email})
+                organization = await self.organization_repo.add({'name': 'Company name', 'email': email})
                 await self.session.flush()
                 await self.organization_member_repo.add(
                     organization.id,
@@ -68,32 +66,35 @@ class AuthController:
                 )
                 await self.session.flush()
 
-                await self.balance_repo.create_balance({
+                balance = await self.balance_repo.create_balance({
                     'organization_id': organization.id,
-                    'atl_tokens': 100,
+                    'atl_tokens': 10000,
                     'free_trial': True
                 })
+                await self.session.flush()
                 # call cron job ...
+                free_trial_tracker.apply_async(kwargs={"balance_id": balance.id},
+                                               eta=balance.created_at + timedelta(minutes=1))
                 return Token(
-                    access_token=JWTHandler.encode_access_token(payload={"sub": user.id,"role":user.role.name}),
-                    refresh_token=JWTHandler.encode_refresh_token(payload={"sub": user.id,"role":user.role.name}),
+                    access_token=JWTHandler.encode_access_token(payload={"sub": user.id, "role": user.role.name}),
+                    refresh_token=JWTHandler.encode_refresh_token(payload={"sub": user.id, "role": user.role.name}),
                 )
             except Exception as e:
-                raise e            
+                raise e
 
     async def login(self, email: str, password: str) -> Token:
         try:
             user = await self._get_user_by_email(email)
-            if not PasswordHandler.verify(user.password,password):
+            if not PasswordHandler.verify(user.password, password):
                 raise UnauthorizedException(message='Incorrect Password')
             return Token(
-                    access_token=JWTHandler.encode_access_token(payload={"sub": user.id,"role":user.role.name}),
-                    refresh_token=JWTHandler.encode_refresh_token(payload={"sub": user.id,"role":user.role.name}),
-                )
+                access_token=JWTHandler.encode_access_token(payload={"sub": user.id, "role": user.role.name}),
+                refresh_token=JWTHandler.encode_refresh_token(payload={"sub": user.id, "role": user.role.name}),
+            )
         except Exception:
             raise
 
-    async def refresh_token(self,refresh_token: str)->Token:
+    async def refresh_token(self, refresh_token: str) -> Token:
         try:
             user_payload = JWTHandler.decode(refresh_token)
             if user_payload.get('type') != 'refresh':
@@ -103,12 +104,11 @@ class AuthController:
             if user is None:
                 raise UnauthorizedException(message="User not found")
             return Token(
-                access_token=JWTHandler.encode_access_token(payload={"sub": user.id,"role":user.role.name}),
-                refresh_token=JWTHandler.encode_refresh_token(payload={"sub": user.id,"role":user.role.name}),
-                )
+                access_token=JWTHandler.encode_access_token(payload={"sub": user.id, "role": user.role.name}),
+                refresh_token=JWTHandler.encode_refresh_token(payload={"sub": user.id, "role": user.role.name}),
+            )
         except Exception:
             raise
-
 
     async def request_to_reset_password(self, email: str):
         try:
@@ -130,7 +130,7 @@ class AuthController:
                 subject="Password Reset Request",
                 html_content=html_content
             )
-            
+
             return {"message": "Password reset instructions sent to your email"}
         except Exception as e:
             raise BadRequestException(str(e))
@@ -141,16 +141,16 @@ class AuthController:
                 payload = JWTHandler.decode(token)
                 if payload.get('type') != 'password_reset':
                     raise BadRequestException('Invalid password reset token')
-                
+
                 user_id = payload.get('sub')
                 user = await self.user_repo.get_by_user_id(user_id)
-                
+
                 if user is None:
                     raise BadRequestException('User not found')
-                
+
                 password_hash = PasswordHandler.hash(new_password)
                 await self.user_repo.update_user(user.id, {'password': password_hash})
-                
+
                 # Send confirmation email
                 html_content = """
                 <h2>Сброс пароля успешно выполнен</h2>
@@ -158,20 +158,20 @@ class AuthController:
                 <p>Если вы не совершали это действие, пожалуйста, немедленно свяжитесь со службой поддержки.</p>
 
                 """
-                
+
                 await self.email_service.send_email(
                     to_email=user.email,
                     subject="Password Reset Successful",
                     html_content=html_content
                 )
-                
+
                 return {"message": "Password reset successfully"}
             except BadRequestException as e:
                 raise e
             except Exception as e:
                 raise BadRequestException(str(e))
-        
-    async def _get_user_by_email(self,email: str)-> User:
+
+    async def _get_user_by_email(self, email: str) -> User:
         try:
             user = await self.user_repo.get_by_email(email)
             if user is None:
@@ -180,12 +180,12 @@ class AuthController:
         except Exception:
             raise
 
-    async def get_current_user(self,user_id: int)-> User:
+    async def get_current_user(self, user_id: int) -> User:
         try:
             user = await self.user_repo.get_current_user(user_id)
             return user
         except Exception:
-            raise 
+            raise
 
     async def verify_email(self, token: str) -> dict:
         try:
@@ -194,25 +194,25 @@ class AuthController:
                 print(payload)
                 if payload.get('type') != 'verification':
                     raise BadRequestException('Invalid verification token')
-                
+
                 email = payload.get('sub')
                 user = await self.user_repo.get_by_email(email)
-                
+
                 if user is None:
                     raise BadRequestException('User not found')
                 if user.is_verified:
                     raise BadRequestException('Email already verified')
-                
+
                 await self.user_repo.update_user(user.id, {'is_verified': True})
                 return Token(
-                        access_token=JWTHandler.encode_access_token(payload={"sub": user.id,"role":user.role.name}),
-                        refresh_token=JWTHandler.encode_refresh_token(payload={"sub": user.id,"role":user.role.name}),
-                    )
+                    access_token=JWTHandler.encode_access_token(payload={"sub": user.id, "role": user.role.name}),
+                    refresh_token=JWTHandler.encode_refresh_token(payload={"sub": user.id, "role": user.role.name}),
+                )
         except Exception as e:
             await self.session.rollback()
             raise BadRequestException(str(e))
-        
-    async def google_auth(self,request:Request):
+
+    async def google_auth(self, request: Request):
         """
         Инициализирует OAuth2 поток и перенаправляет пользователя на страницу авторизации Google.
         """
@@ -234,8 +234,7 @@ class AuthController:
         # Рекомендуется сохранить state для проверки в callback (например, в сессии)
         return RedirectResponse(url=authorization_url)
 
-
-    async def google_auth_callback(self,params: dict):
+    async def google_auth_callback(self, params: dict):
         query_params = params
         if "error" in query_params:
             raise HTTPException(status_code=400, detail=f"Auth error: {query_params['error']}")
@@ -259,7 +258,7 @@ class AuthController:
             flow.fetch_token(code=code)
         except Exception as e:
             raise HTTPException(status_code=400, detail=f"Auth code is not valid: {str(e)}")
-        
+
         credentials = flow.credentials
 
         try:
@@ -280,7 +279,8 @@ class AuthController:
                     'password': password_hash,
                     'role_id': role.id
                 })
-                organization = await self.organization_repo.add({'name':'Top Company','email':user_info.get("email")})
+                organization = await self.organization_repo.add(
+                    {'name': 'Top Company', 'email': user_info.get("email")})
                 await self.session.flush()
                 await self.organization_member_repo.add(
                     organization.id,
@@ -298,6 +298,6 @@ class AuthController:
             access_token = JWTHandler.encode_access_token(payload={"sub": user.id, "role": user_role.name})
             refresh_token = JWTHandler.encode_refresh_token(payload={"sub": user.id, "role": user_role.name})
         return {
-            'access_token':access_token,
-            'refresh_token':refresh_token
+            'access_token': access_token,
+            'refresh_token': refresh_token
         }
