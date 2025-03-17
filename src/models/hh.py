@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from src.models import Base, TimestampMixin
 
 import sqlalchemy as sa
@@ -11,7 +13,7 @@ class HHAccount(Base):
     access_token = sa.Column(sa.String, nullable=False)
     refresh_token = sa.Column(sa.String, nullable=False)
     expires_at = sa.Column(sa.DateTime, nullable=False)
-    created_at = sa.Column(sa.DateTime, server_default=sa.func.now(), nullable=False)
-    updated_at = sa.Column(sa.DateTime, onupdate=sa.func.now(), nullable=True)
+    created_at = sa.Column(sa.DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = sa.Column(sa.DateTime, onupdate=datetime.utcnow, nullable=True)
 
     user = so.relationship("User", back_populates="hh_account")

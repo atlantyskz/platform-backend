@@ -1,4 +1,6 @@
 import uuid
+from datetime import datetime
+
 import sqlalchemy as sa
 import sqlalchemy.orm as so
 from src.models import Base,TimestampMixin
@@ -18,7 +20,7 @@ class HRTask(Base):
     tokens_spent: so.Mapped[int] = so.mapped_column(sa.Integer,nullable=True)
     task_type: so.Mapped[str] = so.mapped_column(sa.String, nullable=False)
     file_key: so.Mapped[str] = so.mapped_column(sa.String, nullable=True) 
-    created_at: so.Mapped[str] = so.mapped_column(sa.DateTime, default=sa.func.now())
+    created_at: so.Mapped[str] = so.mapped_column(sa.DateTime, default=datetime.utcnow)
     hh_file_url: so.Mapped[str] = so.mapped_column(sa.String, nullable=True)
     session = so.relationship("AssistantSession", back_populates="tasks")
     favorites = so.relationship("FavoriteResume", back_populates="task", cascade="all, delete-orphan")
