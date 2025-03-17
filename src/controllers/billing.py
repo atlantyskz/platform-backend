@@ -106,7 +106,7 @@ class BillingController:
                 "payment_type": 'card'
             }
             billing_transaction = await self.billing_transaction_repository.create(billing_transaction_data)
-            # await self.balance_repository.topup_balance(organization.id, request.atl_amount)
+            await self.balance_repository.topup_balance(organization.id, request.atl_amount)
             
             return {
                 "id": billing_transaction.id,
