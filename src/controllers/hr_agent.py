@@ -77,7 +77,7 @@ class HRAgentController:
         self.client = Client(username=self.TWILIO_ACCOUNT_SID, password=self.TWILIO_AUTH_TOKEN)
         self.TWILIO_PHONE_NUMBER = '+19159759046'
         self.OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
-        self.VOICE = 'alloy'
+        self.VOICE = 'Polly.Tatyana'
         self.LOG_EVENT_TYPES = [
             'error', 'response.content.done', 'rate_limits.updated',
             'response.done', 'input_audio_buffer.committed',
