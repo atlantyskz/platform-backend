@@ -1,71 +1,58 @@
 import asyncio
+import base64
 import csv
 import hashlib
 import json
-from io import BytesIO, StringIO
-import math
-import pprint
-from uuid import UUID, uuid4
+import os
+import uuid
 from datetime import datetime, timedelta
-import pprint
-import json
+from io import BytesIO
+from io import StringIO
+from typing import List, Optional
+from uuid import UUID
 
 import httpx
-from reportlab.lib.pagesizes import letter
-from reportlab.pdfgen import canvas
-from reportlab.lib.utils import simpleSplit
-from io import BytesIO
-from fastapi.responses import StreamingResponse
-import json
-from typing import List, Optional
-import uuid
-from fastapi import  HTTPException, UploadFile, WebSocket, WebSocketDisconnect
-from fastapi.responses import StreamingResponse
-from src.controllers.hh import HHController
-from src.repositories.hh import HHAccountRepository
-from src.repositories.balance import BalanceRepository
-from src.repositories.balance_usage import BalanceUsageRepository
-from src.services.email import EmailService
-from src.services.websocket import manager
-from src.models.favorite_resume import FavoriteResume
-from src.core.dramatiq_worker import DramatiqWorker
-from src.core.exceptions import BadRequestException,NotFoundException
-from src.repositories.assistant_session import AssistantSessionRepository
-from src.repositories.assistant import AssistantRepository
-from src.repositories.organization import OrganizationRepository
-from src.repositories.favorite_resume import FavoriteResumeRepository
-from src.repositories.vacancy import VacancyRepository
-from src.repositories.user import UserRepository
-from src.repositories.chat_message_history import ChatHistoryMessageRepository
-from src.core.exceptions import BadRequestException
-from src.repositories.user import UserRepository
-from sqlalchemy.ext.asyncio import AsyncSession
-from src.core.backend import BackgroundTasksBackend
-from src.services.extractor import AsyncTextExtractor
-from src.services.request_sender import RequestSender
-from src.repositories.vacancy_requirement import VacancyRequirementRepository
-from src.services.minio import MinioUploader
-from reportlab.lib.pagesizes import letter
-from reportlab.pdfgen import canvas
-from reportlab.pdfbase import pdfmetrics
-from reportlab.pdfbase.ttfonts import TTFont
-import os
-import json
-import asyncio
-import base64
-import time
 import requests
 import websockets
-from fastapi import FastAPI, WebSocket, Request, Form
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi import HTTPException, UploadFile
+from fastapi import WebSocket, Request
+from fastapi.responses import HTMLResponse
+from fastapi.responses import StreamingResponse
 from fastapi.websockets import WebSocketDisconnect
-from twilio.twiml.voice_response import VoiceResponse, Connect, Say, Stream
-from dotenv import load_dotenv
+from reportlab.lib.pagesizes import letter
+from reportlab.lib.utils import simpleSplit
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
+from reportlab.pdfgen import canvas
+from sqlalchemy.ext.asyncio import AsyncSession
 from twilio.rest import Client
+
+from src.controllers.hh import HHController
+from src.core.backend import BackgroundTasksBackend
+from src.core.dramatiq_worker import DramatiqWorker
+from src.core.exceptions import BadRequestException
+from src.core.exceptions import NotFoundException
+from src.repositories.assistant import AssistantRepository
+from src.repositories.assistant_session import AssistantSessionRepository
+from src.repositories.balance import BalanceRepository
+from src.repositories.balance_usage import BalanceUsageRepository
+from src.repositories.chat_message_history import ChatHistoryMessageRepository
+from src.repositories.favorite_resume import FavoriteResumeRepository
+from src.repositories.hh import HHAccountRepository
+from src.repositories.organization import OrganizationRepository
+from src.repositories.user import UserRepository
+from src.repositories.vacancy import VacancyRepository
+from src.repositories.vacancy_requirement import VacancyRequirementRepository
+from src.services.email import EmailService
+from src.services.extractor import AsyncTextExtractor
+from src.services.minio import MinioUploader
+from src.services.request_sender import RequestSender
+from src.services.websocket import manager
+
 
 class HRAgentController:
 
-    def __init__(self,session:AsyncSession,text_extractor:AsyncTextExtractor):
+    def __init__(self, session: AsyncSession, text_extractor: AsyncTextExtractor):
         self.session = session
         self.text_extractor = text_extractor
         self.request_sender = RequestSender()
@@ -84,7 +71,7 @@ class HRAgentController:
         self.hh_account_repository = HHAccountRepository(session)
         self.headhunter_service = HHController(session)
         self.TWILIO_ACCOUNT_SID = os.getenv("TWILIO_ACCOUNT_SID")
-        self.TWILIO_SECRET= os.getenv("TWILIO_SECRET")
+        self.TWILIO_SECRET = os.getenv("TWILIO_SECRET")
         self.client = Client(username=self.TWILIO_ACCOUNT_SID, password=self.TWILIO_SECRET)
         self.TWILIO_PHONE_NUMBER = '+19159759046'
         self.OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
@@ -97,48 +84,47 @@ class HRAgentController:
         ]
         self.SHOW_TIMING_MATH = False
 
-
-
         self.minio_service = MinioUploader(
-            host="minio:9000",  
+            host="minio:9000",
             access_key="admin",
             secret_key="admin123",
             bucket_name="analyze-resumes"
-    )
+        )
         self.manager = manager
         self.upload_progress = {}
         pdfmetrics.registerFont(TTFont('DejaVu', 'dejavu-sans-ttf-2.37/ttf/DejaVuSans.ttf'))
 
-    async def process_balance_usage(self, user_id: int, organization_id: int, balance_id: int, user_message: str, llm_tokens: int, file: Optional[UploadFile],assistant_id:int,type_of_usage):
-            atl_tokens_spent = round(llm_tokens / 3000,2)
-            print("TOKENS SPENT",atl_tokens_spent)
-            await self.balance_usage_repo.create({
-                'user_id': user_id,
-                'organization_id': organization_id,
-                'assistant_id': assistant_id,
-                'balance_id': balance_id,
-                'input_text_count': len(user_message),
-                'gpt_token_spent': llm_tokens,
-                'input_token_count': llm_tokens,
-                'file_count': 1 if file else 0,
-                'file_size': file.size if file else None,
-                'atl_token_spent': (atl_tokens_spent),
-                "type": type_of_usage
-            })
-            await self.balance_repo.withdraw_balance(organization_id, atl_tokens_spent)
+    async def process_balance_usage(self, user_id: int, organization_id: int, balance_id: int, user_message: str,
+                                    llm_tokens: int, file: Optional[UploadFile], assistant_id: int, type_of_usage):
+        atl_tokens_spent = round(llm_tokens / 3000, 2)
+        print("TOKENS SPENT", atl_tokens_spent)
+        await self.balance_usage_repo.create({
+            'user_id': user_id,
+            'organization_id': organization_id,
+            'assistant_id': assistant_id,
+            'balance_id': balance_id,
+            'input_text_count': len(user_message),
+            'gpt_token_spent': llm_tokens,
+            'input_token_count': llm_tokens,
+            'file_count': 1 if file else 0,
+            'file_size': file.size if file else None,
+            'atl_token_spent': (atl_tokens_spent),
+            "type": type_of_usage
+        })
+        await self.balance_repo.withdraw_balance(organization_id, atl_tokens_spent)
 
-    async def create_vacancy(self,user_id:int, file: Optional[UploadFile], vacancy_text: Optional[str]):
+    async def create_vacancy(self, user_id: int, file: Optional[UploadFile], vacancy_text: Optional[str]):
         async with self.session.begin() as session:
             try:
-                
+
                 user_organization = await self.organization_repo.get_user_organization(user_id)
                 if user_organization is None:
                     raise BadRequestException('You dont have organization')
-                user_organization_info  = {
-                    'company_name':user_organization.name,
-                    'company_registered_address':user_organization.registered_address,
-                    'company_phone':user_organization.phone_number,
-                    'company_email':user_organization.email
+                user_organization_info = {
+                    'company_name': user_organization.name,
+                    'company_registered_address': user_organization.registered_address,
+                    'company_phone': user_organization.phone_number,
+                    'company_email': user_organization.email
                 }
                 balance = await self.balance_repo.get_balance(user_organization.id)
                 if balance is None:
@@ -151,16 +137,16 @@ class HRAgentController:
 
                 if file and vacancy_text:
                     raise BadRequestException("Only one of 'file' or 'vacancy_text' should be provided")
-                
+
                 if not file and not vacancy_text:
-                    raise BadRequestException("Either 'file' or 'vacancy_text' must be provided")        
+                    raise BadRequestException("Either 'file' or 'vacancy_text' must be provided")
                 user_message = None
                 if file:
                     content = await self.text_extractor.extract_text(file)
                     user_message = content
                 elif vacancy_text:
                     user_message = vacancy_text
-                messages = []  
+                messages = []
                 messages.append({
                     "role": "user",
                     "content": f"{user_message} user info:{user_organization_info}"
@@ -174,10 +160,11 @@ class HRAgentController:
                 )
                 print(llm_response.get('tokens_spent'))
                 assistant = await self.assistant_repo.get_assistant_by_name('ИИ Рекрутер')
-                
+
                 await self.process_balance_usage(
-                    user_id, user_organization.id, balance.id, user_message, llm_response.get('tokens_spent'), file,assistant.id,type_of_usage="vacancy generation"
-                )                
+                    user_id, user_organization.id, balance.id, user_message, llm_response.get('tokens_spent'), file,
+                    assistant.id, type_of_usage="vacancy generation"
+                )
 
                 llm_title = llm_response.get('llm_response').get("job_title")
                 assistant = await self.assistant_repo.get_assistant_by_name('ИИ Рекрутер')
@@ -186,43 +173,41 @@ class HRAgentController:
                     'title': llm_title,
                     'organization_id': user_organization.id,
                     'assistant_id': assistant.id
-                }) 
+                })
                 session_id = str(assist_session.id)
-                
+
                 await self.history_repo.create({
-                    'session_id':session_id,
-                    'user_id':user_id,
-                    'role':'user',
-                    'message':user_message
+                    'session_id': session_id,
+                    'user_id': user_id,
+                    'role': 'user',
+                    'message': user_message
                 })
                 await self.history_repo.create({
-                    'session_id':session_id,    
-                    'user_id':user_id,
-                    'role':'assistant',
-                    'message':llm_response
+                    'session_id': session_id,
+                    'user_id': user_id,
+                    'role': 'assistant',
+                    'message': llm_response
                 })
- 
+
                 vacancy = await self.vacancy_repo.add({
-                    'title':llm_title,
-                    'session_id':session_id,
-                    'user_id':user_id,
-                    'vacancy_text':llm_response
+                    'title': llm_title,
+                    'session_id': session_id,
+                    'user_id': user_id,
+                    'vacancy_text': llm_response
                 })
 
                 return {
-                    'session_id':vacancy.session_id,
-                    'title':vacancy.title,
-                    'vacancy_text':vacancy.vacancy_text.get('llm_response')
+                    'session_id': vacancy.session_id,
+                    'title': vacancy.title,
+                    'vacancy_text': vacancy.vacancy_text.get('llm_response')
                 }
             except Exception as e:
                 await session.rollback()
                 raise e
-            
-    
 
-    async def delete_vacancy_by_session_id(self,session_id:str,user_id:int):
+    async def delete_vacancy_by_session_id(self, session_id: str, user_id: int):
         try:
-            
+
             vacancy = await self.vacancy_repo.get_by_session_id(session_id)
             if vacancy is None:
                 raise NotFoundException("Vacancy not found")
@@ -230,29 +215,27 @@ class HRAgentController:
                 raise BadRequestException('You dont have permission')
             await self.vacancy_repo.delete_vacancy(session_id)
             return {
-                'success':True
+                'success': True
             }
         except Exception as e:
             raise
-    
 
-    async def add_session_to_archive(self,user_id:int,session_id:UUID):
+    async def add_session_to_archive(self, user_id: int, session_id: UUID):
         try:
             session = await self.vacancy_repo.get_by_session_id(session_id)
             if session is None:
                 raise NotFoundException("Session not found")
             if user_id != session.user_id:
                 raise BadRequestException('You dont have permission')
-            await self.assistant_session_repo.update_session(session_id,{'is_archived':True})
+            await self.assistant_session_repo.update_session(session_id, {'is_archived': True})
             await self.session.commit()
             return {
-                'success':True
+                'success': True
             }
         except Exception as e:
             raise
 
-
-    async def get_generated_vacancy(self,session_id:str,):
+    async def get_generated_vacancy(self, session_id: str, ):
         try:
             vacancy = await self.vacancy_repo.get_by_session_id(session_id)
             if vacancy is None:
@@ -261,23 +244,22 @@ class HRAgentController:
         except Exception as e:
             raise
 
-
-    async def update_vacancy(self,user_id,session_id:str, attributes:dict):
+    async def update_vacancy(self, user_id, session_id: str, attributes: dict):
         async with self.session.begin():
             try:
                 existing_vacancy = await self.get_generated_vacancy(session_id)
                 if existing_vacancy.user_id != user_id:
                     raise BadRequestException("You dont have permissions to update vacancy")
-                
+
                 updated_vacancy = await self.vacancy_repo.get_by_session_id(session_id)
-            
+
                 updated_data = {
                     "vacancy_text": {
-                        **updated_vacancy.vacancy_text,  
-                        "llm_response": attributes.get('vacancy_text')    
+                        **updated_vacancy.vacancy_text,
+                        "llm_response": attributes.get('vacancy_text')
                     }
                 }
-                
+
                 updated_vacancy = await self.vacancy_repo.update_by_session_id(session_id, updated_data)
                 await self.history_repo.create({
                     'session_id': session_id,
@@ -296,25 +278,25 @@ class HRAgentController:
             except Exception as e:
                 raise e
 
-    async def get_user_vacancies(self,user_id:int,is_archived: bool = False):
+    async def get_user_vacancies(self, user_id: int, is_archived: bool = False):
         try:
-            user_vacancies = await self.vacancy_repo.get_by_user_id(user_id,is_archived)
+            user_vacancies = await self.vacancy_repo.get_by_user_id(user_id, is_archived)
             if user_vacancies is None:
                 raise BadRequestException("Vacancies not found")
             return user_vacancies
         except Exception:
             raise
 
-    async def get_user_sessions(self,user_id:int):
+    async def get_user_sessions(self, user_id: int):
         try:
             user_sessions = await self.assistant_session_repo.get_by_user_id(user_id)
             return user_sessions
         except Exception:
             raise
 
-    def get_text_hash(self,text: str) -> str:
+    def get_text_hash(self, text: str) -> str:
         return hashlib.sha256(text.encode('utf-8')).hexdigest()
-    
+
     async def session_creator(self, user_id: int, title: str):
         async with self.session.begin() as session:
             try:
@@ -329,32 +311,32 @@ class HRAgentController:
                     'assistant_id': assistant.id
                 })
                 await self.vacancy_repo.add({
-                    'title':title,
-                    'session_id':assist_session.id,
-                    'user_id':user_id
+                    'title': title,
+                    'session_id': assist_session.id,
+                    'user_id': user_id
                 })
                 return {
                     'session_id': str(assist_session.id),
-                    "title":assist_session.title,
+                    "title": assist_session.title,
                 }
             except Exception as e:
                 raise e
 
-    async def delete_session(self,session_id:str):
+    async def delete_session(self, session_id: str):
         await self.assistant_session_repo.delete_session(session_id)
         return {
-            "success":True
+            "success": True
         }
-    
-    async def preview_cv(self,task_id):
+
+    async def preview_cv(self, task_id):
         cv_task = await self.bg_backend.get_by_task_id(task_id)
         user_id = cv_task.session.user_id
         if cv_task and cv_task.file_key:
             file_stream = self.minio_service.get_file(cv_task.file_key)
             if not file_stream:
                 raise HTTPException(status_code=404, detail="Файл не найден")
-            
-            return  StreamingResponse(
+
+            return StreamingResponse(
                 file_stream,
                 media_type="application/pdf",
                 headers={
@@ -368,8 +350,8 @@ class HRAgentController:
 
             if datetime.utcnow() >= hh_account.expires_at - timedelta(minutes=5):
                 hh_account = await self.headhunter_service.refresh_token(user_id)
-            
-            headers = {"Authorization":f"Bearer {hh_account.access_token}"}
+
+            headers = {"Authorization": f"Bearer {hh_account.access_token}"}
             async with httpx.AsyncClient() as client:
                 response = await client.get(cv_task.hh_file_url, headers=headers)
                 if response.status_code == 200:
@@ -385,33 +367,31 @@ class HRAgentController:
         else:
             raise NotFoundException("File not found")
 
-
-
     async def cv_analyzer(
-        self, 
-        user_id: int, 
-        session_id: Optional[str], 
-        vacancy_file: Optional[UploadFile], 
-        vacancy_text: Optional[str],  
-        resumes: List[UploadFile], 
-    ):      
+            self,
+            user_id: int,
+            session_id: Optional[str],
+            vacancy_file: Optional[UploadFile],
+            vacancy_text: Optional[str],
+            resumes: List[UploadFile],
+    ):
         async with self.session.begin() as session:
             user_organization = await self.organization_repo.get_user_organization(user_id)
             if user_organization is None:
                 raise BadRequestException("You don't have an organization")
-            balance = await self.balance_repo.get_balance(user_organization.id) 
+            balance = await self.balance_repo.get_balance(user_organization.id)
             if balance is None:
                 raise BadRequestException("Balance not found")
             if balance.atl_tokens < 5:
                 raise BadRequestException("Not enough tokens")
-            
+
             if not vacancy_file and not vacancy_text:
                 raise BadRequestException("You must upload a file or provide text")
             if len(resumes) == 0:
                 raise BadRequestException("You must upload resume files")
             if len(resumes) > 100:
                 raise BadRequestException("Too many resume files. Max number of resume files is 100")
-            
+
             # Извлечение текста из вакансии
             if vacancy_file:
                 vacancy_text = await self.text_extractor.extract_text(vacancy_file)
@@ -433,9 +413,9 @@ class HRAgentController:
             # Извлечение текста из резюме
             resume_texts = await asyncio.gather(*[self.text_extractor.extract_text(resume) for resume in resumes])
             for resume in resumes:
-                resume.file.seek(0) 
+                resume.file.seek(0)
 
-            # Уникализация текстов
+                # Уникализация текстов
             unique_hashes = set()
             unique_batch = []
 
@@ -451,7 +431,7 @@ class HRAgentController:
                 raise BadRequestException("No unique resumes found")
 
             unique_resumes = [resume for resume, _ in unique_batch]
-            minio_uploader =self.minio_service
+            minio_uploader = self.minio_service
 
             try:
                 file_info = await minio_uploader.save_files_in_minio(unique_resumes, session_id)
@@ -477,15 +457,13 @@ class HRAgentController:
                     "file_key": str(file_key),
                 })
 
-                DramatiqWorker.process_resume.send(task_id, vacancy_text, resume_text,user_id, user_organization.id, balance.id, vacancy_text,)
+                DramatiqWorker.process_resume.send(task_id, vacancy_text, resume_text, user_id, user_organization.id,
+                                                   balance.id, vacancy_text, )
                 processed_count += 1
                 await self.send_progress(user_id, processed_count=processed_count, total_files=total_files)
                 all_task_ids.append(task_id)
 
             return {"session_id": session_id, "tasks": all_task_ids, "tasks_count": len(all_task_ids)}
-
-
-
 
     async def send_progress(self, user_id: int, processed_count: int, total_files: int):
         """Отправляет прогресс пользователю через WebSocket"""
@@ -501,22 +479,19 @@ class HRAgentController:
         await self.manager.connect(user_id, websocket)
 
         print("12312321")
-        await self.manager.send_json(1,{"hi":"user"})
+        await self.manager.send_json(1, {"hi": "user"})
         try:
             while True:
-                await self.manager.send_json(123123,{"hi":"user"})
+                await self.manager.send_json(123123, {"hi": "user"})
                 await websocket.receive_text()
         except Exception as e:
             print(f"WebSocket connection error: {e}")
         finally:
             await self.manager.disconnect(user_id)
 
-
-        
-
-    async def delete_resume_by_session_id(self,user_id:int, session_id:str):
+    async def delete_resume_by_session_id(self, user_id: int, session_id: str):
         try:
-            
+
             assistant_session = await self.assistant_session_repo.get_by_session_id(session_id)
             if assistant_session is None:
                 raise NotFoundException("Assistant session not found")
@@ -524,38 +499,38 @@ class HRAgentController:
                 raise BadRequestException('You dont have permission')
             await self.assistant_session_repo.delete_session(session_id)
             return {
-                'success':True
+                'success': True
             }
         except Exception as e:
             raise e
 
     async def export_to_csv(self, session_id: str):
         results = await self.bg_backend.get_session_results_to_export(session_id)
-        
+
         csv_output = StringIO()
         fieldnames = [
-            "fullname", 
-            "gender", 
-            "age", 
-            "birth_date", 
-            "phone_number", 
-            "email", 
-            "preferred_contact", 
-            "location", 
-            "languages", 
-            "desired_position", 
-            "specializations", 
-            "employment_type", 
-            "work_schedule", 
-            "desired_salary", 
-            "overall_years_experience", 
-            "experience_details", 
-            "education", 
-            "skills", 
-            "matching_percentage", 
+            "fullname",
+            "gender",
+            "age",
+            "birth_date",
+            "phone_number",
+            "email",
+            "preferred_contact",
+            "location",
+            "languages",
+            "desired_position",
+            "specializations",
+            "employment_type",
+            "work_schedule",
+            "desired_salary",
+            "overall_years_experience",
+            "experience_details",
+            "education",
+            "skills",
+            "matching_percentage",
             "overall_comment"
         ]
-        
+
         writer = csv.DictWriter(csv_output, fieldnames=fieldnames, delimiter=';', quoting=csv.QUOTE_MINIMAL)
         writer.writeheader()
 
@@ -564,14 +539,14 @@ class HRAgentController:
                 if isinstance(result.result_data, str):
                     result_data = json.loads(result.result_data)
                 else:
-                    result_data = result.result_data 
+                    result_data = result.result_data
 
-                candidate_info   = result_data.get("candidate_info", {})
-                job_preferences  = result_data.get("job_preferences", {})
-                analysis         = result_data.get("analysis", {})
-                experience_obj   = result_data.get("experience", {})
-                experience_list  = experience_obj.get("details", [])
-                overall_years    = experience_obj.get("overall_years", "")
+                candidate_info = result_data.get("candidate_info", {})
+                job_preferences = result_data.get("job_preferences", {})
+                analysis = result_data.get("analysis", {})
+                experience_obj = result_data.get("experience", {})
+                experience_list = experience_obj.get("details", [])
+                overall_years = experience_obj.get("overall_years", "")
 
                 experience_details = []
                 for exp in experience_list:
@@ -581,15 +556,15 @@ class HRAgentController:
                     experience_details.append(f"{duration}, {company}, {role}")
                 experience_str = " | ".join(experience_details)
 
-                education_obj   = result_data.get("education", {})
-                education_list  = education_obj.get("degrees", [])
-                education_str   = ", ".join(education_list)
+                education_obj = result_data.get("education", {})
+                education_list = education_obj.get("degrees", [])
+                education_str = ", ".join(education_list)
 
-                skills_list     = result_data.get("skills", [])
-                skills_str      = ", ".join(skills_list)
+                skills_list = result_data.get("skills", [])
+                skills_str = ", ".join(skills_list)
 
-                languages_list  = candidate_info.get("languages", [])
-                languages_str   = ", ".join(languages_list)
+                languages_list = candidate_info.get("languages", [])
+                languages_str = ", ".join(languages_list)
 
                 row = {
                     "fullname": candidate_info.get("fullname", ""),
@@ -617,7 +592,7 @@ class HRAgentController:
                 writer.writerow(row)
             except Exception as e:
                 print(f"Error processing result with id={result.id}: {e}")
-        
+
         csv_output.seek(0)
         csv_data = csv_output.getvalue()
 
@@ -627,11 +602,11 @@ class HRAgentController:
         )
         response.headers["Content-Disposition"] = "attachment; filename=export.csv"
         return response
-    
 
-    async def get_cv_analyzer_result_by_session_id(self, session_id: str, user_id: int, offset: Optional[int], limit: Optional[int]):
+    async def get_cv_analyzer_result_by_session_id(self, session_id: str, user_id: int, offset: Optional[int],
+                                                   limit: Optional[int]):
         results, total_results = await self.bg_backend.get_results_by_session_id(session_id, user_id, offset, limit)
-        
+
         return {
             "session_id": session_id,
             "results": [
@@ -644,15 +619,14 @@ class HRAgentController:
                 for res in results
             ],
             "meta": {
-                "total_results": total_results, 
+                "total_results": total_results,
                 "offset": offset,
                 "limit": limit,
                 "total_pages": (total_results + limit - 1) // limit if limit else 1
             }
         }
-    
 
-    async def add_resume_to_favorites(self,user_id: int, resume_id: int):
+    async def add_resume_to_favorites(self, user_id: int, resume_id: int):
         try:
             exist_resume = await self.favorite_repo.get_favorite_resumes_by_resume_id(resume_id)
             session = await self.bg_backend.get_by_id(resume_id)
@@ -661,77 +635,79 @@ class HRAgentController:
             if await self.favorite_repo.get_resume(resume_id) is None:
                 raise BadRequestException('Not Found')
             hh_account = await self.hh_account_repository.get_hh_account_by_user_id(user_id)
-            if hh_account is None:
-                raise NotFoundException("HH account not found")
+            if hh_account:
+                if datetime.utcnow() >= hh_account.expires_at - timedelta(minutes=5):
+                    hh_account = await self.headhunter_service.refresh_token(user_id)
 
-            if datetime.utcnow() >= hh_account.expires_at - timedelta(minutes=5):
-                hh_account = await self.headhunter_service.refresh_token(user_id)
-            
-            headers = {"Authorization":f"Bearer {hh_account.access_token}"}
+                headers = {"Authorization": f"Bearer {hh_account.access_token}"}
 
-            favorite_resume = await self.favorite_repo.add({
-                "user_id":user_id,
-                "resume_id":resume_id,
-                "session_id":session.session_id
-            })
-            async with httpx.AsyncClient() as client:
-                url = f"https://api.hh.ru/negotiations/phone_interview"
-                params = {
-                    "resume_id": session.resume_id,
-                    "vacancy_id": session.vacancy_id
-                }
-                response = await client.post(url, headers=headers, params=params)
-                if response.status_code != 201:
-                    error_data = response.json()
-                    print(f"Ошибка при отправке запроса: {error_data}")
-                    raise BadRequestException(f"HH API error: {error_data}")       
+                favorite_resume = await self.favorite_repo.add({
+                    "user_id": user_id,
+                    "resume_id": resume_id,
+                    "session_id": session.session_id
+                })
+                async with httpx.AsyncClient() as client:
+                    url = f"https://api.hh.ru/negotiations/phone_interview"
+                    params = {
+                        "resume_id": session.resume_id,
+                        "vacancy_id": session.vacancy_id
+                    }
+                    response = await client.post(url, headers=headers, params=params)
+                    if response.status_code != 201:
+                        error_data = response.json()
+                        print(f"Ошибка при отправке запроса: {error_data}")
+                        raise BadRequestException(f"HH API error: {error_data}")
+            else:
+                favorite_resume = await self.favorite_repo.add({
+                    "user_id": user_id,
+                    "resume_id": resume_id,
+                    "session_id": session.session_id
+
+                })
             await self.session.commit()
             await self.session.refresh(favorite_resume)
             return favorite_resume
         except Exception as e:
             raise e
 
-    async def generate_questions_for_candidate(self,resume_id:int):
+    async def generate_questions_for_candidate(self, resume_id: int):
         resume = await self.favorite_repo.get_result_data_by_resume_id(resume_id)
-        messages = []  
+        messages = []
         messages.append({
             "role": "user",
             "content": f"Candidate Resume: {resume}"
         })
 
         llm_response = await self.request_sender._send_request(
-                    llm_url=f'http://llm_service:8001/hr/generate_questions_for_candidate',
-                    data={"messages": messages}
-                )    
-        updated_resume =     await self.favorite_repo.update_questions_for_candidate(resume_id,llm_response.get('llm_response'))
+            llm_url=f'http://llm_service:8001/hr/generate_questions_for_candidate',
+            data={"messages": messages}
+        )
+        updated_resume = await self.favorite_repo.update_questions_for_candidate(resume_id,
+                                                                                 llm_response.get('llm_response'))
         return llm_response
-    
-    async def delete_from_favorites(self, user_id: int,resume_id: int):
+
+    async def delete_from_favorites(self, user_id: int, resume_id: int):
         try:
-            resume = await self.favorite_repo.delete_by_resume_id(user_id=user_id,resume_id=resume_id)
+            resume = await self.favorite_repo.delete_by_resume_id(user_id=user_id, resume_id=resume_id)
             if resume is None:
                 raise BadRequestException('Invalid request or resume id')
             await self.session.delete(resume)
             await self.session.commit()
             return {
-                'success':True
+                'success': True
             }
         except Exception:
             raise
 
-
-    async def get_favorite_resumes(self,user_id: int,session_id:str):
+    async def get_favorite_resumes(self, user_id: int, session_id: str):
         favorite_resumes = await self.favorite_repo.get_favorite_resumes_by_user_id(user_id, session_id)
         return favorite_resumes
-
 
     async def fetch_result_data(self, resume_id: int) -> dict:
         result_data = await self.favorite_repo.get_result_data_by_resume_id(resume_id)
         if result_data is None:
             raise HTTPException(status_code=404, detail="Result data not found")
         return result_data
-
-
 
     async def ws_update_vacancy_by_ai(self, session_id: int, websocket: WebSocket):
         try:
@@ -801,19 +777,19 @@ class HRAgentController:
             await websocket.send_json({'error': f'An unexpected error occurred - {str(e)}'})
             await websocket.close()
 
-    async def ws_review_results_by_ai(self,session_id:str, websocket: WebSocket,user_id:int):
+    async def ws_review_results_by_ai(self, session_id: str, websocket: WebSocket, user_id: int):
         try:
             session_results = await self.bg_backend.get_results_by_session_id_ws(session_id)
             await websocket.accept()
-            
+
             await websocket.send_json({
                 "session_id": session_id,
                 "results": [
-                {
-                    "id": res.id, 
-                    "result_data": res.result_data
-                }
-                for res in session_results
+                    {
+                        "id": res.id,
+                        "result_data": res.result_data
+                    }
+                    for res in session_results
                 ]
             })
 
@@ -849,7 +825,6 @@ class HRAgentController:
         finally:
             pass
 
-        
     async def generate_pdf(self, session_id: str):
         vacancy = await self.vacancy_repo.get_by_session_id(session_id)
         buffer = BytesIO()
@@ -907,7 +882,7 @@ class HRAgentController:
         def add_wrapped_text(x, y, text, available_width):
             """Добавляет текст с переносом строк и возвращает новую позицию y."""
             nonlocal y_position
-            
+
             # Если текст короче доступной ширины, добавляем его как есть
             if c.stringWidth(text, "DejaVu", 12) <= available_width:
                 if y_position < margin:
@@ -932,17 +907,17 @@ class HRAgentController:
         def add_section(title, items, indent=0):
             """Добавляет раздел с заголовком и списком элементов."""
             nonlocal y_position
-            
+
             # Добавляем заголовок
             available_width = width - (2 * margin) - indent
             y_position = add_wrapped_text(margin + indent, y_position, title, available_width)
             y_position -= 5  # дополнительный отступ после заголовка
-            
+
             # Добавляем элементы списка
             for item in items:
                 bullet_text = f"• {item}"
                 y_position = add_wrapped_text(margin + indent + 15, y_position, bullet_text, available_width - 15)
-            
+
             y_position -= 10  # отступ после секции
 
         # Начальная позиция
@@ -980,7 +955,7 @@ class HRAgentController:
         y_position -= 10
         contact_title = "Contact Information:"
         y_position = add_wrapped_text(margin, y_position, contact_title, width - (2 * margin))
-        
+
         if contacts:
             phone = contacts.get('phone', 'Не указано')
             email = contacts.get('email', 'Не указано')
@@ -1000,44 +975,42 @@ class HRAgentController:
             media_type="application/pdf",
             headers={"Content-Disposition": "attachment; filename=vacancy.pdf"}
         )
-        
 
     def update_upload_progress(self, user_id: int, uploaded: int, total: int):
         self.upload_progress[user_id] = {"uploaded": uploaded, "total": total}
 
     def get_upload_progress(self, user_id: int):
         return self.upload_progress.get(user_id, {"uploaded": 0, "total": 0})
-    
 
-    async def rename_session(self,user_id,session_id,new_title: str):
+    async def rename_session(self, user_id, session_id, new_title: str):
         async with self.session.begin() as session:
-            user_session =  await self.assistant_session_repo.get_by_user_id(user_id)
+            user_session = await self.assistant_session_repo.get_by_user_id(user_id)
             print(user_session)
             if user_session is None:
                 raise BadRequestException('Session not found')
-            await self.assistant_session_repo.update_session(session_id,{
-                'title':new_title
+            await self.assistant_session_repo.update_session(session_id, {
+                'title': new_title
             })
             return {
-                'success':True
+                'success': True
             }
-        
-    async def remove_session_from_archive(self,user_id,session_id):
+
+    async def remove_session_from_archive(self, user_id, session_id):
         try:
             session = await self.vacancy_repo.get_by_session_id(session_id)
             if session is None:
                 raise NotFoundException("Session not found")
             if user_id != session.user_id:
                 raise BadRequestException('You dont have permission')
-            await self.assistant_session_repo.update_session(session_id,{'is_archived':False})
+            await self.assistant_session_repo.update_session(session_id, {'is_archived': False})
             await self.session.commit()
             return {
-                'success':True
+                'success': True
             }
         except Exception as e:
             raise
 
-    async def media_stream(self, websocket: WebSocket,resume_id):
+    async def media_stream(self, websocket: WebSocket, resume_id):
         questions_for_candidate = await self.favorite_repo.get_favorite_resumes_by_resume_id(resume_id)
         instructions = f"""
         Ты – ИИ-рекрутер, который проводит первичный телефонный звонок кандидатам. Твоя задача — задать кандидату только те вопросы, которые указаны в списке questions_for_candidate, и ничего больше.
@@ -1068,13 +1041,13 @@ class HRAgentController:
         ai_audio_buffer = bytearray()
 
         async with websockets.connect(
-            'wss://api.openai.com/v1/realtime?model=gpt-4o-mini-realtime-preview',
-            additional_headers={
-                "Authorization": f"Bearer {self.OPENAI_API_KEY}",
-                "OpenAI-Beta": "realtime=v1",
-            }
+                'wss://api.openai.com/v1/realtime?model=gpt-4o-mini-realtime-preview',
+                additional_headers={
+                    "Authorization": f"Bearer {self.OPENAI_API_KEY}",
+                    "OpenAI-Beta": "realtime=v1",
+                }
         ) as openai_ws:
-            await self.initialize_session(openai_ws,instructions)
+            await self.initialize_session(openai_ws, instructions)
             await self.send_initial_conversation_item(openai_ws)
             stream_sid = None
             latest_media_timestamp = 0
@@ -1194,8 +1167,6 @@ class HRAgentController:
 
             await asyncio.gather(receive_from_twilio(), send_to_twilio())
 
-
-
     async def send_initial_conversation_item(self, openai_ws):
         """Отправляет начальный элемент диалога, чтобы ИИ мог начать разговор."""
         initial_conversation_item = {
@@ -1231,8 +1202,7 @@ class HRAgentController:
         print('Sending session update:', json.dumps(session_update))
         await openai_ws.send(json.dumps(session_update))
 
-
-    async def recording_status(self,request: Request):
+    async def recording_status(self, request: Request):
         """
         Получает статус записи звонка от Twilio и скачивает запись, 
         когда она готова.
@@ -1244,60 +1214,62 @@ class HRAgentController:
         recording_url = form_data.get("RecordingUrl")
         call_sid = form_data.get("CallSid")
         duration = form_data.get("RecordingDuration")
-        
+
         print(f"Recording status update: {recording_status}")
         print(f"Recording SID: {recording_sid}")
         print(f"Call SID: {call_sid}")
         print(f"Duration: {duration} seconds")
-        
+
         if recording_status == "completed" and recording_url:
             print(f"Recording URL: {recording_url}")
-            
+
             try:
-                
+
                 if "?auth_token=" in recording_url:
                     recording_url = recording_url.split("?auth_token=")[0]
-                
+
                 response = requests.get(url=recording_url, auth=(self.TWILIO_ACCOUNT_SID, self.TWILIO_SECRET))
                 print(f"Response status code: {response.status_code}")
                 print(f"Response content: {response.content[:100]}")  # Первые 100 байт ответа
-                
+
                 if response.status_code == 200:
                     file_data = response.content
                     file_key = f"recordings/{call_sid}_{recording_sid}.mp3"
-                    permanent_url, _ = await self.minio_service.upload_single_file(file_data,file_key)
-                    await self.favorite_repo.update_favorite_resume(call_sid=call_sid, upd_data={"recording_file":file_key,"is_responded":True,"is_called":True})
+                    permanent_url, _ = await self.minio_service.upload_single_file(file_data, file_key)
+                    await self.favorite_repo.update_favorite_resume(call_sid=call_sid,
+                                                                    upd_data={"recording_file": file_key,
+                                                                              "is_responded": True, "is_called": True})
                 else:
                     print(f"Failed to download recording. Status code: {response.status_code}")
-                
+
             except Exception as e:
                 print(f"Error downloading recording: {e}")
-                
+
         return HTMLResponse(content="Recording status received", status_code=200)
 
-
-    async def make_call(self,resume_id:int, ):
+    async def make_call(self, resume_id: int, ):
         """Инициирует звонок на указанный номер и включает запись разговора."""
         try:
             result_data = await self.favorite_repo.get_result_data_by_resume_id((resume_id))
             if not result_data:
                 raise BadRequestException("Resume not found")
 
-            phone_number:str = result_data.get('candidate_info',{}).get('contacts').get('phone_number')
+            phone_number: str = result_data.get('candidate_info', {}).get('contacts').get('phone_number')
 
             if phone_number is not None:
-                phone_number.replace('-','').replace('(','').replace(')','').replace(" ",'')
+                phone_number.replace('-', '').replace('(', '').replace(')', '').replace(" ", '')
                 print(phone_number)
-                call = self.client.calls.create( 
-                to=phone_number,
-                from_=self.TWILIO_PHONE_NUMBER,
-                url=f"https://71dc-79-142-54-219.ngrok-free.app/api/v1/phone_interview/incoming-call?resume_id={resume_id}",
-                record=True,  
-                recording_status_callback=f"https://71dc-79-142-54-219.ngrok-free.app/api/v1/phone_interview/recording-status",
-                recording_status_callback_method="POST",
-                recording_channels="mono",
-                )   
-                await self.favorite_repo.update_favorite_resume(resume_id=resume_id,call_sid=None, upd_data={"call_sid":call.sid, "is_called":True})
-                return {"success":True}
+                call = self.client.calls.create(
+                    to=phone_number,
+                    from_=self.TWILIO_PHONE_NUMBER,
+                    url=f"https://71dc-79-142-54-219.ngrok-free.app/api/v1/phone_interview/incoming-call?resume_id={resume_id}",
+                    record=True,
+                    recording_status_callback=f"https://71dc-79-142-54-219.ngrok-free.app/api/v1/phone_interview/recording-status",
+                    recording_status_callback_method="POST",
+                    recording_channels="mono",
+                )
+                await self.favorite_repo.update_favorite_resume(resume_id=resume_id, call_sid=None,
+                                                                upd_data={"call_sid": call.sid, "is_called": True})
+                return {"success": True}
         except Exception as e:
             raise e
