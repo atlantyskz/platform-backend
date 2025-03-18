@@ -17,13 +17,10 @@ async def handle_incoming_call(request: Request):
     """
     resume_id = request.query_params.get('resume_id')
     response = VoiceResponse()
-    response.say("Подождите пока мы настраиваем подключение")
-    response.pause(length=1)
-    response.say("Отлично, соединение настроено, вы можете говорить")
-    host = request.url.hostname
     connect = Connect()
     stream = Stream(url=f'wss://api.atlantys.kz/api/v1/phone_interview/media-stream/{resume_id}')
-
+    response.record(transcribe=True)
+    response.hangup()
     connect.append(stream)
     response.append(connect)
 
