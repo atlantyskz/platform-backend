@@ -3,6 +3,8 @@ import httpx
 from typing import Any, Dict
 from abc import ABC, abstractmethod
 
+from src.core.settings import settings
+
 logging.basicConfig(level=logging.INFO)
 
 class IRequestSender(ABC):
@@ -12,7 +14,7 @@ class IRequestSender(ABC):
 
 class RequestSender(IRequestSender):
 
-    LLM_URL = "http://llm_service:8001/hr/analyze_cv_by_vacancy"
+    LLM_URL = f"{settings.LLM_SERVICE_URL}/hr/analyze_cv_by_vacancy"
 
     async def _send_request(self, data: Dict[str, Any], llm_url: str = LLM_URL) -> Dict[str, Any]:
         headers = {

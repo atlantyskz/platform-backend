@@ -12,7 +12,7 @@ class Settings:
     JWT_ALGORITHM: str = "HS256"
     JWT_ACCESS_EXPIRE_MINUTES :int = 60 * 24
     JWT_REFRESH_EXPIRE_MINUTES  : int = 60 * 24 *7
-    LLM_SERVICE_URL:str = 'http://0.0.0.0:8001'
+    LLM_SERVICE_URL:str =  os.getenv('LLM_SERVICE_URL')
 
 
 

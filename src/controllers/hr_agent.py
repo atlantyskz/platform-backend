@@ -32,6 +32,7 @@ from src.core.backend import BackgroundTasksBackend
 from src.core.dramatiq_worker import DramatiqWorker
 from src.core.exceptions import BadRequestException
 from src.core.exceptions import NotFoundException
+from src.core.settings import settings
 from src.repositories.assistant import AssistantRepository
 from src.repositories.assistant_session import AssistantSessionRepository
 from src.repositories.balance import BalanceRepository
@@ -155,7 +156,7 @@ class HRAgentController:
                 if balance is None:
                     raise BadRequestException('Balance not found')
                 llm_response = await self.request_sender._send_request(
-                    llm_url=f'http://llm_service:8001/hr/generate_vacancy',
+                    llm_url=f'{settings.LLM_SERVICE_URL}/hr/generate_vacancy',
                     data={"messages": messages}
                 )
                 print(llm_response.get('tokens_spent'))
@@ -1262,9 +1263,9 @@ class HRAgentController:
                 call = self.client.calls.create(
                     to=phone_number,
                     from_=self.TWILIO_PHONE_NUMBER,
-                    url=f"https://71dc-79-142-54-219.ngrok-free.app/api/v1/phone_interview/incoming-call?resume_id={resume_id}",
+                    url=f"https://api.atlantys.kz/api/v1/phone_interview/incoming-call?resume_id={resume_id}",
                     record=True,
-                    recording_status_callback=f"https://71dc-79-142-54-219.ngrok-free.app/api/v1/phone_interview/recording-status",
+                    recording_status_callback=f"https://api.atlantys.kz/api/v1/phone_interview/recording-status",
                     recording_status_callback_method="POST",
                     recording_channels="mono",
                 )

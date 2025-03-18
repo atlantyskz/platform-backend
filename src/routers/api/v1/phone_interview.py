@@ -22,7 +22,7 @@ async def handle_incoming_call(request: Request):
     response.say("Отлично, соединение настроено, вы можете говорить")
     host = request.url.hostname
     connect = Connect()
-    stream = Stream(url=f'wss://71dc-79-142-54-219.ngrok-free.app/api/v1/phone_interview/media-stream/{resume_id}')
+    stream = Stream(url=f'wss://api.atlantys.kz/api/v1/phone_interview/media-stream/{resume_id}')
 
     connect.append(stream)
     response.append(connect)
