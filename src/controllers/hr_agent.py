@@ -73,7 +73,8 @@ class HRAgentController:
         self.headhunter_service = HHController(session)
         self.TWILIO_ACCOUNT_SID = os.getenv("TWILIO_ACCOUNT_SID")
         self.TWILIO_SECRET = os.getenv("TWILIO_SECRET")
-        self.client = Client(username=self.TWILIO_ACCOUNT_SID, password=self.TWILIO_SECRET)
+        self.TWILIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN")
+        self.client = Client(username=self.TWILIO_ACCOUNT_SID, password=self.TWILIO_AUTH_TOKEN)
         self.TWILIO_PHONE_NUMBER = '+19159759046'
         self.OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
         self.VOICE = 'alloy'
