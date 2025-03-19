@@ -650,7 +650,7 @@ class HRAgentController:
             if await self.favorite_repo.get_resume(resume_id) is None:
                 raise BadRequestException('Not Found')
             hh_account = await self.hh_account_repository.get_hh_account_by_user_id(user_id)
-            async with self.session.begin():
+            async with self.session:
                 if hh_account:
                     if datetime.utcnow() >= hh_account.expires_at - timedelta(minutes=5):
                         hh_account = await self.headhunter_service.refresh_token(user_id)
