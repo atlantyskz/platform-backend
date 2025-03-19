@@ -41,6 +41,8 @@ from .discount import Discount
 from .balance_usage import BalanceUsage
 from .refund_application import RefundApplication
 from .hh import HHAccount
+from .interview_common_question import InterviewCommonQuestion
+from .interview_individual_question import InterviewIndividualQuestion
 
 sql_admin_models_list = [
     User,
@@ -61,4 +63,6 @@ sql_admin_models_list = [
     BalanceUsage,
     RefundApplication,
     HHAccount,
+    InterviewCommonQuestion,
+    InterviewIndividualQuestion,
 ]

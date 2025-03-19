@@ -40,6 +40,8 @@ from src.repositories.balance_usage import BalanceUsageRepository
 from src.repositories.chat_message_history import ChatHistoryMessageRepository
 from src.repositories.favorite_resume import FavoriteResumeRepository
 from src.repositories.hh import HHAccountRepository
+from src.repositories.interview_common_question import InterviewCommonQuestionRepository
+from src.repositories.interview_individual_question import InterviewIndividualQuestionRepository
 from src.repositories.organization import OrganizationRepository
 from src.repositories.user import UserRepository
 from src.repositories.vacancy import VacancyRepository
@@ -59,6 +61,10 @@ class HRAgentController:
         self.request_sender = RequestSender()
         self.user_repo = UserRepository(session)
         self.favorite_repo = FavoriteResumeRepository(session)
+
+        self.interview_common_question_repo = InterviewCommonQuestionRepository(session)
+        self.interview_individual_question_repo = InterviewIndividualQuestionRepository(session)
+
         self.vacancy_repo = VacancyRepository(session)
         self.assistant_session_repo = AssistantSessionRepository(session)
         self.assistant_repo = AssistantRepository(session)
@@ -94,6 +100,13 @@ class HRAgentController:
         )
         self.manager = manager
         self.upload_progress = {}
+        self.default_interview_questions = [
+            "Расскажите о себе и вашем профессиональном пути.",
+            "Какие достижения в вашей карьере вы считаете наиболее значимыми?",
+            "Почему вы хотите работать в нашей компании?",
+            "Как вы справляетесь с трудными ситуациями или конфликтами на работе?",
+            "Какие у вас долгосрочные карьерные цели?"
+        ]
         pdfmetrics.registerFont(TTFont('DejaVu', 'dejavu-sans-ttf-2.37/ttf/DejaVuSans.ttf'))
 
     async def process_balance_usage(self, user_id: int, organization_id: int, balance_id: int, user_message: str,
@@ -666,6 +679,15 @@ class HRAgentController:
                     "session_id": session.session_id
 
                 })
+
+            for question_text in self.default_interview_questions:
+                await self.interview_common_question_repo.create_question(
+                    {
+                        "session_id": session.session_id,
+                        "question_text": question_text
+                    }
+                )
+
             await self.session.commit()
             await self.session.refresh(favorite_resume)
             return favorite_resume

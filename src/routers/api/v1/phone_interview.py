@@ -5,6 +5,7 @@ from twilio.twiml.voice_response import VoiceResponse, Connect, Stream
 
 from src.controllers.hr_agent import HRAgentController
 from src.core.factory import Factory
+from src.core.settings import settings
 
 phone_interview_router = APIRouter(prefix='/api/v1/phone_interview', tags=['PHONE INTERVIEW'])
 
@@ -18,7 +19,7 @@ async def handle_incoming_call(request: Request):
     resume_id = request.query_params.get('resume_id')
     response = VoiceResponse()
     connect = Connect()
-    stream = Stream(url=f'wss://api.atlantys.kz/api/v1/phone_interview/media-stream/{resume_id}')
+    stream = Stream(url=f'wss://{settings.PLATFORM_BACKEND_URL}/api/v1/phone_interview/media-stream/{resume_id}')
     response.record(transcribe=True)
     connect.append(stream)
     response.append(connect)

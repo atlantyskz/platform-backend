@@ -47,11 +47,13 @@ class AssistantSessionRepository(BaseRepository):
         ]
         return sessions_with_names
     
-    async def get_by_session_id(self, session_id: str) -> Optional[AssistantSession]:
+    async def get_by_session_id(self, session_id: str, user_id:int = None) -> Optional[AssistantSession]:
         stmt = (
             select(AssistantSession)
             .where(AssistantSession.id == session_id)
         )
+        if user_id:
+            stmt = stmt.where(AssistantSession.user_id == user_id)
         result = await self.session.execute(stmt)
         return result.scalars().first()     
     
