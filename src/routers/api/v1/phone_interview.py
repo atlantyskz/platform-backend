@@ -20,7 +20,6 @@ async def handle_incoming_call(request: Request):
     connect = Connect()
     stream = Stream(url=f'wss://api.atlantys.kz/api/v1/phone_interview/media-stream/{resume_id}')
     response.record(transcribe=True)
-    response.hangup()
     connect.append(stream)
     response.append(connect)
 
