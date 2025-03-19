@@ -12,8 +12,7 @@ class InterviewCommonQuestion(Base, TimestampMixin):
         sa.ForeignKey(
             'assistant_sessions.id',
             ondelete='CASCADE'),
-        nullable=False,
-        unique=True
+        nullable=False
     )
     question_text = sa.Column(sa.Text, nullable=False)
 
