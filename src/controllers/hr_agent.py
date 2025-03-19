@@ -680,14 +680,15 @@ class HRAgentController:
                         "session_id": session.session_id
 
                     })
-
-                for question_text in self.default_interview_questions:
-                    await self.interview_common_question_repo.create_question(
-                        {
-                            "session_id": session.session_id,
-                            "question_text": question_text
-                        }
-                    )
+                db_question_session = await self.interview_common_question_repo.get_session_questions(session_id=session.session_id)
+                if not db_question_session:
+                    for question_text in self.default_interview_questions:
+                        await self.interview_common_question_repo.create_question(
+                            {
+                                "session_id": session.session_id,
+                                "question_text": question_text
+                            }
+                        )
             await self.session.commit()
             await self.session.refresh(favorite_resume)
             return favorite_resume
