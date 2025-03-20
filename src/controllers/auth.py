@@ -9,7 +9,7 @@ from googleapiclient.discovery import build
 from pydantic import EmailStr
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.core.exceptions import BadRequestException, UnauthorizedException
+from src.core.exceptions import BadRequestException, UnauthorizedException, NotFoundException
 from src.core.password import PasswordHandler
 from src.core.security import JWTHandler
 from src.core.tasks import free_trial_tracker
@@ -41,19 +41,23 @@ class AuthController:
         self.organization_member_repo = OrganizationMemberRepository(session)
         self.email_service = EmailService()
 
-    async def create_user(self, email: EmailStr, password: str) -> Token:
+    async def create_user(self, email: EmailStr, phone_number: str, password: str) -> Token:
         async with self.session.begin():
             try:
                 # Проверяем существующего пользователя
                 user = await self.user_repo.get_by_email(email)
                 if user is not None:
-                    raise HTTPException(status_code=400, detail="User already exists")
+                    raise HTTPException(status_code=400, detail="User with this email already exists")
+                user = await self.user_repo.get_by_phone_number(phone_number)
+                if user is not None:
+                    raise HTTPException(status_code=400, detail="User with this phone number already exists")
 
                 # Получаем роль и создаем пользователя
                 role = await self.role_repo.get_role_by_name(RoleEnum.ADMIN)
                 password_hash = PasswordHandler.hash(password)
                 user = await self.user_repo.create_user({
                     'email': email,
+                    'phone_number': phone_number,
                     'password': password_hash,
                     'role_id': role.id
                 })
@@ -82,9 +86,20 @@ class AuthController:
             except Exception as e:
                 raise e
 
-    async def login(self, email: str, password: str) -> Token:
+    async def login(self, password: str, email: str | None = None, phone_number: str | None = None) -> Token:
         try:
-            user = await self._get_user_by_email(email)
+            if email:
+                user = await self._get_user_by_email(email)
+                if not user:
+                    raise NotFoundException("User with this email does not exist")
+
+            elif phone_number:
+                user = await self.user_repo.get_by_phone_number(phone_number)
+                if not user:
+                    raise NotFoundException("User with this phone number does not exist")
+            else:
+                raise BadRequestException("Either email or phone_number must be provided")
+
             if not PasswordHandler.verify(user.password, password):
                 raise UnauthorizedException(message='Incorrect Password')
             return Token(

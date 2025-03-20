@@ -1,14 +1,15 @@
 # pylint: disable=all
 
 import re
+from typing import Optional
 
 from pydantic import BaseModel, EmailStr, constr, field_validator
 
 
 class RegisterUserRequest(BaseModel):
     email: EmailStr
+    phone_number: str
     password: constr(min_length=8, max_length=64)
-
 
     @field_validator("password")
     def password_must_contain_numbers(cls, v):
@@ -29,14 +30,14 @@ class RegisterUserRequest(BaseModel):
         return v
 
 
-
 class LoginUserRequest(BaseModel):
-    email: EmailStr
+    email: Optional[EmailStr] = None
+    phone_number: Optional[str] = None
     password: str
-
 
 class VerifyEmailRequest(BaseModel):
     token: str
+
 
 class PasswordResetRequest(BaseModel):
     token: str
@@ -45,6 +46,7 @@ class PasswordResetRequest(BaseModel):
 
 class ResetPasswordRequest(BaseModel):
     email: EmailStr
+
 
 class SetNewPassword(BaseModel):
     token: str

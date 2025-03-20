@@ -18,7 +18,14 @@ class UserRepository(BaseRepository):
         stmt = select(User).where(User.email == email).options(joinedload(User.role))
         result = await self.session.execute(stmt)
         return result.scalars().first()
-    
+
+    async def get_by_phone_number(self, phone_number: str) -> User | None:
+        stmt = select(User).where(User.phone_number == phone_number).options(
+            joinedload(User.role)
+        )
+        result = await self.session.execute(stmt)
+        return result.scalars().first()
+
     async def get_by_user_id(self, user_id:int) -> User | None:
         stmt = (
             select(User)

@@ -11,10 +11,13 @@ class User(Base,TimestampMixin):
     firstname: so.Mapped[str] = so.mapped_column(sa.String,nullable=True)
     lastname: so.Mapped[str] = so.mapped_column(sa.String,nullable=True)
     email: so.Mapped[str] = so.mapped_column(sa.String,nullable=False,unique=True,index=True)
+    phone_number: so.Mapped[str] = so.mapped_column(sa.String, nullable=True,unique=True,index=True)
+
     password:so.Mapped[str] = so.mapped_column(sa.String,nullable=False)
     role_id: so.Mapped[int] = so.mapped_column(sa.ForeignKey('roles.id'),nullable=False)
     is_verified: so.Mapped[bool] = so.mapped_column(sa.Boolean,default=False,nullable=True)
-    
+
+
     members = so.relationship("OrganizationMember", back_populates="user",cascade="all, delete-orphan",passive_deletes=True) 
     role = so.relationship("Role",back_populates='users')
     
