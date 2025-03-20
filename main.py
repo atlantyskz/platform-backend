@@ -1,3 +1,4 @@
+import httpx
 from fastapi import FastAPI
 from fastapi import staticfiles
 from fastapi.middleware.cors import CORSMiddleware
@@ -127,9 +128,20 @@ for model in sql_admin_models_list:
 from sqlalchemy.exc import IntegrityError, DBAPIError
 
 
+TELEGRAM_BOT_URL = "http://telegram-bot:9005/send_alert"  # Docker service name
+
 # Глобальный обработчик IntegrityError
 @app.exception_handler(IntegrityError)
 async def database_error_handler(request, exc: IntegrityError):
+    error_message = f"🚨 *Ошибка сервера:* {exc}"
+
+    async with httpx.AsyncClient() as client:
+        try:
+            response = await client.post(TELEGRAM_BOT_URL, data={"error_message": error_message})
+            print(response.json())
+        except Exception as e:
+            print(f"Failed to notify Telegram bot: {e}")
+
     return JSONResponse(
         status_code=500,
         content={"error": "Database Error", "detail": str(exc.orig)},
@@ -138,9 +150,35 @@ async def database_error_handler(request, exc: IntegrityError):
 
 @app.exception_handler(DBAPIError)
 async def database_error_handler(request, exc: DBAPIError):
+    error_message = f"🚨 *Ошибка сервера:* {exc}"
+
+    async with httpx.AsyncClient() as client:
+        try:
+            response = await client.post(TELEGRAM_BOT_URL, data={"error_message": error_message})
+            print(response.json())  # Debugging
+        except Exception as e:
+            print(f"Failed to notify Telegram bot: {e}")
+
     return JSONResponse(
         status_code=500,
         content={"error": "Database Error", "detail": str(exc.orig)},
+    )
+
+
+@app.exception_handler(Exception)
+async def database_error_handler(request, exc: Exception):
+    error_message = f"🚨 *Ошибка сервера:* {exc}"
+
+    async with httpx.AsyncClient() as client:
+        try:
+            response = await client.post(TELEGRAM_BOT_URL, data={"error_message": error_message})
+            print(response.json())  # Debugging
+        except Exception as e:
+            print(f"Failed to notify Telegram bot: {e}")
+
+    return JSONResponse(
+        status_code=500,
+        content={"error": "Internal server error"},
     )
 
 

@@ -32,7 +32,9 @@ from src.core.backend import BackgroundTasksBackend
 from src.core.dramatiq_worker import DramatiqWorker
 from src.core.exceptions import BadRequestException
 from src.core.exceptions import NotFoundException
+from src.core.redis_cli import redis_client
 from src.core.settings import settings
+from src.core.tasks import generate_questions_task
 from src.repositories.assistant import AssistantRepository
 from src.repositories.assistant_session import AssistantSessionRepository
 from src.repositories.balance import BalanceRepository
@@ -695,21 +697,58 @@ class HRAgentController:
         except Exception as e:
             raise e
 
-    async def generate_questions_for_candidate(self, resume_id: int):
-        resume = await self.favorite_repo.get_result_data_by_resume_id(resume_id)
-        messages = []
-        messages.append({
-            "role": "user",
-            "content": f"Candidate Resume: {resume}"
-        })
+    async def generate_questions_for_candidate(self, session_id: str, user_id: int):
+        task_key = f"task:{user_id}:{session_id}"
+        existing_task = await redis_client.get(task_key)
+        if existing_task:
+            status = await redis_client.get(existing_task)
+            if status is None or status in ['success', 'failed']:
+                await redis_client.delete(task_key)
+            else:
+                raise BadRequestException(f"Task already exists: {existing_task}")
 
-        llm_response = await self.request_sender._send_request(
-            llm_url=f'http://llm_service:8001/hr/generate_questions_for_candidate',
-            data={"messages": messages}
+        assistant = await self.assistant_repo.get_assistant_by_name('ИИ Рекрутер')
+
+        user_organization = await self.organization_repo.get_user_organization(user_id)
+
+        if not user_organization:
+            return {
+                "error": "You don't have an organization",
+                "success": False
+            }
+
+        balance = await self.balance_repo.get_balance(user_organization.id)
+        if not balance:
+            return {
+                "error": "Balance not found",
+                "success": False
+            }
+
+        if balance.atl_tokens < 5:
+            return {
+                "error": "Not enough tokens",
+                "success": False
+            }
+
+        task_id = generate_questions_task.apply_async(
+            kwargs={
+                "session_id": session_id,
+                "user_id": user_id,
+                "assistant_id": assistant.id,
+                "user_organization_id": user_organization.id,
+                "balance_id": balance.id,
+            },
         )
-        updated_resume = await self.favorite_repo.update_questions_for_candidate(resume_id,
-                                                                                 llm_response.get('llm_response'))
-        return llm_response
+
+        await redis_client.set(
+            name=task_key,
+            value=task_id
+        )
+        await redis_client.set(
+            name=str(task_id),
+            value="pending"
+        )
+        return await redis_client.get(task_key)
 
     async def delete_from_favorites(self, user_id: int, resume_id: int):
         try:
@@ -1262,8 +1301,10 @@ class HRAgentController:
                     file_key = f"recordings/{call_sid}_{recording_sid}.mp3"
                     permanent_url, _ = await self.minio_service.upload_single_file(file_data, file_key)
                     await self.favorite_repo.update_favorite_resume(call_sid=call_sid,
+                                                                    resume_id=None,
                                                                     upd_data={"recording_file": file_key,
-                                                                              "is_responded": True, "is_called": True})
+                                                                              "is_responded": True,
+                                                                              "call_status": "completed"})
                 else:
                     print(f"Failed to download recording. Status code: {response.status_code}")
 
@@ -1294,7 +1335,8 @@ class HRAgentController:
                     recording_channels="mono",
                 )
                 await self.favorite_repo.update_favorite_resume(resume_id=resume_id, call_sid=None,
-                                                                upd_data={"call_sid": call.sid, "is_called": True})
+                                                                upd_data={"call_sid": call.sid,
+                                                                          "call_status": "is_called"})
                 return {"success": True}
         except Exception as e:
             raise e

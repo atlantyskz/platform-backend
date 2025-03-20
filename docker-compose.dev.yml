@@ -13,6 +13,17 @@ services:
       - .:/app
     depends_on:
       - postgres
+
+  telegram-bot:
+    build: .
+    container_name: telegram_bot
+    restart: always
+    env_file:
+      - .env
+    networks:
+      - app_network
+    ports:
+      - "9005:9005"
       
   postgres:
     image: postgres:alpine

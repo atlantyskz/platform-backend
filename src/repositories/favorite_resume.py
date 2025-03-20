@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, List
 
 from sqlalchemy import or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -31,7 +31,17 @@ class FavoriteResumeRepository(BaseRepository):
         result = await self.session.execute(stmt)
         return result.scalars().all()
 
-    async def get_favorite_resume_by_user_id(self, user_id: int, resume_id: int, session_id: str) -> FavoriteResume | None:
+    async def get_favorite_resumes_by_session_id(self, session_id: str) -> List[FavoriteResume]:
+        stmt = (
+            select(HRTask)
+            .join(FavoriteResume, HRTask.id == FavoriteResume.resume_id)
+            .where(HRTask.session_id == session_id)
+        )
+        result = await self.session.execute(stmt)
+        return result.scalars().all()
+
+    async def get_favorite_resume_by_user_id(self, user_id: int, resume_id: int,
+                                             session_id: str) -> FavoriteResume | None:
         stmt = select(HRTask).join(FavoriteResume, HRTask.id == FavoriteResume.resume_id).where(
             FavoriteResume.user_id == user_id, FavoriteResume.resume_id == resume_id, HRTask.session_id == session_id)
         result = await self.session.execute(stmt)

@@ -12,6 +12,7 @@ class CallStatus(enum.Enum):
     NOT_STARTED = "not_started"
     IS_CALLED = "is_called"
     IN_PROGRESS = "in_progress"
+    COMPLETED = "completed"
     BUSY = "busy"
 
 

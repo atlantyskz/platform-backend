@@ -22,6 +22,7 @@ python-multipart==0.0.17
 redis==5.2.0
 SQLAlchemy==2.0.36
 uvicorn==0.32.1
+aiogram==3.19.0
 websockets
 arq==0.26.1 
 dramatiq
