@@ -23,7 +23,7 @@ services:
     networks:
       - app_network
     ports:
-      - "9005:9005"
+      - "9010:9010"
 
   postgres:
     image: postgres:15

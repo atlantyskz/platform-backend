@@ -128,7 +128,7 @@ for model in sql_admin_models_list:
 from sqlalchemy.exc import IntegrityError, DBAPIError
 
 
-TELEGRAM_BOT_URL = "http://telegram-bot:9005/send_alert"  # Docker service name
+TELEGRAM_BOT_URL = "http://telegram-bot:9010/send_alert"  # Docker service name
 
 # Глобальный обработчик IntegrityError
 @app.exception_handler(IntegrityError)
