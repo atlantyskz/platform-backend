@@ -70,12 +70,12 @@ async def _process_expired_free_trials_async():
                 for balance in expired_trials:
                     logger.info(f"Processing expired trial for organization_id: {balance.organization_id}")
                     # Apply the business logic:
-                    if balance.atl_tokens >= 10000:
-                        await balance_repo.withdraw_balance(balance.organization_id, 9990)
+                    if balance.atl_tokens >= 15:
+                        await balance_repo.withdraw_balance(balance.organization_id, 15)
                         logger.info(f"Reduced unused trial balance from 100 to 10 tokens")
 
-                    elif balance.atl_tokens < 10000:
-                        await balance_repo.update_balance(balance.organization_id, data={"atl_tokens": 10})
+                    elif balance.atl_tokens < 15:
+                        await balance_repo.update_balance(balance.organization_id, data={"atl_tokens": 0})
                         logger.info(f"Set partially used trial balance to 10 tokens")
 
                     await balance_repo.update_balance(balance.organization_id, data={"free_trial": False})
@@ -115,11 +115,11 @@ async def _process_expired_free_trial_async(balance_id):
 
                 balance_repo = BalanceRepository(session)
 
-                if balance.atl_tokens >= 10000:
-                    await balance_repo.withdraw_balance(balance.organization_id, 9990)
+                if balance.atl_tokens >= 15:
+                    await balance_repo.withdraw_balance(balance.organization_id, 15)
 
-                elif balance.atl_tokens < 10000:
-                    await balance_repo.update_balance(balance.organization_id, data={"atl_tokens": 10})
+                elif balance.atl_tokens < 15:
+                    await balance_repo.update_balance(balance.organization_id, data={"atl_tokens": 0})
 
                 await balance_repo.update_balance(balance.organization_id, data={"free_trial": False})
                 await session.flush()

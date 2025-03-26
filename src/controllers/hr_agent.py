@@ -651,36 +651,30 @@ class HRAgentController:
                 raise BadRequestException('Already exist')
             if await self.favorite_repo.get_resume(resume_id) is None:
                 raise BadRequestException('Not Found')
-            hh_account = await self.hh_account_repository.get_hh_account_by_user_id(user_id)
-            if hh_account:
-                if datetime.utcnow() >= hh_account.expires_at - timedelta(minutes=5):
-                    hh_account = await self.headhunter_service.refresh_token(user_id)
+            # hh_account = await self.hh_account_repository.get_hh_account_by_user_id(user_id)
+            favorite_resume = await self.favorite_repo.add({
+                "user_id": user_id,
+                "resume_id": resume_id,
+                "session_id": session.session_id
 
-                headers = {"Authorization": f"Bearer {hh_account.access_token}"}
-
-                favorite_resume = await self.favorite_repo.add({
-                    "user_id": user_id,
-                    "resume_id": resume_id,
-                    "session_id": session.session_id
-                })
-                async with httpx.AsyncClient() as client:
-                    url = f"https://api.hh.ru/negotiations/phone_interview"
-                    params = {
-                        "resume_id": session.resume_id,
-                        "vacancy_id": session.vacancy_id
-                    }
-                    response = await client.post(url, headers=headers, params=params)
-                    if response.status_code != 201:
-                        error_data = response.json()
-                        print(f"Ошибка при отправке запроса: {error_data}")
-                        raise BadRequestException(f"HH API error: {error_data}")
-            else:
-                favorite_resume = await self.favorite_repo.add({
-                    "user_id": user_id,
-                    "resume_id": resume_id,
-                    "session_id": session.session_id
-
-                })
+            })
+            # if hh_account:
+            #     if datetime.utcnow() >= hh_account.expires_at - timedelta(minutes=5):
+            #         hh_account = await self.headhunter_service.refresh_token(user_id)
+            #
+            #     headers = {"Authorization": f"Bearer {hh_account.access_token}"}
+            #
+            #     async with httpx.AsyncClient() as client:
+            #         url = f"https://api.hh.ru/negotiations/phone_interview"
+            #         params = {
+            #             "resume_id": session.resume_id,
+            #             "vacancy_id": session.vacancy_id
+            #         }
+            #         response = await client.post(url, headers=headers, params=params)
+            #         if response.status_code != 201:
+            #             error_data = response.json()
+            #             print(f"Ошибка при отправке запроса: {error_data}")
+            #             raise BadRequestException(f"HH API error: {error_data}")
             db_question_session = await self.interview_common_question_repo.get_session_questions(
                 session_id=session.session_id)
             if not db_question_session:

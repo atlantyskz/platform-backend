@@ -72,7 +72,7 @@ class AuthController:
 
                 balance = await self.balance_repo.create_balance({
                     'organization_id': organization.id,
-                    'atl_tokens': 10000,
+                    'atl_tokens': 15,
                     'free_trial': True
                 })
                 await self.session.flush()
