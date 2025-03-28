@@ -27,6 +27,8 @@ from src.routers.api.v1.interview_individual_question import interview_individua
 from src.routers.api.v1.organization import organization_router
 from src.routers.api.v1.organization_member import organization_member_router
 from src.routers.api.v1.phone_interview import phone_interview_router
+from src.routers.api.v1.promo_code import promocode_router
+from src.routers.api.v1.subs_router import subs_router
 from src.routers.api.v1.user_feedback import user_feedback_router
 
 
@@ -94,6 +96,8 @@ def create_app(create_custom_static_urls: bool = False) -> FastAPI:
     app.include_router(phone_interview_router)
     app.include_router(interview_common_question_router)
     app.include_router(interview_individual_question_router)
+    app.include_router(subs_router)
+    app.include_router(promocode_router)
 
     app.add_middleware(
         CORSMiddleware,
@@ -127,8 +131,8 @@ for model in sql_admin_models_list:
     admin.add_view(ModelViewClass)
 from sqlalchemy.exc import IntegrityError, DBAPIError
 
-
 TELEGRAM_BOT_URL = "http://telegram-bot:9010/send_alert"  # Docker service name
+
 
 # Глобальный обработчик IntegrityError
 @app.exception_handler(IntegrityError)

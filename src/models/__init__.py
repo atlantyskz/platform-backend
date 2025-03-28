@@ -1,9 +1,9 @@
-import os
 from datetime import datetime
 
-from sqlalchemy.orm import declarative_base,mapped_column
-from sqlalchemy import DateTime, func
+from sqlalchemy import DateTime
 from sqlalchemy.ext.declarative import declared_attr
+from sqlalchemy.orm import declarative_base, mapped_column
+
 
 class TimestampMixin:
     @declared_attr
@@ -44,6 +44,11 @@ from .hh import HHAccount
 from .interview_common_question import InterviewCommonQuestion
 from .interview_individual_question import InterviewIndividualQuestion
 
+from .promocode import PromoCode
+from .subscription import Subscription
+from .user_subs import UserSubs
+from .user_cache_balance import UserCacheBalance
+
 sql_admin_models_list = [
     User,
     Role,
@@ -65,4 +70,8 @@ sql_admin_models_list = [
     HHAccount,
     InterviewCommonQuestion,
     InterviewIndividualQuestion,
+    PromoCode,
+    Subscription,
+    UserSubs,
+    UserCacheBalance
 ]

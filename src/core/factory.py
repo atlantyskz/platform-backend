@@ -12,6 +12,8 @@ from src.controllers.interview_common_question import InterviewCommonQuestionCon
 from src.controllers.interview_individual_question import InterviewIndividualQuestionController
 from src.controllers.organization import OrganizationController
 from src.controllers.organization_member import OrganizationMemberController
+from src.controllers.promocode import PromoCodeController
+from src.controllers.subs import SubsController
 from src.controllers.user_feedback import UserFeedbackController
 from src.core.backend import BackgroundTasksBackend
 from src.core.databases import get_session
@@ -86,3 +88,9 @@ class Factory:
     def get_individual_question_controller(
             session: AsyncSession = Depends(get_session)) -> InterviewIndividualQuestionController:
         return InterviewIndividualQuestionController(session)
+
+    def get_promocode_controller(session: AsyncSession = Depends(get_session)) -> PromoCodeController:
+        return PromoCodeController(session)
+
+    def get_subs_controller(session: AsyncSession = Depends(get_session)) -> SubsController:
+        return SubsController(session)

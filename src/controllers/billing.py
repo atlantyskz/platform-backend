@@ -1,30 +1,34 @@
-import uuid
-from fastapi import File, HTTPException, UploadFile
-import httpx
-from sqlalchemy.ext.asyncio import AsyncSession
-from src.services.minio import MinioUploader
-from src.core.exceptions import NotFoundException, BadRequestException
-from src.repositories.discount import DiscountRepository
-from src.repositories.billing_transactions import BillingTransactionRepository
-from src.repositories.balance_usage import BalanceUsageRepository
-from src.repositories.balance import BalanceRepository
-from src.repositories.organization import OrganizationRepository
-from src.repositories.user import UserRepository
-from src.schemas.requests.billing import TopUpBillingRequest
-from src.repositories.refund_application import RefundApplicationRepository
-import httpx
-
 import logging
+import uuid
+from datetime import datetime, timedelta
+
 import httpx
+from fastapi import File, HTTPException, UploadFile
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from src.core.exceptions import NotFoundException, BadRequestException
+from src.core.tasks import handle_user_sub
+from src.repositories.balance import BalanceRepository
+from src.repositories.balance_usage import BalanceUsageRepository
+from src.repositories.billing_transactions import BillingTransactionRepository
+from src.repositories.discount import DiscountRepository
+from src.repositories.organization import OrganizationRepository
+from src.repositories.promocode import PromoCodeRepository
+from src.repositories.refund_application import RefundApplicationRepository
+from src.repositories.subscription import SubscriptionRepository
+from src.repositories.user import UserRepository
+from src.repositories.user_cache_balance import UserCacheBalanceRepository
+from src.repositories.user_subs import UserSubsRepository
+from src.schemas.requests.billing import TopUpBillingRequest, BuySubscription
+from src.services.minio import MinioUploader
 
 logger = logging.getLogger(__name__)
 
 
-
 class BillingController:
-
     ATL_TOKEN_RATE = 230
-    def __init__(self,session:AsyncSession):
+
+    def __init__(self, session: AsyncSession):
         self.session = session
         self.billing_transaction_repository = BillingTransactionRepository(session)
         self.balance_usage_repository = BalanceUsageRepository(session)
@@ -33,33 +37,38 @@ class BillingController:
         self.user_repository = UserRepository(session)
         self.discount_repository = DiscountRepository(session)
         self.refund_repository = RefundApplicationRepository(session)
+        self.subscription_repository = SubscriptionRepository(session)
+        self.user_subs_repository = UserSubsRepository(session)
+        self.promocode_repository = PromoCodeRepository(session)
+        self.user_cahce_balance = UserCacheBalanceRepository(session)
         self.minio_service = MinioUploader(
-        host="minio:9000",  
-        access_key="admin",
-        secret_key="admin123",
-        bucket_name="analyze-resumes"
-    )
-                
-    
-    async def refund_application_create(self, user_id: int,transaction_id:int, email: str, reason: str, file:UploadFile = File(None)): 
+            host="minio:9000",
+            access_key="admin",
+            secret_key="admin123",
+            bucket_name="analyze-resumes"
+        )
+
+    async def refund_application_create(self, user_id: int, transaction_id: int, email: str, reason: str,
+                                        file: UploadFile = File(None)):
         async with self.session.begin() as session:
             user = await self.user_repository.get_by_user_id(user_id)
             if user is None:
                 raise NotFoundException("User not found")
-            
+
             organization = await self.organization_repository.get_user_organization(user_id)
             if organization is None:
                 raise NotFoundException("Organization not found")
-            billing_transaction = await self.billing_transaction_repository.get_transaction(transaction_id, user.id, organization.id)
+            billing_transaction = await self.billing_transaction_repository.get_transaction(transaction_id, user.id,
+                                                                                            organization.id)
             if billing_transaction is None:
                 raise NotFoundException("Transaction not found")
             if file is not None:
                 if file.content_type not in ["application/pdf", "image/jpeg", "image/png", "image/jpg"]:
                     raise BadRequestException("Invalid file type")
                 file_bytes = await file.read()
-                permanent_url, file_key = await self.minio_service.upload_single_file(file_bytes, f"refund_applications/{uuid.uuid4()}_{file.filename}")   
+                permanent_url, file_key = await self.minio_service.upload_single_file(file_bytes,
+                                                                                      f"refund_applications/{uuid.uuid4()}_{file.filename}")
 
-            
             refund_application = await self.refund_repository.create({
                 "user_id": user.id,
                 "email": email,
@@ -70,8 +79,8 @@ class BillingController:
                 "file_path": file_key if file else None
             })
             await self.billing_transaction_repository.update(
-                    billing_transaction.id, {"status": "pending refund"}
-                )
+                billing_transaction.id, {"status": "pending refund"}
+            )
 
             return {
                 "id": refund_application.id,
@@ -85,11 +94,11 @@ class BillingController:
             user = await self.user_repository.get_by_user_id(user_id)
             if user is None:
                 raise NotFoundException("User not found")
-            
+
             organization = await self.organization_repository.get_user_organization(user_id)
             if organization is None:
                 raise NotFoundException("Organization not found")
-            
+
             kzt_amount = request.atl_amount * self.ATL_TOKEN_RATE
             discount_value, discount_id = await self.discount_checker_by_range(request.atl_amount)
             kzt_amount = kzt_amount * (1 - (discount_value / 100))
@@ -107,7 +116,7 @@ class BillingController:
             }
             billing_transaction = await self.billing_transaction_repository.create(billing_transaction_data)
             await self.balance_repository.topup_balance(organization.id, request.atl_amount)
-            
+
             return {
                 "id": billing_transaction.id,
                 "amount": billing_transaction.amount,
@@ -115,28 +124,14 @@ class BillingController:
                 "status": billing_transaction.status,
                 "payment_type": billing_transaction.payment_type
             }
-    
-    async def discount_checker_by_range(self,atl_amount: int):
-        if atl_amount <= 100 :
+
+    async def discount_checker_by_range(self, atl_amount: int):
+        if atl_amount <= 100:
             discount = await self.discount_repository.get_discount(5)
-            return discount.value,discount.id
-        elif atl_amount <= 300:
-            discount = await self.discount_repository.get_discount(10)
-            return discount.value,discount.id
-        elif atl_amount <= 500:
-            discount = await self.discount_repository.get_discount(15)
-            return discount.value,discount.id
-        elif atl_amount <= 1000:
-            discount = await self.discount_repository.get_discount(20)
-            return discount.value,discount.id
-        elif atl_amount <= 5000:
-            discount = await self.discount_repository.get_discount(25)
-            return discount.value,discount.id
-        elif atl_amount <= 10000 or atl_amount > 10000:
-            discount = await self.discount_repository.get_discount(30)
-            return discount.value,discount.id
+            return discount.value, discount.id
         else:
-            return 0,None
+            discount = await self.discount_repository.get_discount(10)
+            return discount.value, discount.id
 
     async def billing_status(self, data: dict):
         async with self.session.begin() as session:
@@ -150,7 +145,7 @@ class BillingController:
                         f"https://epay-api.homebank.kz/check-status/payment/transaction/{invoice_id}",
                         headers={"Authorization": f"Bearer {billing_transaction.access_token}"},
                     )
-                    bank_transaction_response.raise_for_status() 
+                    bank_transaction_response.raise_for_status()
                     bank_transaction_response_json = bank_transaction_response.json()
                     print(bank_transaction_response_json)
 
@@ -158,8 +153,8 @@ class BillingController:
                     status_name = transaction_data.get("statusName")
                     transaction_id = transaction_data.get("id")
                     await self.billing_transaction_repository.update(
-                            billing_transaction.id, {"bank_transaction_id": transaction_id}
-                        )
+                        billing_transaction.id, {"bank_transaction_id": transaction_id}
+                    )
 
                     print(status_name)
                     if status_name == "AUTH":
@@ -204,52 +199,52 @@ class BillingController:
                     print(f"Unexpected error: {str(e)}")
                     return {"error": "Unexpected error", "details": str(e)}
 
-
     async def refund_billing_transaction(self, access_token: str, user_id: int, transaction_id: int):
         logger.info(f"Starting refund process for user_id={user_id}, transaction_id={transaction_id}")
-        
+
         # Retrieve the user
         user = await self.user_repository.get_by_user_id(user_id)
         logger.info(f"User fetched: {user}")
         if user is None:
             logger.error("User not found")
             raise NotFoundException("User not found")
-        
+
         # Retrieve the organization
         organization = await self.organization_repository.get_user_organization(user_id)
         logger.info(f"Organization fetched: {organization}")
         if organization is None:
             logger.error("Organization not found")
             raise NotFoundException("Organization not found")
-        
+
         # Retrieve the billing transaction
-        billing_transaction = await self.billing_transaction_repository.get_transaction(transaction_id, user.id, organization.id)
+        billing_transaction = await self.billing_transaction_repository.get_transaction(transaction_id, user.id,
+                                                                                        organization.id)
         logger.info(f"Billing transaction fetched: {billing_transaction}")
         if billing_transaction is None:
             logger.error("Transaction not found")
             raise NotFoundException("Transaction not found")
-        
+
         # Verify the transaction belongs to the organization
         if billing_transaction.organization_id != organization.id:
             logger.error("Transaction does not belong to your organization")
             raise BadRequestException("Transaction does not belong to your organization")
-        
+
         # Check if transaction status is pending
         if billing_transaction.status == "pending":
             logger.error("Transaction is pending and cannot be refunded")
             raise BadRequestException("Transaction is pending")
-        
+
         # Check if transaction is already refunded
         if billing_transaction.status == "refunded":
             logger.error("Transaction already fully refunded")
             raise BadRequestException("Transaction already fully refunded")
-        
+
         # Attempt to process the refund via external API
         async with httpx.AsyncClient() as client:
             try:
                 url = f"https://epay-api.homebank.kz/operation/{billing_transaction.bank_transaction_id}/refund"
                 logger.info(f"Sending refund request to URL: {url}")
-                
+
                 refund_response = await client.post(
                     url,
                     headers={"Authorization": f"Bearer {access_token}"},
@@ -257,69 +252,70 @@ class BillingController:
                 logger.info(f"Refund response received: {refund_response}")
                 refund_response.raise_for_status()
                 logger.info("Refund API call successful")
-                
+
                 # Log refund details before updating internal records
                 amount = billing_transaction.amount
                 atl_tokens_to_refund = billing_transaction.atl_tokens
                 logger.info(f"Refund details - Amount: {amount}, ATL Tokens: {atl_tokens_to_refund}")
-                
+
                 # Update the billing transaction status to refunded
                 await self.billing_transaction_repository.update(
                     billing_transaction.id, {"status": "refunded"}
                 )
                 logger.info(f"Billing transaction {billing_transaction.id} updated to 'refunded'")
-                
+
                 # Withdraw the tokens from the organization's balance
                 await self.balance_repository.withdraw_balance(
                     billing_transaction.organization_id, atl_tokens_to_refund
                 )
-                logger.info(f"Withdrew {atl_tokens_to_refund} tokens from organization {billing_transaction.organization_id}")
-                
+                logger.info(
+                    f"Withdrew {atl_tokens_to_refund} tokens from organization {billing_transaction.organization_id}")
+
                 logger.info("Refund process completed successfully")
                 return {"status": "refunded", "refund_transaction_id": transaction_id}
-            
+
             except httpx.HTTPStatusError as e:
                 logger.error(f"HTTP Error: {e.response.status_code} - {e.response.text}")
                 raise HTTPException(status_code=400, detail=f"HTTP Error: {e.response.status_code} - {e.response.text}")
-            
+
             except Exception as e:
                 logger.error(f"Unexpected error: {str(e)}")
                 raise HTTPException(status_code=400, detail=f"Unexpected error: {str(e)}")
-
 
     async def get_all_billing_transactions_by_organization_id(self, user_id: int, status: str, limit: int, offset: int):
         user = await self.user_repository.get_by_user_id(user_id)
         if user is None:
             raise NotFoundException("User not found")
-        
+
         organization = await self.organization_repository.get_user_organization(user_id)
         if organization is None:
             raise NotFoundException("Organization not found")
-        
+
         billing_transactions = await self.billing_transaction_repository.get_all_by_organization_id(
             organization.id, status, limit, offset
         )
         return billing_transactions
-    
-    async def get_refunds_application(self, user_id: int,status:str,limit: int|None, offset: int|None):
+
+    async def get_refunds_application(self, user_id: int, status: str, limit: int | None, offset: int | None):
         user = await self.user_repository.get_by_user_id(user_id)
         if user is None:
             raise NotFoundException("User not found")
-        
+
         organization = await self.organization_repository.get_user_organization(user_id)
         if organization is None:
             raise NotFoundException("Organization not found")
-        
-        refund_application = await self.refund_repository.get_refunds_by_organization_id(organization.id,status, limit, offset)
+
+        refund_application = await self.refund_repository.get_refunds_by_organization_id(organization.id, status, limit,
+                                                                                         offset)
         return refund_application
-        
+
     async def update_refund_application(self, refund_id: int, status: str):
         async with self.session.begin() as session:
             refund_application = await self.refund_repository.get_refund_application(refund_id)
-            
+
             if refund_application is None:
                 raise NotFoundException("Refund application not found")
-            
+
             # Логируем данные заявки на возврат
             print({
                 "refund_id": refund_application.id,
@@ -332,34 +328,33 @@ class BillingController:
                 raise NotFoundException("Transaction not linked to refund application")
 
             transaction = await self.billing_transaction_repository.get_transaction(
-                refund_application.transaction_id, 
-                refund_application.user_id, 
+                refund_application.transaction_id,
+                refund_application.user_id,
                 refund_application.organization_id
             )
 
             if transaction is None:
                 raise NotFoundException("Transaction not found")
-            
+
             if transaction.status != 'pending refund':
                 raise BadRequestException("Transaction already refunded,pending or rejected")
             print({"retrieved_transaction": transaction})
-
 
             if status == 'approved':
 
                 invoice_id = transaction.invoice_id
                 amount = transaction.amount
-                
+
                 # Логируем перед запросом в Halyk
                 print("Fetching Halyk token with invoice_id:", invoice_id, "amount:", amount)
 
                 try:
                     response = await self.fetch_halyk_token(invoice_id, amount)
-                    
+
                     access_token = response.get("access_token")
                     if not access_token:
                         raise Exception("Failed to get access_token from Halyk")
-                    
+
                     await self.refund_billing_transaction(
                         access_token, refund_application.user_id, refund_application.transaction_id
                     )
@@ -382,8 +377,7 @@ class BillingController:
             else:
                 raise BadRequestException("Invalid status")
 
-          
-    async def fetch_halyk_token(self,unique_invoice_id: str, discounted_price: float):
+    async def fetch_halyk_token(self, unique_invoice_id: str, discounted_price: float):
         url = "https://epay-oauth.homebank.kz/oauth2/token"
         data = {
             "grant_type": "client_credentials",
@@ -398,10 +392,68 @@ class BillingController:
             "postLink": "https://api.atlantys.kz/api/v1/balance/billing-status",
             "failurePostLink": "https://platform.atlantys.kz/payment/failure",
         }
-        
+
         headers = {"Content-Type": "application/x-www-form-urlencoded"}
 
         async with httpx.AsyncClient() as client:
             response = await client.post(url, data=data, headers=headers)
-            response.raise_for_status() 
+            response.raise_for_status()
             return response.json()
+
+    async def buy_subscription(self, user_id: int, request: BuySubscription):
+        async with self.session.begin() as session:
+            user = await self.user_repository.get_by_user_id(user_id)
+            if user is None:
+                raise NotFoundException("User not found")
+
+            organization = await self.organization_repository.get_user_organization(user_id)
+            if organization is None:
+                raise NotFoundException("Organization not found")
+            subscription = await self.subscription_repository.get_subscription(request.subscription_id)
+            if not subscription:
+                raise BadRequestException("No subscription found")
+            active_sub = await self.user_subs_repository.user_active_subscription(user_id)
+            if active_sub:
+                raise BadRequestException("Active subscription already active")
+
+            promocode = await self.promocode_repository.get_promo_code(request.promo_code)
+            if not promocode:
+                raise BadRequestException("Promo code not found")
+
+            kzt_amount = subscription.price - subscription.price * (1 - (25 / 100))
+
+            billing_transaction_data = {
+                "user_id": user.id,
+                "organization_id": organization.id,
+                "user_role": user.role.name,
+                "discount_id": None,
+                "amount": kzt_amount,
+                "subscription_id": subscription.id,
+                "access_token": request.access_token,
+                "invoice_id": request.invoice_id,
+                "status": "pending",
+                "payment_type": 'card'
+            }
+            billing_transaction = await self.billing_transaction_repository.create(billing_transaction_data)
+            await self.balance_repository.buy_subscription(organization.id)
+            days = subscription.active_month * 30
+            cache_balance = await self.user_cahce_balance.get_cache_balance(user_id)
+
+            await self.user_cahce_balance.update_cache_balance(
+                user_id=user_id,
+                data={
+                    "balance": cache_balance.balance + subscription.price * (1 - (25 / 100)),
+                }
+            )
+            handle_user_sub.send(
+                user_id=user_id,
+                organization_id=organization.id,
+                eta=datetime.utcnow() + timedelta(days=days)
+            )
+            return {
+                "id": billing_transaction.id,
+                "amount": billing_transaction.amount,
+                "subscription_id": billing_transaction.subscription_id,
+                "status": billing_transaction.status,
+                "payment_type": billing_transaction.payment_type
+            }

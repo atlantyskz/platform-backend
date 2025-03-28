@@ -20,6 +20,7 @@ from src.repositories.organization import OrganizationRepository
 from src.repositories.organization_member import OrganizationMemberRepository
 from src.repositories.role import RoleRepository
 from src.repositories.user import UserRepository
+from src.repositories.user_cache_balance import UserCacheBalanceRepository
 from src.schemas.responses.auth import Token
 from src.services.email import EmailService
 
@@ -40,6 +41,7 @@ class AuthController:
         self.balance_repo = BalanceRepository(session)
         self.organization_member_repo = OrganizationMemberRepository(session)
         self.email_service = EmailService()
+        self.user_cache_balance_repo = UserCacheBalanceRepository(session)
 
     async def create_user(self, email: EmailStr, phone_number: str, password: str) -> Token:
         async with self.session.begin():
@@ -75,6 +77,12 @@ class AuthController:
                     'atl_tokens': 15,
                     'free_trial': True
                 })
+                await self.user_cache_balance_repo.create_cache_balance(
+                    {
+                        "user_id": user.id,
+                        "balance": 0,
+                    }
+                )
                 await self.session.flush()
                 # call cron job ...
                 free_trial_tracker.apply_async(kwargs={"balance_id": balance.id},
@@ -198,6 +206,8 @@ class AuthController:
     async def get_current_user(self, user_id: int) -> User:
         try:
             user = await self.user_repo.get_current_user(user_id)
+            balance = await self.balance_repo.get_balance(user.id)
+            user["subscription"] = balance.subscription
             return user
         except Exception:
             raise

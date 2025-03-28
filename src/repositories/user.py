@@ -57,6 +57,7 @@ class UserRepository(BaseRepository):
             return {
                 "id": user.id,
                 "email": user.email,
+                "phone_number": user.phone_number,
                 "firstname": user.firstname,
                 "lastname": user.lastname,
                 "role": user.role.name if user.role else None,

@@ -1,5 +1,4 @@
 import asyncio
-import json
 import logging
 from datetime import datetime, timedelta
 
@@ -16,6 +15,7 @@ from src.repositories.balance import BalanceRepository
 from src.repositories.balance_usage import BalanceUsageRepository
 from src.repositories.favorite_resume import FavoriteResumeRepository
 from src.repositories.interview_individual_question import InterviewIndividualQuestionRepository
+from src.repositories.user_subs import UserSubsRepository
 from src.services.request_sender import RequestSender
 
 # Setup logging
@@ -171,7 +171,6 @@ async def _process_generate_questions(session_id, user_id, assistant_id, user_or
                 for key, value in resume_data.items():
                     candidate_info += f"{key}: {value}\n"
 
-
                 balance = await balance_repo.get_balance(user_organization_id)
                 if balance.atl_tokens < 5:
                     error_msg = f"Недостаточно средств: имеется {balance.atl_tokens} токенов, требуется минимум 5"
@@ -252,3 +251,19 @@ async def _process_generate_questions(session_id, user_id, assistant_id, user_or
             await redis_client.set(task_id, "failed")
 
         raise e
+
+
+@shared_task(bind=True)
+def handle_user_sub(user_id, organization_id):
+    async def async_process():
+        async with session_manager.session() as session:
+            user_sub_repo = UserSubsRepository(session)
+            balance_repo = BalanceRepository(session)
+
+            db_sub = await user_sub_repo.user_subscriptions(user_id)
+
+            if db_sub is not None:
+                await balance_repo.update_balance(organization_id, {"subscription": False})
+
+            await session.commit()
+    asyncio.run(async_process())
