@@ -4,6 +4,7 @@ import string
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.exceptions import BadRequestException
+from src.core.telegram_cli import TelegramCli
 from src.repositories.promocode import PromoCodeRepository
 from src.repositories.user_cache_balance import UserCacheBalanceRepository
 from src.repositories.user_subs import UserSubsRepository
@@ -29,23 +30,33 @@ class PromoCodeController:
         generated_promocode = generate_promo_code()
         while await self.promocode_repo.get_promo_code(generated_promocode) is not None:
             generated_promocode = generate_promo_code()
+
         async with self.session:
-            await self.promocode_repo.create_promo_code(
-                {
-                    "user_id": user_id,
-                    "promo_code": generated_promocode,
-                    **data,
-                }
-            )
+            await self.promocode_repo.create_promo_code({
+                "user_id": user_id,
+                "promo_code": generated_promocode,
+                **data,
+            })
+
             cache_balance = await self.user_cache_balance.get_cache_balance(user_id)
             if cache_balance is None:
                 await self.user_cache_balance.create_cache_balance({
                     "user_id": user_id,
                     "balance": 0
                 })
+
             await self.session.commit()
 
-        return {"promo_code": generated_promocode, "detail": "Successfully created promo code"}
+        name = data.get("name", "Неизвестно")
+        phone = data.get("phone_number", "Неизвестно")
+        message = f"\n📬 *Новая заявка от пользователя:*\n👤 Имя: {name}\n📞 Телефон: {phone}"
+
+        await TelegramCli().send_message(message, "feature")
+
+        return {
+            "promo_code": generated_promocode,
+            "detail": "Successfully created promo code"
+        }
 
     async def get_user_promo_code(self, user_id: int):
         db_promocode = await self.promocode_repo.get_user_promo_code(user_id)

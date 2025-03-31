@@ -33,7 +33,7 @@ dp.include_router(router)
 @app.post("/send_alert")
 async def send_alert(error_message: str = Form()):
     """Sends an alert message to all registered Telegram chats."""
-    chat_ids = ["-2270969400"]
+    chat_ids = ["-2270969400", '#-2270969400', "-1002270969400"]
     async def send_messages():
         for chat_id in chat_ids:
             try:
