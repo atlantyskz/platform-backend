@@ -22,6 +22,6 @@ class TelegramCli:
 
         try:
             async with httpx.AsyncClient() as client:
-                await client.post(self.TELEGRAM_BOT_URL, json={"error_message": message})
+                await client.post(self.TELEGRAM_BOT_URL, data={"error_message": message})
         except httpx.RequestError as e:
             print(f"[TelegramCli] Failed to send message: {e}")
