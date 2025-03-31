@@ -83,6 +83,11 @@ def create_app(create_custom_static_urls: bool = False) -> FastAPI:
         redoc_url=None if create_custom_static_urls else '/api/redoc',
         openapi_url="/api/openapi.json"
     )
+
+    @app.get("/exceptions")
+    async def send_exception(request):
+        raise Exception
+
     app.include_router(hh_router)
     app.include_router(auth_router)
     app.include_router(hr_agent_router)
