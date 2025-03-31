@@ -38,7 +38,7 @@ async def update_promocode(
     return await promocode_controller.update_promocode(user_id, data.dict())
 
 
-@promocode_router.get("/analyze", response_model=PromoUsageAnalysis)
+@promocode_router.get("/analyze")
 async def analyze_user_subscription(
         promo_controller: PromoCodeController = Depends(Factory.get_promocode_controller),
         current_user: dict = Depends(get_current_user)

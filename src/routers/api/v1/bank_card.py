@@ -5,10 +5,10 @@ from src.core.factory import Factory
 from src.core.middlewares.auth_middleware import get_current_user
 from src.schemas.requests.bank_card import BankCardCreate, BankCardResponse
 
-router = APIRouter()
+bank_card_router = APIRouter(prefix="/api/v1/bank_card", tags=["BANK CARD"])
 
 
-@router.post("/bank-card", response_model=BankCardResponse)
+@bank_card_router.post("/", response_model=BankCardResponse)
 async def add_or_update_bank_card(
         card: BankCardCreate,
         bank_card_controller: BankCardController = Depends(Factory.get_bank_card_controller),
@@ -18,7 +18,7 @@ async def add_or_update_bank_card(
     return await bank_card_controller.upsert_bank_card(user_id=user_id, data=card)
 
 
-@router.get("/bank-card", response_model=BankCardResponse)
+@bank_card_router.get("/", response_model=BankCardResponse)
 async def get_bank_card(
         bank_card_controller: BankCardController = Depends(Factory.get_bank_card_controller),
         current_user=Depends(get_current_user)

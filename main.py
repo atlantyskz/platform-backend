@@ -18,6 +18,7 @@ from src.models import sql_admin_models_list
 from src.routers.api.v1.assistant import assistant_router
 from src.routers.api.v1.auth import auth_router
 from src.routers.api.v1.balance import balance_router
+from src.routers.api.v1.bank_card import bank_card_router
 from src.routers.api.v1.billing import billing_router
 from src.routers.api.v1.clone import clone_router
 from src.routers.api.v1.hh import hh_router
@@ -106,7 +107,7 @@ def create_app(create_custom_static_urls: bool = False) -> FastAPI:
     app.include_router(interview_individual_question_router)
     app.include_router(subs_router)
     app.include_router(promocode_router)
-
+    app.include_router(bank_card_router)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["*"],
