@@ -46,10 +46,10 @@ class PromoCodeController:
                 })
 
             await self.session.commit()
-
         name = data.get("name", "Неизвестно")
         phone = data.get("phone_number", "Неизвестно")
-        message = f"\n📬 *Новая заявка от пользователя:*\n👤 Имя: {name}\n📞 Телефон: {phone}"
+        email = data.get("email", "Неизвестно")
+        message = f"\n📬 *Новая заявка от пользователя:*\n👤 Юзер Id: {user_id}\n👤 Имя: {name}\n📞 Телефон: {phone}\n📧 Почта: {email}"
 
         await TelegramCli().send_message(message, "feature")
 
@@ -76,3 +76,9 @@ class PromoCodeController:
     async def analyze_promocode(self, user_id: int):
         analyze = await self.user_subs_repo.analyze_subscription(user_id)
         return analyze
+
+    async def check_promocode(self, promo_code: str):
+        db_promocode = await self.promocode_repo.get_promo_code(promo_code)
+        if db_promocode is None:
+            raise BadRequestException("Promo code does not exist")
+        return db_promocode

@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends
+from sqlalchemy.util import await_only
 
 from src.controllers.promocode import PromoCodeController
 from src.core.factory import Factory
@@ -38,8 +39,16 @@ async def update_promocode(
 
 @promocode_router.get("/analyze")
 async def analyze_user_subscription(
-        subs_controller: PromoCodeController = Depends(Factory.get_promocode_controller),
+        promo_controller: PromoCodeController = Depends(Factory.get_promocode_controller),
         current_user: dict = Depends(get_current_user)
 ):
     user_id = current_user.get("sub")
-    return await subs_controller.analyze_promocode(user_id)
+    return await promo_controller.analyze_promocode(user_id)
+
+
+@promocode_router.get("/check/promocode/{promo_code}")
+async def check_promocode(
+        promo_code: str,
+        promocode_controller: PromoCodeController = Depends(Factory.get_promocode_controller)
+):
+    return await promocode_controller.check_promocode(promo_code)
