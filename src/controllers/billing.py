@@ -1,13 +1,12 @@
 import logging
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime
 
 import httpx
 from fastapi import File, HTTPException, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.exceptions import NotFoundException, BadRequestException
-from src.core.tasks import handle_user_sub
 from src.repositories.balance import BalanceRepository
 from src.repositories.balance_usage import BalanceUsageRepository
 from src.repositories.billing_transactions import BillingTransactionRepository
@@ -40,7 +39,7 @@ class BillingController:
         self.subscription_repository = SubscriptionRepository(session)
         self.user_subs_repository = UserSubsRepository(session)
         self.promocode_repository = PromoCodeRepository(session)
-        self.user_cahce_balance = UserCacheBalanceRepository(session)
+        self.user_cache_balance_repo = UserCacheBalanceRepository(session)
         self.minio_service = MinioUploader(
             host="minio:9000",
             access_key="admin",
@@ -426,47 +425,63 @@ class BillingController:
             organization = await self.organization_repository.get_user_organization(user_id)
             if organization is None:
                 raise NotFoundException("Organization not found")
+
             subscription = await self.subscription_repository.get_subscription(request.subscription_id)
             if not subscription:
                 raise BadRequestException("No subscription found")
+
             active_sub = await self.user_subs_repository.user_active_subscription(user_id)
             if active_sub:
                 raise BadRequestException("Active subscription already active")
+
+            promocode = None
             if request.promo_code:
                 promocode = await self.promocode_repository.get_promo_code(request.promo_code)
                 if not promocode:
                     raise BadRequestException("Promo code not found")
 
-            kzt_amount = subscription.price - subscription.price * (1 - (25 / 100))
+            if promocode:
+                price_to_pay = subscription.price * 0.75
+            else:
+                price_to_pay = subscription.price
 
             billing_transaction_data = {
                 "user_id": user.id,
                 "organization_id": organization.id,
                 "user_role": user.role.name,
                 "discount_id": None,
-                "amount": kzt_amount,
+                "amount": price_to_pay,
                 "subscription_id": subscription.id,
                 "access_token": request.access_token,
                 "invoice_id": request.invoice_id,
                 "status": "pending",
-                "payment_type": 'card',
+                "payment_type": "card",
                 "type": "package",
                 "promo_id": promocode.id if promocode else None,
             }
             billing_transaction = await self.billing_transaction_repository.create(billing_transaction_data)
-            days = subscription.active_month * 30
-            cache_balance = await self.user_cahce_balance.get_cache_balance(user_id)
+            await self.session.commit()
 
-            await self.user_cahce_balance.update_cache_balance(
-                user_id=user_id,
-                data={
-                    "balance": cache_balance.balance + subscription.price * (1 - (25 / 100)),
-                }
-            )
-            handle_user_sub.apply_async(
-                kwargs={"user_id": user_id, "organization_id": organization.id},
-                eta=datetime.utcnow() + timedelta(days=days)
-            )
+            if promocode:
+                promo_owner_id = promocode.user_id
+
+                promo_owner_cache_balance = await self.user_cache_balance_repo.get_cache_balance(promo_owner_id)
+                if not promo_owner_cache_balance:
+                    promo_owner_cache_balance = await self.user_cache_balance_repo.create_cache_balance(
+                        {
+                            "user_id": promo_owner_id,
+                            "balance": 0,
+                        }
+                    )
+
+                await self.user_cache_balance_repo.update_cache_balance(
+                    user_id=promo_owner_id,
+                    data={
+                        "balance": promo_owner_cache_balance.balance + price_to_pay,
+                    }
+                )
+                await self.session.commit()
+
             return {
                 "id": billing_transaction.id,
                 "amount": billing_transaction.amount,

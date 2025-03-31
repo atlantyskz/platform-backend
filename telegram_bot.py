@@ -21,7 +21,7 @@ router = Router()
 
 app = FastAPI()
 
-BACKEND_URL = "http://platform-backend/"
+BACKEND_URL = "http://platform-backend:9000/"
 
 async def set_bot_commands(bot: Bot):
     commands = [
