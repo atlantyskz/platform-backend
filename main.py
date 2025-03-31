@@ -32,7 +32,7 @@ from src.routers.api.v1.subs_router import subs_router
 from src.routers.api.v1.user_feedback import user_feedback_router
 
 
-def custom_openapi():
+def custom_openapi(app):
     if app.openapi_schema:
         return app.openapi_schema
     openapi_schema = get_openapi(
@@ -52,8 +52,8 @@ def register_static_docs_routers(app: FastAPI):
             openapi_url=app.openapi_url,
             title=app.title + " - Swagger UI",
             oauth2_redirect_url=app.swagger_ui_oauth2_redirect_url,
-            swagger_js_url="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js",
-            swagger_css_url="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css",
+            swagger_js_url="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui-bundle.js",
+            swagger_css_url="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui.css",
         )
 
     @app.get(app.swagger_ui_oauth2_redirect_url, include_in_schema=False)
@@ -70,9 +70,7 @@ def register_static_docs_routers(app: FastAPI):
 
     @app.get("/api/openapi.json", include_in_schema=False)
     async def get_openapi_json():
-        schema = app.openapi()
-        print(f"OpenAPI schema requested. Schema size: {len(str(schema))} characters")
-        return JSONResponse(content=schema)
+        return JSONResponse(content=app.openapi())
 
 
 def create_app(create_custom_static_urls: bool = False) -> FastAPI:
@@ -83,6 +81,8 @@ def create_app(create_custom_static_urls: bool = False) -> FastAPI:
         redoc_url=None if create_custom_static_urls else '/api/redoc',
         openapi_url="/api/openapi.json"
     )
+
+    app.openapi = lambda: custom_openapi(app)
 
     @app.get("/exceptions")
     async def send_exception(request):
@@ -118,7 +118,6 @@ def create_app(create_custom_static_urls: bool = False) -> FastAPI:
         async def get_openapi_json():
             schema = app.openapi()
             return JSONResponse(content=schema)
-    app.openapi = custom_openapi
     return app
 
 
