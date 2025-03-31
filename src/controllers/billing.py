@@ -460,7 +460,7 @@ class BillingController:
                 "promo_id": promocode.id if promocode else None,
             }
             billing_transaction = await self.billing_transaction_repository.create(billing_transaction_data)
-            await session.commit()
+            await self.session.flush()
 
             if promocode:
                 promo_owner_id = promocode.user_id
@@ -480,7 +480,7 @@ class BillingController:
                         "balance": promo_owner_cache_balance.balance + price_to_pay,
                     }
                 )
-                await session.commit()
+                await self.session.flush()
 
             return {
                 "id": billing_transaction.id,
