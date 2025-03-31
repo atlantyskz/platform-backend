@@ -477,7 +477,7 @@ class BillingController:
                 await self.user_cache_balance_repo.update_cache_balance(
                     user_id=promo_owner_id,
                     data={
-                        "balance": promo_owner_cache_balance.balance + price_to_pay,
+                        "balance": promo_owner_cache_balance.balance + (subscription.price - price_to_pay),
                     }
                 )
                 await self.session.flush()
