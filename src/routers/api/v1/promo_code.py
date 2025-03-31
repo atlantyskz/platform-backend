@@ -5,6 +5,7 @@ from src.controllers.promocode import PromoCodeController
 from src.core.factory import Factory
 from src.core.middlewares.auth_middleware import get_current_user
 from src.schemas.requests.promo_code import PromoCodeCreate, PromoCodeUpdate
+from src.schemas.responses.subscription import PromoUsageAnalysis
 
 promocode_router = APIRouter(prefix="/api/v1/promocode", tags=["Promo Code"])
 
@@ -37,7 +38,7 @@ async def update_promocode(
     return await promocode_controller.update_promocode(user_id, data.dict())
 
 
-@promocode_router.get("/analyze")
+@promocode_router.get("/analyze", response_model=PromoUsageAnalysis)
 async def analyze_user_subscription(
         promo_controller: PromoCodeController = Depends(Factory.get_promocode_controller),
         current_user: dict = Depends(get_current_user)

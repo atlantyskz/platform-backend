@@ -4,6 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.controllers.assistant import AssistantController
 from src.controllers.auth import AuthController
 from src.controllers.balance import BalanceController
+from src.controllers.bank_card import BankCardController
 from src.controllers.billing import BillingController
 from src.controllers.clone import CloneController
 from src.controllers.hh import HHController
@@ -94,3 +95,6 @@ class Factory:
 
     def get_subs_controller(session: AsyncSession = Depends(get_session)) -> SubsController:
         return SubsController(session)
+
+    def get_bank_card_controller(session: AsyncSession = Depends(get_session)) -> BankCardController:
+        return BankCardController(session)

@@ -65,20 +65,26 @@ class UserSubsRepository:
         result = await self.session.execute(stmt)
         return result.scalar_one_or_none()
 
-    async def analyze_subscription(self, user_id: int) -> Optional[UserSubs]:
+    async def analyze_subscription(self, user_id: int) -> dict:
         stmt = (
-            select(
-                UserSubs,
-                func.sum(Subscription.price).label("total_price"),
-                func.count(UserSubs.id).label("count"),
-            )
-            .select_from(UserSubs)
+            select(UserSubs, Subscription.price)
             .join(PromoCode, PromoCode.id == UserSubs.promo_id)
             .join(Subscription, Subscription.id == UserSubs.subscription_id)
-            .where(
-                PromoCode.user_id == user_id
-            ).group_by(UserSubs.id)
+            .where(PromoCode.user_id == user_id)
         )
 
-        user_sub = await self.session.execute(stmt)
-        return user_sub.scalar()
+        result = await self.session.execute(stmt)
+        rows = result.all()
+
+        total_price = 0
+        user_subs = []
+
+        for user_sub, price in rows:
+            user_subs.append(user_sub)
+            total_price += price
+
+        return {
+            "count": len(user_subs),
+            "total_price": total_price,
+            "items": user_subs,
+        }

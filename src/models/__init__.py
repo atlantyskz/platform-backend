@@ -5,6 +5,7 @@ from sqlalchemy.ext.declarative import declared_attr
 from sqlalchemy.orm import declarative_base, mapped_column
 
 
+
 class TimestampMixin:
     @declared_attr
     def created_at(cls):
@@ -48,6 +49,7 @@ from .promocode import PromoCode
 from .subscription import Subscription
 from .user_subs import UserSubs
 from .user_cache_balance import UserCacheBalance
+from .bank_cards import BankCard
 
 sql_admin_models_list = [
     User,
@@ -73,5 +75,6 @@ sql_admin_models_list = [
     PromoCode,
     Subscription,
     UserSubs,
-    UserCacheBalance
+    UserCacheBalance,
+    BankCard
 ]

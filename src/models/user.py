@@ -37,6 +37,7 @@ class User(Base, TimestampMixin):
     hh_account = so.relationship("HHAccount", back_populates="user", uselist=False)
     promo_code = so.relationship("PromoCode", back_populates="user")
     user_cache_balance = so.relationship("UserCacheBalance", back_populates="user", uselist=False)
+    bank_card = so.relationship("BankCard", back_populates="user", uselist=False)
 
     def __str__(self):
         return f"{self.id}"

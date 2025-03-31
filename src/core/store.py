@@ -11,8 +11,8 @@ class StoreManager:
 
     async def connect(self):
         async with self.postgres.connect() as conn:
-            await conn.run_sync(Base.metadata.create_all)
-        
+            # await conn.run_sync(Base.metadata.create_all)
+            pass
         async with self.postgres.session() as session:
             await insert_roles(session)
             # await insert_assistants(session)

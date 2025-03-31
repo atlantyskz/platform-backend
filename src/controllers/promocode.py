@@ -20,7 +20,7 @@ class PromoCodeController:
         self.session = session
         self.promocode_repo = PromoCodeRepository(session)
         self.user_subs_repo = UserSubsRepository(session)
-        self.user_cache_balance = UserCacheBalanceRepository(session)
+        self.user_cache_balance_repo = UserCacheBalanceRepository(session)
 
     async def generate_promocode(self, user_id: int, data: dict):
         db_promocode = await self.promocode_repo.get_user_promo_code(user_id)
@@ -38,9 +38,9 @@ class PromoCodeController:
                 **data,
             })
 
-            cache_balance = await self.user_cache_balance.get_cache_balance(user_id)
+            cache_balance = await self.user_cache_balance_repo.get_cache_balance(user_id)
             if cache_balance is None:
-                await self.user_cache_balance.create_cache_balance({
+                await self.user_cache_balance_repo.create_cache_balance({
                     "user_id": user_id,
                     "balance": 0
                 })
@@ -74,8 +74,13 @@ class PromoCodeController:
         return {"detail": "Successfully updated promo code detail"}
 
     async def analyze_promocode(self, user_id: int):
-        analyze = await self.user_subs_repo.analyze_subscription(user_id)
-        return analyze
+        user_cache_balance = await self.user_cache_balance_repo.get_cache_balance(user_id)
+        if not user_cache_balance:
+            return {"error": "No cache balance found"}
+
+        data = user_cache_balance.__dict__.copy()
+        data['analyze'] = await self.user_subs_repo.analyze_subscription(user_id)
+        return data
 
     async def check_promocode(self, promo_code: str):
         db_promocode = await self.promocode_repo.get_promo_code(promo_code)

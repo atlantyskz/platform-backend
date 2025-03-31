@@ -51,12 +51,6 @@ class SubsController:
         )
         return result
 
-    async def analyze_subs_user(self, user_id):
-        analyze = await self.user_subs_repo.analyze_subscription(user_id)
-        if not analyze:
-            return {}
-        return analyze
-
     async def get_user_active_subscriptions(self, user_id):
         user_sub = await self.user_subs_repo.user_active_subscription(user_id)
         if not user_sub:
