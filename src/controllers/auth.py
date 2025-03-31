@@ -206,7 +206,7 @@ class AuthController:
     async def get_current_user(self, user_id: int) -> User:
         try:
             user = await self.user_repo.get_current_user(user_id)
-            balance = await self.balance_repo.get_balance(user.id)
+            balance = await self.balance_repo.get_balance(user_id)
             user["subscription"] = balance.subscription
             return user
         except Exception:
