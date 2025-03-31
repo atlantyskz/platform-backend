@@ -1,6 +1,7 @@
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import List, Optional
 
+from dateutil.relativedelta import relativedelta
 from sqlalchemy import select, update, insert, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
@@ -17,18 +18,13 @@ class UserSubsRepository:
         stmt = (
             select(UserSubs)
             .options(joinedload(UserSubs.subscription))
-            .where(UserSubs.user_id == user_id)
-            .order_by(UserSubs.bought_date.desc())
+            .where(
+                UserSubs.user_id == user_id,
+                (UserSubs.bought_date + relativedelta(months=UserSubs.subscription.active_month)) >= now
+            )
         )
         result = await self.session.execute(stmt)
-        all_subs = result.scalars().all()
-
-        for sub in all_subs:
-            months = sub.subscription.active_month
-            expiry = sub.bought_date + timedelta(days=months * 30)
-            if expiry > now:
-                return sub
-        return None
+        return result.scalar_one_or_none()
 
     async def set_user_subscription(self, user_id: int, subscription_id: int, data: dict) -> Optional[UserSubs]:
         stmt = (

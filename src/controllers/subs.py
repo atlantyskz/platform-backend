@@ -58,4 +58,7 @@ class SubsController:
         return analyze
 
     async def get_user_active_subscriptions(self, user_id):
-        return await self.user_subs_repo.user_active_subscription(user_id)
+        user_sub = await self.user_subs_repo.user_active_subscription(user_id)
+        if not user_sub:
+            raise BadRequestException("No active subscription found")
+        return user_sub
