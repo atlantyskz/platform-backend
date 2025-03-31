@@ -2,7 +2,7 @@ import httpx
 
 
 class TelegramCli:
-    TELEGRAM_BOT_URL = "http://telegram-bot:9005/send_alert"  # Docker service name
+    TELEGRAM_BOT_URL = "http://telegram-bot:9010/send_alert"  # Docker service name
 
     async def send_message(self, text: str, type_: str) -> None:
         """
