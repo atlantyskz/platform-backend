@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import List, Optional
 
 from sqlalchemy import select, update, insert, func
@@ -13,20 +13,23 @@ class UserSubsRepository:
         self.session = session
 
     async def user_active_subscription(self, user_id: int) -> Optional[UserSubs]:
-        now = datetime.utcnow()
-
         stmt = (
             select(UserSubs)
-            .join(Subscription, UserSubs.subscription_id == Subscription.id)
             .options(joinedload(UserSubs.subscription))
-            .where(
-                UserSubs.user_id == user_id,
-                UserSubs.bought_date + func.make_interval(days=(30 * Subscription.active_month)) >= now
-            )
+            .where(UserSubs.user_id == user_id)
         )
-
         result = await self.session.execute(stmt)
-        return result.scalar_one_or_none()
+        user_sub: Optional[UserSubs] = result.scalar_one_or_none()
+
+        if not user_sub:
+            return None
+
+        months = user_sub.subscription.active_month or 1
+        expiration_date = user_sub.bought_date + timedelta(days=30 * months)
+
+        if expiration_date >= datetime.utcnow():
+            return user_sub
+        return None
 
     async def set_user_subscription(self, user_id: int, subscription_id: int, data: dict) -> Optional[UserSubs]:
         stmt = (
