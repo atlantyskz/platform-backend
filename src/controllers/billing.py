@@ -440,10 +440,7 @@ class BillingController:
                 if not promocode:
                     raise BadRequestException("Promo code not found")
 
-            if promocode:
-                price_to_pay = subscription.price * 0.75
-            else:
-                price_to_pay = subscription.price
+            price_to_pay = subscription.price
 
             billing_transaction_data = {
                 "user_id": user.id,

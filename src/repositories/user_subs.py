@@ -1,11 +1,11 @@
 from datetime import datetime, timedelta
 from typing import List, Optional
 
-from sqlalchemy import select, update, insert, func
+from sqlalchemy import select, update, insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
-from src.models import UserSubs, Subscription, PromoCode
+from src.models import UserSubs, Subscription, PromoCode, User, BillingTransaction
 
 
 class UserSubsRepository:
@@ -67,24 +67,39 @@ class UserSubsRepository:
 
     async def analyze_subscription(self, user_id: int) -> dict:
         stmt = (
-            select(UserSubs, Subscription.price)
+            select(
+                User.email,
+                BillingTransaction.amount,
+                UserSubs.bought_date,
+                Subscription.name,
+                Subscription.price
+            )
+            .select_from(UserSubs)
             .join(PromoCode, PromoCode.id == UserSubs.promo_id)
             .join(Subscription, Subscription.id == UserSubs.subscription_id)
+            .join(User, User.id == UserSubs.user_id)
+            .join(BillingTransaction, BillingTransaction.user_id == UserSubs.user_id)
             .where(PromoCode.user_id == user_id)
         )
 
         result = await self.session.execute(stmt)
         rows = result.all()
 
-        total_price = 0
-        user_subs = []
+        total_price = sum(row.amount for row in rows)
 
-        for user_sub, price in rows:
-            user_subs.append(user_sub)
-            total_price += price
+        items = [
+            {
+                "email": row.email,
+                "amount": row.amount,
+                "bought_date": row.bought_date,
+                "income": row.price * 0.25,
+                "subscription_name": row.name
+            }
+            for row in rows
+        ]
 
         return {
-            "count": len(user_subs),
+            "count": len(items),
             "total_price": total_price,
-            "items": user_subs,
+            "items": items,
         }
