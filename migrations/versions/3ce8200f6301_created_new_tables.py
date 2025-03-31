@@ -65,8 +65,11 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(['user_id'], ['users.id'], ),
         sa.PrimaryKeyConstraint('id')
         )
-    op.drop_index('ix_ai_clones_id', table_name='ai_clones')
-    op.drop_table('ai_clones')
+    if 'ai_clones' in insp.get_table_names():
+        indexes = [ix['name'] for ix in insp.get_indexes('ai_clones')]
+        if 'ix_ai_clones_id' in indexes:
+            op.drop_index('ix_ai_clones_id', table_name='ai_clones')
+        op.drop_table('ai_clones')
     op.add_column('balances', sa.Column('subscription', sa.Boolean(), default=False, nullable=True))
     # ### end Alembic commands ###
 
