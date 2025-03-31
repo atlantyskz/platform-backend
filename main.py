@@ -84,7 +84,7 @@ def create_app(create_custom_static_urls: bool = False) -> FastAPI:
 
     app.openapi = lambda: custom_openapi(app)
 
-    @app.get("/exceptions")
+    @app.get("/api/v1/test/exceptions")
     async def send_exception():
         try:
             return 3/0
