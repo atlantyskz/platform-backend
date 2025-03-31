@@ -22,7 +22,7 @@ async def get_subscription_by_id(
     return await subs_controller.get_subscription(subscription_id)
 
 
-@subs_router.post("/get_user_active_subscription")
+@subs_router.get("/user_active_subscription")
 async def get_user_active_subscription(
         current_user: dict = Depends(get_current_user),
         subs_controller: SubsController = Depends(Factory.get_subs_controller)
