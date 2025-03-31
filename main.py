@@ -85,8 +85,11 @@ def create_app(create_custom_static_urls: bool = False) -> FastAPI:
     app.openapi = lambda: custom_openapi(app)
 
     @app.get("/exceptions")
-    async def send_exception(request):
-        raise Exception
+    async def send_exception():
+        try:
+            return 3/0
+        except Exception as e:
+            raise e
 
     app.include_router(hh_router)
     app.include_router(auth_router)
