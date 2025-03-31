@@ -1,3 +1,5 @@
+from typing import Optional
+
 from pydantic import BaseModel
 
 
@@ -10,6 +12,6 @@ class TopUpBillingRequest(BaseModel):
 
 class BuySubscription(BaseModel):
     subscription_id: int
-    promo_code: str
+    promo_code: Optional[str] = None
     access_token: str
     invoice_id: str

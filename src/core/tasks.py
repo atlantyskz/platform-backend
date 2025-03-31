@@ -266,4 +266,5 @@ def handle_user_sub(user_id, organization_id):
                 await balance_repo.update_balance(organization_id, {"subscription": False})
 
             await session.commit()
+
     asyncio.run(async_process())

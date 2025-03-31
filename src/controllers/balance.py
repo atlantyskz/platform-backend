@@ -8,6 +8,7 @@ from src.repositories.balance import BalanceRepository
 from src.repositories.balance_usage import BalanceUsageRepository
 from src.repositories.organization import OrganizationRepository
 from src.repositories.user import UserRepository
+from src.repositories.user_cache_balance import UserCacheBalanceRepository
 from src.repositories.user_subs import UserSubsRepository
 
 
@@ -20,6 +21,7 @@ class BalanceController:
         self.organization_repository = OrganizationRepository(session)
         self.user_repository = UserRepository(session)
         self.user_sub_repository = UserSubsRepository(session)
+        self.user_cache_balance_repository = UserCacheBalanceRepository(session)
 
     async def get_balance(self, user_id: int) -> dict:
         user = await self.user_repository.get_by_user_id(user_id)
@@ -79,3 +81,11 @@ class BalanceController:
             }
             for usage in balance_usage
         ]
+
+    async def get_user_cache_balance(self, user_id):
+        user = await self.user_repository.get_by_user_id(user_id)
+        if user is None:
+            raise NotFoundException("User not found")
+
+        user_cache = await self.user_cache_balance_repository.get_cache_balance(user_id)
+        return user_cache

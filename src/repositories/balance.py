@@ -70,13 +70,3 @@ class BalanceRepository:
         )
         result = await self.session.execute(stmt)
         return result.scalars().first()
-
-    async def buy_subscription(self, organization_id: int, ):
-        stmt = (
-            update(Balance)
-            .where(Balance.organization_id == organization_id)
-            .values(subscription=True)
-            .returning(Balance)
-        )
-        result = await self.session.execute(stmt)
-        return result.scalars().first()

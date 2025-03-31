@@ -111,6 +111,7 @@ class BillingController:
                 "atl_tokens": request.atl_amount,
                 "access_token": request.access_token,
                 "invoice_id": request.invoice_id,
+                "type": "balance",
                 "status": "pending",
                 "payment_type": 'card'
             }
@@ -168,19 +169,35 @@ class BillingController:
                         await self.billing_transaction_repository.update(
                             billing_transaction.id, {"status": "charged"}
                         )
-                        await self.balance_repository.topup_balance(
-                            billing_transaction.organization_id, billing_transaction.atl_tokens
-                        )
+                        if billing_transaction.type == "package":
+                            await self.user_subs_repository.create_user_subscription({
+                                "user_id": billing_transaction.user_id,
+                                "promo_id": billing_transaction.promo_id,
+                                "subscription_id": billing_transaction.subscription_id,
+                                "bought_date": datetime.now(),
+                            })
+                        elif billing_transaction.type == "balance":
+                            await self.balance_repository.topup_balance(
+                                billing_transaction.organization_id, billing_transaction.atl_tokens
+                            )
                         print("Success Charge")
                         return {"status": "charged"}
 
                     elif status_name == "CHARGE":
                         print("Already charged, updating balance...")
+                        if billing_transaction.type == "package":
+                            await self.user_subs_repository.create_user_subscription({
+                                "user_id": billing_transaction.user_id,
+                                "promo_id": billing_transaction.promo_id,
+                                "subscription_id": billing_transaction.subscription_id,
+                                "bought_date": datetime.now(),
+                            })
+                        elif billing_transaction.type == "balance":
+                            await self.balance_repository.topup_balance(
+                                billing_transaction.organization_id, billing_transaction.atl_tokens
+                            )
                         await self.billing_transaction_repository.update(
                             billing_transaction.id, {"status": "charged"}
-                        )
-                        await self.balance_repository.topup_balance(
-                            billing_transaction.organization_id, billing_transaction.atl_tokens
                         )
                         return {"status": "charged"}
 
@@ -415,10 +432,10 @@ class BillingController:
             active_sub = await self.user_subs_repository.user_active_subscription(user_id)
             if active_sub:
                 raise BadRequestException("Active subscription already active")
-
-            promocode = await self.promocode_repository.get_promo_code(request.promo_code)
-            if not promocode:
-                raise BadRequestException("Promo code not found")
+            if request.promo_code:
+                promocode = await self.promocode_repository.get_promo_code(request.promo_code)
+                if not promocode:
+                    raise BadRequestException("Promo code not found")
 
             kzt_amount = subscription.price - subscription.price * (1 - (25 / 100))
 
@@ -432,10 +449,11 @@ class BillingController:
                 "access_token": request.access_token,
                 "invoice_id": request.invoice_id,
                 "status": "pending",
-                "payment_type": 'card'
+                "payment_type": 'card',
+                "type": "package",
+                "promo_id": promocode.id if promocode else None,
             }
             billing_transaction = await self.billing_transaction_repository.create(billing_transaction_data)
-            await self.balance_repository.buy_subscription(organization.id)
             days = subscription.active_month * 30
             cache_balance = await self.user_cahce_balance.get_cache_balance(user_id)
 
@@ -445,9 +463,8 @@ class BillingController:
                     "balance": cache_balance.balance + subscription.price * (1 - (25 / 100)),
                 }
             )
-            handle_user_sub.send(
-                user_id=user_id,
-                organization_id=organization.id,
+            handle_user_sub.apply_async(
+                kwargs={"user_id": user_id, "organization_id": organization.id},
                 eta=datetime.utcnow() + timedelta(days=days)
             )
             return {

@@ -45,9 +45,8 @@ class SubsController:
             })
 
         days = subscription.active_month * 30
-        handle_user_sub.send(
-            user_id=user_id,
-            organization_id=organization.id,
+        handle_user_sub.apply_async(
+            kwargs={"user_id": user_id, "organization_id": organization.id},
             eta=datetime.utcnow() + timedelta(days=days)
         )
         return result
@@ -57,3 +56,6 @@ class SubsController:
         if not analyze:
             return {}
         return analyze
+
+    async def get_user_active_subscriptions(self, user_id):
+        return await self.user_subs_repo.user_active_subscription(user_id)
