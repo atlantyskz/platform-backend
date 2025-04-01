@@ -80,6 +80,10 @@ class PromoCodeController:
 
         data = user_cache_balance.__dict__.copy()
         data['analyze'] = await self.user_subs_repo.analyze_subscription(user_id)
+        if "id" in data:
+            data.pop("id")
+        if "user_id" in data:
+            data.pop("user_id")
         return data
 
     async def check_promocode(self, promo_code: str):
