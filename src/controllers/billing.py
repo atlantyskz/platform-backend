@@ -434,13 +434,15 @@ class BillingController:
             if active_sub:
                 raise BadRequestException("Active subscription already active")
 
+            price_to_pay = subscription.price
             promocode = None
             if request.promo_code:
                 promocode = await self.promocode_repository.get_promo_code(request.promo_code)
                 if not promocode:
                     raise BadRequestException("Promo code not found")
 
-            price_to_pay = subscription.price
+                price_to_pay *= 0.75
+
 
             billing_transaction_data = {
                 "user_id": user.id,
@@ -470,11 +472,12 @@ class BillingController:
                             "balance": 0,
                         }
                     )
+                    await self.session.flush()
 
                 await self.user_cache_balance_repo.update_cache_balance(
                     user_id=promo_owner_id,
                     data={
-                        "balance": promo_owner_cache_balance.balance + (subscription.price - price_to_pay),
+                        "balance": promo_owner_cache_balance.balance + (price_to_pay * 0.25),
                     }
                 )
                 await self.session.flush()
