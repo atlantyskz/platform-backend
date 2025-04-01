@@ -87,12 +87,12 @@ class UserSubsRepository:
         result = await self.session.execute(stmt)
         rows = result.all()
 
-        total_price = 0
+        total_income = 0
         items = []
 
         for row in rows:
             income = row.price * 0.25
-            total_price += income
+            total_income += income
             items.append({
                 "id": row.id,
                 "email": row.email,
@@ -103,6 +103,6 @@ class UserSubsRepository:
 
         return {
             "count": len(items),
-            "total_price": total_price,
+            "total_income": total_income,
             "items": items,
         }
