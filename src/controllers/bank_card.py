@@ -13,10 +13,12 @@ class BankCardController:
         data = data.dict()
         if existing:
             await self.repo.update(user_id, data)
+            await self.session.commit()
             return existing
         else:
             data['user_id'] = user_id
             created = await self.repo.create(data)
+            await self.session.commit()
             return created
 
     async def get_bank_card(self, user_id):
