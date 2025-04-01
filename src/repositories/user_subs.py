@@ -81,7 +81,7 @@ class UserSubsRepository:
             .join(User, User.id == UserSubs.user_id)
             .join(BillingTransaction, BillingTransaction.user_id == UserSubs.user_id)
             .where(PromoCode.user_id == user_id)
-            .distinct()
+            .distinct(UserSubs.id)
         )
 
         result = await self.session.execute(stmt)
