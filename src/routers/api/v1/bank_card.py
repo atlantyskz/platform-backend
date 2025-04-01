@@ -18,7 +18,7 @@ async def add_or_update_bank_card(
     return await bank_card_controller.upsert_bank_card(user_id=user_id, data=card)
 
 
-@bank_card_router.get("/", response_model=BankCardResponse)
+@bank_card_router.get("/me", response_model=BankCardResponse)
 async def get_bank_card(
         bank_card_controller: BankCardController = Depends(Factory.get_bank_card_controller),
         current_user=Depends(get_current_user)

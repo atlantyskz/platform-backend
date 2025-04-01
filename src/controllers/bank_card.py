@@ -10,12 +10,14 @@ class BankCardController:
 
     async def upsert_bank_card(self, user_id, data: BankCardCreate):
         existing = await self.repo.get_by_user_id(user_id)
-        if existing:
-            await self.repo.delete_by_user_id(user_id)
         data = data.dict()
-        data['user_id'] = user_id
-        created = await self.repo.create(data)
-        return created
+        if existing:
+            await self.repo.update(user_id, data)
+            return existing
+        else:
+            data['user_id'] = user_id
+            created = await self.repo.create(data)
+            return created
 
     async def get_bank_card(self, user_id):
         existing = await self.repo.get_by_user_id(user_id)

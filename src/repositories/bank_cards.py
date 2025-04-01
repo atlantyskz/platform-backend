@@ -1,4 +1,4 @@
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.models.bank_cards import BankCard
@@ -32,3 +32,9 @@ class BankCardRepository(BaseRepository):
             await self.session.delete(bank_card)
             await self.session.flush()
         return bank_card
+
+    async def update(self, user_id, attributes: dict) -> BankCard:
+        stmt = update(BankCard).where(BankCard.user_id == user_id).values(**attributes)
+        await self.session.execute(stmt)
+        await self.session.flush()
+        return BankCard(**attributes)

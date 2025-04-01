@@ -68,6 +68,7 @@ class UserSubsRepository:
     async def analyze_subscription(self, user_id: int) -> dict:
         stmt = (
             select(
+                UserSubs.id,
                 User.email,
                 BillingTransaction.amount,
                 UserSubs.bought_date,
@@ -86,18 +87,19 @@ class UserSubsRepository:
         result = await self.session.execute(stmt)
         rows = result.all()
 
-        total_price = sum(row.amount for row in rows)
+        total_price = 0
+        items = []
 
-        items = [
-            {
+        for row in rows:
+            income = row.price * 0.25
+            total_price += income
+            items.append({
+                "id": row.id,
                 "email": row.email,
-                "amount": row.amount,
                 "bought_date": row.bought_date,
-                "income": row.price * 0.25,
+                "income": income,
                 "subscription_name": row.name
-            }
-            for row in rows
-        ]
+            })
 
         return {
             "count": len(items),
