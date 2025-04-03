@@ -159,13 +159,17 @@ class HHController:
                 
                 while True:
                     try:
-                        # Получаем вакансии для текущей страницы менеджера
-                        vacancies_response = await client.get(
-                            f"https://api.hh.ru/employers/{emp_id}/vacancies/{status}?page={page_number}&manager_id={manager_id}",
-                            headers=headers,
-                            timeout=10.0,
-                        )
-                        vacancies_response.raise_for_status()
+                        # Получаем вакансии для текущей страницы менеджера"
+                        try:
+                            vacancies_response = await client.get(
+                                f"https://api.hh.ru/employers/{emp_id}/vacancies/{status}?page={page_number}&manager_id={manager_id}",
+                                headers=headers,
+                                timeout=10.0,
+                            )
+                        except httpx.RequestError as exc:
+                            pass
+                            print(f"HTTP error during vacancies retrieval: {exc}")
+                        print(vacancies_response.json())
                         vacancies_data = vacancies_response.json()
                         vacancies = vacancies_data.get("items", [])
                         

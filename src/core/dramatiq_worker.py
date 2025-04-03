@@ -18,7 +18,6 @@ from src.models.balance import Balance
 redis_broker = RedisBroker(host="redis", port=6379)
 
 redis_broker.add_middleware(AsyncIO())  
-redis_broker.add_middleware(retries.Retries())    
 redis_broker.add_middleware(time_limit.TimeLimit())
 
 dramatiq.set_broker(redis_broker)
