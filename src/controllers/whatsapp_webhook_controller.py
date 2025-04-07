@@ -17,58 +17,48 @@ class WhatsappWebhookController:
         self.whatsapp_instance_repo = repositories.WhatsappInstanceRepository(session)
         self.green_api_instance_client = GreenApiInstanceCli()
 
-    async def handle_incoming_webhook(self, data: dict, instance_id) -> dict:
-        if not data:
-            return {"error": "No data provided"}
+    async def handle_incoming_webhook(self, data: dict) -> dict:
+        webhook_type = data.get("typeWebhook")
+        instance_id = data.get("instanceData", {}).get("idInstance")
+        instance_wid = data.get("instanceData", {}).get("wid")
+        sender_chat_id = data.get("senderData", {}).get("chatId")
 
-        if data.get("typeWebhook") == "incomingMessageReceived":
-            return await self._handle_incoming_message(data, instance_id)
+        whatsapp_instance = await self.whatsapp_instance_repo.get_by_instance_id(instance_id)
+
+        if webhook_type == "pollAnswer":
+            return await self._handle_poll_answer(data, whatsapp_instance)
+
+        if webhook_type == "incomingMessageReceived":
+            return {"status": "text_message_ignored"}
 
         return {"status": "ignored"}
 
-    async def _handle_incoming_message(self, data: dict, instance_id) -> dict:
-        message_data = data.get("messageData", {})
-        message_type = message_data.get("typeMessage")
+    async def _handle_poll_answer(self, data: dict, instance) -> dict:
+        chat_id = data["senderData"].get("chatId")
+        answer = data["messageData"].get("optionAnswer")
+        message_id = data["messageData"].get("idMessage")
 
-        if message_type == "buttonMessage":
-            return await self._handle_button_message(data)
-
-        if message_type == "textMessage":
-            sender = data.get("senderData", {}).get("sender")
-            text_message = message_data.get("textMessageData", {}).get("textMessage")
-            logger.info(f"Текстовое сообщение от {sender}: {text_message}")
-            return {"status": "text_received"}
-
-        return {"status": "unhandled_message_type"}
-
-    async def _handle_button_message(self, data: dict, instance_id) -> dict:
-        button_id = data["messageData"]["buttonMessageData"]["buttonId"]
-        chat_id = data["senderData"].get("chatId")  # например "79001234567@c.us"
+        if not chat_id or not answer:
+            return {"error": "Invalid poll answer data"}
 
         interaction = await self.user_interaction_repo.get_not_answered_by_chat(
             chat_id, "RESUME_OFFER"
         )
-        if not interaction:
-            logger.info("No active interaction found for chat_id=%s", chat_id)
-            return {"status": "interaction_not_found"}
+        if interaction:
+            await self.user_interaction_repo.mark_answered(interaction.id, answer)
 
-        await self.user_interaction_repo.mark_answered(interaction.id, button_id)
-        reply_text = None
-        if button_id == "continue":
-            reply_text = "Отлично! Давайте обсудим детали. Можете рассказать о своём опыте..."
-        elif button_id == "not_interested":
-            reply_text = "Спасибо за ответ. Если что, будем на связи!"
+        reply = None
+        if answer == "Продолжить":
+            reply = "Отлично! Давайте обсудим детали. Расскажите немного о себе."
+        elif answer == "Не интересует":
+            reply = "Спасибо за честный ответ. Если что — будем на связи."
 
-        if reply_text:
-            instance = await self.whatsapp_instance_repo.get_by_instance_id(instance_id)
+        if reply:
             if instance:
-                data_send = {"chat_id": chat_id, "message": reply_text}
                 await self.green_api_instance_client.send_message(
-                    data_send,
+                    data={"chat_id": chat_id, "message": reply},
                     instance_id=instance.instance_id,
                     instance_token=instance.instance_token
                 )
-            else:
-                logger.warning("Не найден активный инстанс для отправки ответа")
 
-        return {"status": f"button_{button_id}_received"}
+        return {"status": f"poll_answer_received: {answer}"}

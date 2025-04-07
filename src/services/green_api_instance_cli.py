@@ -29,21 +29,15 @@ class GreenApiInstanceCli:
 
     async def send_poll(self, data: dict, instance_id: str, instance_token: str) -> dict:
         url = f"{self.__api_url}/waInstance{instance_id}/sendPoll/{instance_token}"
-        chat_id = data.get("chat_id")
-        message = data.get("message")
-        options = data.get("options")
+        payload = {
+            "chatId": data["chat_id"],
+            "message": data["message"],
+            "options": data["options"]
+        }
 
         try:
             async with aiohttp.ClientSession() as session:
-                async with session.post(
-                        url,
-                        json={
-                            "chatId": chat_id,
-                            "message": message,
-                            "options": options
-                        },
-                        headers={"Content-Type": "application/json"}
-                ) as response:
+                async with session.post(url, json=payload) as response:
                     response.raise_for_status()
                     return await response.json()
         except Exception as e:

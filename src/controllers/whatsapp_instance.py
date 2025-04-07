@@ -147,7 +147,7 @@ class WhatsappInstanceController:
         raise exceptions.BadRequestException(f"Instance in unexpected state: {state}")
 
     async def get_user_instance(self, user_id: int):
-        organization = await self.org_repo.get_organization(user_id)
+        organization = await self.org_repo.get_user_organization(user_id)
         if not organization:
             raise exceptions.NotFoundException("Organization not found")
 

@@ -306,31 +306,15 @@ async def _process_send_whatsapp_messages(
                 chat_id, existing_interaction.id
             )
             continue
-        print(cleaned_number)
-        data = {
-            "chat_id": chat_id,
-            "message": "Добрый день! Мы рассмотрели ваше резюме. Хотите обсудить детали?",
-            "footer": "Нажмите кнопку для ответа.",
-            "buttons": [
-                {
-                    "buttonId": "continue",
-                    "buttonText": {"displayText": "Продолжить"},
-                    "type": 1
-                },
-                {
-                    "buttonId": "not_interested",
-                    "buttonText": {"displayText": "Не интересует"},
-                    "type": 1
-                }
-            ]
-        }
-        print("\n\n\n\n\n")
-        print(whatsapp_instance.instance_id,
-            whatsapp_instance.instance_token)
-        await green_api_instance_client.send_buttons_message(
-            data,
-            whatsapp_instance.instance_id,
-            whatsapp_instance.instance_token
+
+        await green_api_instance_client.send_poll(
+            data={
+                "chat_id": chat_id,
+                "message": "Добрый день! Мы рассмотрели ваше резюме. Хотите обсудить детали?",
+                "options": ["Продолжить", "Не интересует"]
+            },
+            instance_id=whatsapp_instance.instance_id,
+            instance_token=whatsapp_instance.instance_token
         )
 
         await user_interaction_repo.create_interaction(

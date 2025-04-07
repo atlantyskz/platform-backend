@@ -8,7 +8,7 @@ class UserInteractionRepository:
     def __init__(self, session: AsyncSession):
         self.session = session
 
-    async def create_interaction(self, chat_id: str, session_id: int, message_type: str) -> UserInteraction:
+    async def create_interaction(self, chat_id: str, session_id: str, message_type: str) -> UserInteraction:
         interaction = UserInteraction(
             chat_id=chat_id,
             session_id=session_id,
