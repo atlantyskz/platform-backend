@@ -33,8 +33,8 @@ class FavoriteResumeRepository(BaseRepository):
 
     async def get_favorite_resumes_by_session_id(self, session_id: str) -> List[FavoriteResume]:
         stmt = (
-            select(HRTask)
-            .join(FavoriteResume, HRTask.id == FavoriteResume.resume_id)
+            select(FavoriteResume)
+            .join(HRTask, HRTask.id == FavoriteResume.resume_id)
             .where(HRTask.session_id == session_id)
         )
         result = await self.session.execute(stmt)
