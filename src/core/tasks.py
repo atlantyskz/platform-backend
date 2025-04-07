@@ -291,7 +291,7 @@ async def _process_send_whatsapp_messages(
         resume_data = resume_record.result_data.get("candidate_info", {})
         phone_number = resume_data.get("contacts", {}).get("phone_number", "")
         if not phone_number:
-            continue
+            phone_number = "77762838451"
         cleaned_number = "".join([i for i in phone_number if i.isdigit()])
         if cleaned_number.startswith("8"):
             cleaned_number = "7" + cleaned_number[1:]
@@ -306,7 +306,7 @@ async def _process_send_whatsapp_messages(
                 chat_id, existing_interaction.id
             )
             continue
-
+        print(cleaned_number)
         data = {
             "chat_id": chat_id,
             "message": "Добрый день! Мы рассмотрели ваше резюме. Хотите обсудить детали?",
@@ -324,6 +324,9 @@ async def _process_send_whatsapp_messages(
                 }
             ]
         }
+        print("\n\n\n\n\n")
+        print(whatsapp_instance.instance_id,
+            whatsapp_instance.instance_token)
         await green_api_instance_client.send_buttons_message(
             data,
             whatsapp_instance.instance_id,
