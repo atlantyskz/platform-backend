@@ -186,6 +186,7 @@ class BillingController:
                             await self.balance_repository.topup_balance(
                                 billing_transaction.organization_id, billing_transaction.atl_tokens
                             )
+                        await self.session.flush()
                         print("Success Charge")
                         return {"status": "charged"}
 
@@ -204,6 +205,7 @@ class BillingController:
                             await self.balance_repository.topup_balance(
                                 billing_transaction.organization_id, billing_transaction.atl_tokens
                             )
+                        await self.session.flush()
                         await self.billing_transaction_repository.update(
                             billing_transaction.id,
                             {
