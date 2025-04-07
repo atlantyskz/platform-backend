@@ -176,7 +176,7 @@ class BillingController:
                         if billing_transaction.type == "package":
                             await self.organization_subscription_repository.create_organization_subscription(
                                 {
-                                    "organization_id": billing_transaction.user_id,
+                                    "organization_id": billing_transaction.organization_id,
                                     "promo_id": billing_transaction.promo_id,
                                     "subscription_id": billing_transaction.subscription_id,
                                     "bought_date": datetime.now(),
@@ -195,7 +195,7 @@ class BillingController:
                         if billing_transaction.type == "package":
                             await self.organization_subscription_repository.create_organization_subscription(
                                 {
-                                    "organization_id": billing_transaction.user_id,
+                                    "organization_id": billing_transaction.organization_id,
                                     "promo_id": billing_transaction.promo_id,
                                     "subscription_id": billing_transaction.subscription_id,
                                     "bought_date": datetime.now(),
@@ -243,14 +243,12 @@ class BillingController:
             logger.error("User not found")
             raise exceptions.NotFoundException("User not found")
 
-        # Retrieve the organization
         organization = await self.organization_repository.get_user_organization(user_id)
         logger.info(f"Organization fetched: {organization}")
         if organization is None:
             logger.error("Organization not found")
             raise exceptions.NotFoundException("Organization not found")
 
-        # Retrieve the billing transaction
         billing_transaction = await self.billing_transaction_repository.get_transaction(transaction_id, user.id,
                                                                                         organization.id)
         logger.info(f"Billing transaction fetched: {billing_transaction}")
