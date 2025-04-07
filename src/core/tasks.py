@@ -311,7 +311,10 @@ async def _process_send_whatsapp_messages(
             data={
                 "chat_id": chat_id,
                 "message": "Добрый день! Мы рассмотрели ваше резюме. Хотите обсудить детали?",
-                "options": ["Продолжить", "Не интересует"]
+                "options": [
+                    {"optionName": "Продолжить"},
+                    {"optionName": "Не интересует"}
+                ]
             },
             instance_id=whatsapp_instance.instance_id,
             instance_token=whatsapp_instance.instance_token
