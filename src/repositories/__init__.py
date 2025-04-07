@@ -35,6 +35,8 @@ from .whatsapp_instance_association import WhatsappInstanceAssociationRepository
 from .whatsapp_instance import WhatsappInstanceDTO
 from .whatsapp_instance_association import WhatsappInstanceAssociation
 from .whatsapp_instance import InstanceTypeEnum
+from .current_whatsapp_instance import CurrentWhatsappInstanceRepository
+from .user_interaction_repository import UserInteractionRepository
 
 __all__ = [
     "WhatsappInstanceRepository",
@@ -59,4 +61,6 @@ __all__ = [
     "OrganizationRepository",
     "SubscriptionPlanRepository",
     "WhatsappInstanceAssociationRepository",
+    "CurrentWhatsappInstanceRepository",
+    "UserInteractionRepository",
 ]

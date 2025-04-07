@@ -31,6 +31,7 @@ from src.routers.api.v1.promo_code import promo_code_router
 from src.routers.api.v1.subs_router import subs_router
 from src.routers.api.v1.user_feedback import user_feedback_router
 from src.routers.api.v1.whatsapp_instance import router as whatsapp_instance_router
+from src.routers.api.v1.channels import router as channels_router
 from src.services.telegram_cli import TelegramCli
 
 
@@ -110,6 +111,8 @@ def create_app(create_custom_static_urls: bool = False) -> FastAPI:
     app.include_router(promo_code_router)
     app.include_router(bank_card_router)
     app.include_router(whatsapp_instance_router)
+    app.include_router(channels_router)
+
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["*"],

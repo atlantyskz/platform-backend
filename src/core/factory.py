@@ -17,6 +17,7 @@ from src.controllers.promocode import PromoCodeController
 from src.controllers.subscription_plan import SubscriptionPlanController
 from src.controllers.user_feedback import UserFeedbackController
 from src.controllers.whatsapp_instance import WhatsappInstanceController
+from src.controllers.whatsapp_webhook_controller import WhatsappWebhookController
 from src.core.backend import BackgroundTasksBackend
 from src.core.databases import get_session
 from src.services.extractor import AsyncTextExtractor, get_text_extractor
@@ -102,3 +103,10 @@ class Factory:
 
     def get_whatsapp_instance_controller(session: AsyncSession = Depends(get_session)) -> WhatsappInstanceController:
         return WhatsappInstanceController(session)
+
+    def get_whatsapp_webhook_controller(
+            session: AsyncSession = Depends(get_session)
+    ) -> WhatsappWebhookController:
+        return WhatsappWebhookController(
+            session
+        )

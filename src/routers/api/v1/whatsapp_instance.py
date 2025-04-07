@@ -2,6 +2,7 @@ from fastapi import APIRouter, Request, Depends, HTTPException
 from fastapi.responses import JSONResponse
 
 from src.controllers.whatsapp_instance import WhatsappInstanceController
+from src.controllers.whatsapp_webhook_controller import WhatsappWebhookController
 from src.core import exceptions
 from src.core.factory import Factory
 from src.core.middlewares.auth_middleware import get_current_user, require_roles
@@ -63,19 +64,15 @@ async def get_admin_whatsapp_instances(
 
 
 @router.post("/webhook")
-async def whatsapp_webhook(request: Request):
+async def whatsapp_webhook(
+    request: Request,
+    webhook_controller: WhatsappWebhookController = Depends(Factory.get_whatsapp_webhook_controller),
+):
     try:
+
         data = await request.json()
     except Exception:
         return JSONResponse({"error": "Invalid JSON"}, status_code=400)
 
-    if not data:
-        return JSONResponse({"error": "No data provided"}, status_code=400)
-
-    if data.get("typeWebhook") == "incomingMessageReceived":
-        sender = data.get("senderData", {}).get("sender")
-        message = data.get("messageData", {}).get("textMessageData", {}).get("textMessage")
-
-        print(f"📩 New message from {sender}: {message}")
-
-    return JSONResponse({"status": "received"}, status_code=200)
+    result = await webhook_controller.handle_incoming_webhook(data, )
+    return JSONResponse(result, status_code=200 if "error" not in result else 400)

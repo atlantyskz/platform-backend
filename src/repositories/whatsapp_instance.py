@@ -27,6 +27,11 @@ class WhatsappInstanceRepository:
     def __init__(self, session: AsyncSession):
         self.session = session
 
+    async def get_by_id(self, id: int):
+        stmt = select(models.WhatsappInstance).where(models.WhatsappInstance.id == id)
+        instance = await self.session.execute(stmt)
+        return instance.scalar_one_or_none()
+
     async def add_whatsapp_instance(self, data: WhatsappInstanceDTO):
         stmt = (
             insert(models.WhatsappInstance)
