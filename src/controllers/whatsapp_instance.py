@@ -160,7 +160,7 @@ class WhatsappInstanceController:
             raise exceptions.NotFoundException("Sub instance not found")
 
         state_resp = await self.green_api.get_instance_state(
-            sub_instance.whatsapp_instance_id,
+            sub_instance.instance_id,
             sub_instance.instance_token
         )
         if not state_resp.get("success"):
