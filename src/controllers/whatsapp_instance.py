@@ -138,6 +138,10 @@ class WhatsappInstanceController:
             db_instance.instance_token
         )
         state = state_resp.get("state_instance")
+        if state in ("starting",):
+            await self.green_api.reboot_instance(db_instance.instance_id, db_instance.instance_token)
+
+        state = state_resp.get("state_instance")
         if state in ("notAuthorized", "sleepMode"):
             return await self.green_api.get_qr_code(db_instance.instance_id, db_instance.instance_token)
 

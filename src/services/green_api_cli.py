@@ -134,3 +134,30 @@ class GreenApiCli:
             return {"success": False, "error": f"HTTP error: {str(http_err)}"}
         except Exception as e:
             return {"success": False, "error": f"Unexpected error: {str(e)}"}
+
+    async def reboot_instance(self, instance_id: str, instance_token: str) -> dict:
+        url = f"{self.__api_url}/waInstance{instance_id}/reboot/{instance_token}"
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.post(url) as response:
+                    response.raise_for_status()
+                    data = await response.json()
+                    return {
+                        "success": True,
+                        "data": data
+                    }
+        except aiohttp.ClientResponseError as e:
+            return {
+                "success": False,
+                "error": f"HTTP Error: {e.status} {e.message}"
+            }
+        except aiohttp.ClientError as e:
+            return {
+                "success": False,
+                "error": f"Client Error: {str(e)}"
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "error": f"Unexpected Error: {str(e)}"
+            }
