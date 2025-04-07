@@ -8,7 +8,7 @@ from src.core.factory import Factory
 from src.core.middlewares.auth_middleware import get_current_user, require_roles
 from src.models import RoleEnum
 
-router = APIRouter(prefix="/whatsapp-integration", tags=["WHATSAPP"])
+router = APIRouter(prefix="/api/v1/whatsapp-integration", tags=["WHATSAPP"])
 
 
 @router.post("/create-instance")
