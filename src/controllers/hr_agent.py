@@ -736,7 +736,7 @@ class HRAgentController:
 
         await redis_client.set(
             name=task_key,
-            value=task_id
+            value=str(task_id)
         )
         await redis_client.set(
             name=str(task_id),
