@@ -22,7 +22,7 @@ async def topup_balance(
 
 
 @billing_router.post('/buy-subscription')
-@require_roles([RoleEnum.ADMIN.value])
+@require_roles([RoleEnum.ADMIN.value, RoleEnum.SUPER_ADMIN.value])
 async def buy_subscription(
         billing_request: BuySubscription,
         billing_controller: BillingController = Depends(Factory.get_billing_controller),
