@@ -29,6 +29,7 @@ class GreenApiInstanceCli:
 
     async def send_poll(self, data: dict, instance_id: str, instance_token: str) -> dict:
         url = f"{self.__api_url}/waInstance{instance_id}/sendPoll/{instance_token}"
+        print(url)
         payload = {
             "chatId": data["chat_id"],
             "message": data["message"],
@@ -41,6 +42,7 @@ class GreenApiInstanceCli:
                     response.raise_for_status()
                     return await response.json()
         except Exception as e:
+            print("Failed to send poll request", e)
             return {"success": False, "error": str(e)}
 
     async def get_poll_answer(self, instance_id: str, instance_token: str, message_id: str) -> dict:
