@@ -64,28 +64,8 @@ class GreenApiInstanceCli:
             return {"success": False, "error": str(e)}
 
     async def send_buttons_message(self, data: dict, instance_id: str, instance_token: str) -> dict:
-        """
-        Отправляет сообщение с интерактивными кнопками (buttons).
-        data должен содержать:
-          {
-            "chat_id": "...",
-            "message": "...",
-            "footer": "...",       # необязательно
-            "buttons": [
-              {
-                "buttonId": "some_id",
-                "buttonText": { "displayText": "Продолжить" },
-                "type": 1
-              },
-              {
-                "buttonId": "some_id_2",
-                "buttonText": { "displayText": "Не интересует" },
-                "type": 1
-              }
-            ]
-          }
-        """
         url = f"{self.__api_url}/waInstance{instance_id}/sendButtons/{instance_token}"
+        print(url)
         payload = {
             "chatId": data["chat_id"],
             "message": data["message"],
@@ -100,7 +80,10 @@ class GreenApiInstanceCli:
                         json=payload,
                         headers={"Content-Type": "application/json"}
                 ) as response:
+                    response_data = await response.json()
+                    print(f"Green API sendButtons response to {data['chat_id']}: {response_data}")
                     response.raise_for_status()
-                    return await response.json()
+                    return response_data
         except Exception as e:
+            print(f"Error sending buttons to {data['chat_id']}: {str(e)}")
             return {"success": False, "error": str(e)}
