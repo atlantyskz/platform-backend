@@ -290,6 +290,8 @@ async def _process_send_whatsapp_messages(
     for resume_record in resumes:
         phone_number = resume_record.phone_number
         cleaned_number = "".join([i for i in phone_number if i.isdigit()])
+        if cleaned_number.startswith("8"):
+            cleaned_number = "7" + cleaned_number[1:]
         chat_id = f"{cleaned_number}@c.us"
 
         existing_interaction = await user_interaction_repo.get_not_answered_by_chat(
