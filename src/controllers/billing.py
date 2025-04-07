@@ -463,7 +463,7 @@ class BillingController:
 
                 promo_owner_cache_balance = await self.cash_balance_repository.cash_balance(promo_owner_id)
                 if not promo_owner_cache_balance:
-                    await self.cash_balance_repository.create_cash_balance(
+                    promo_owner_cache_balance = await self.cash_balance_repository.create_cash_balance(
                         {
                             "user_id": promo_owner_id,
                             "balance": 0,
