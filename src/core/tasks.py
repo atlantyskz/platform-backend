@@ -286,7 +286,7 @@ async def _process_send_whatsapp_messages(
     if not resumes:
         logger.info("No favorite resumes found for session_id=%s", session_id)
         return
-
+    print(resumes)
     for resume_record in resumes:
         phone_number = resume_record.phone_number
         cleaned_number = "".join([i for i in phone_number if i.isdigit()])

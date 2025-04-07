@@ -88,12 +88,32 @@ class WhatsappInstanceController:
 
         return {"detail": "WhatsApp instance created successfully"}
 
-    async def get_organization_instances(self, organization_id: int):
-        organization = await self.org_repo.get_organization(organization_id)
+    async def get_organization_instances(self, user_id: int):
+        user = await self.user_repo.get_by_user_id(user_id)
+        organization = await self.org_repo.get_user_organization(user_id)
         if not organization:
             raise exceptions.NotFoundException("Organization not found")
 
-        return await self.instance_repo.get_all_by_organization(organization.id, True)
+        if user.role.name == models.RoleEnum.ADMIN.value:
+            return await self.instance_repo.get_all_by_organization(organization.id, True)
+
+        shared_instance = await self.instance_repo.get_by_organization_id(organization.id)
+
+        personal_associated_instance = await self.association_repo.user_whatsapp_instance(
+            user_id=user_id,
+            organization_id=organization.id
+        )
+
+        personal_instance = None
+        if personal_associated_instance:
+            personal_instance = await self.instance_repo.get_by_instance_id(
+                personal_associated_instance.whatsapp_instance_id
+            )
+
+        return {
+            "shared_instance": shared_instance,
+            "personal_instance": personal_instance
+        }
 
     async def get_instance_qr_code(self, user_id: int):
         user = await self.user_repo.get_by_user_id(user_id)
