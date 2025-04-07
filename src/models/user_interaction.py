@@ -10,7 +10,7 @@ class UserInteraction(Base):
 
     id = sa.Column(sa.Integer, primary_key=True, autoincrement=True)
     chat_id = sa.Column(sa.String, nullable=False)
-    session_id = sa.Column(sa.Integer, nullable=True)
+    session_id = sa.Column(sa.String, nullable=True)
     message_type = sa.Column(sa.String, nullable=False)
     is_answered = sa.Column(sa.Boolean, default=False, nullable=False)
     chosen_button = sa.Column(sa.String, nullable=True)
