@@ -11,7 +11,7 @@ class BillingTransaction(Base, TimestampMixin):
     user_id: so.Mapped[int] = so.mapped_column(sa.ForeignKey('users.id', ondelete="CASCADE"), nullable=False)
     organization_id: so.Mapped[int] = so.mapped_column(sa.ForeignKey('organizations.id', ondelete="CASCADE"), nullable=False)
     promo_id: so.Mapped[int] = so.mapped_column(sa.ForeignKey('promocodes.id', ondelete="SET NULL"), nullable=True)
-    subscription_id: so.Mapped[int] = so.mapped_column(sa.ForeignKey('subscriptions.id', ondelete="SET NULL"), nullable=True)
+    subscription_id: so.Mapped[int] = so.mapped_column(sa.ForeignKey('subscription_plans.id', ondelete="SET NULL"), nullable=True)
     amount: so.Mapped[float] = so.mapped_column(sa.Float, nullable=False, default=0)
     user_role: so.Mapped[str] = so.mapped_column(sa.String, nullable=False)
     atl_tokens: so.Mapped[int] = so.mapped_column(sa.Integer, nullable=True)

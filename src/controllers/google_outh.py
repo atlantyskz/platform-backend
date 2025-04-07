@@ -1,9 +1,13 @@
-import google.oauth2.credentials
 import google_auth_oauthlib.flow
 
-flow = google_auth_oauthlib.flow.Flow.from_client_secrets_file('client_secret.json',
-    scopes=['https://www.googleapis.com/auth/drive.metadata.readonly',
-            'https://www.googleapis.com/auth/calendar.readonly'])
+flow = google_auth_oauthlib.flow.Flow.from_client_secrets_file(
+    'client_secret.json',
+    scopes=[
+        'https://www.googleapis.com/auth/drive.metadata.readonly',
+        'https://www.googleapis.com/auth/calendar.readonly'
+    ]
+)
+
 
 class GoogleOauthController:
 

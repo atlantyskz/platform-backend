@@ -13,7 +13,6 @@ from sqladmin import Admin, ModelView
 from src.core.databases import session_manager
 from src.core.middlewares.auth_admin import authentication_backend
 from src.core.store import lifespan
-from src.core.telegram_cli import TelegramCli
 from src.models import sql_admin_models_list
 from src.routers.api.v1.assistant import assistant_router
 from src.routers.api.v1.auth import auth_router
@@ -28,9 +27,11 @@ from src.routers.api.v1.interview_individual_question import interview_individua
 from src.routers.api.v1.organization import organization_router
 from src.routers.api.v1.organization_member import organization_member_router
 from src.routers.api.v1.phone_interview import phone_interview_router
-from src.routers.api.v1.promo_code import promocode_router
+from src.routers.api.v1.promo_code import promo_code_router
 from src.routers.api.v1.subs_router import subs_router
 from src.routers.api.v1.user_feedback import user_feedback_router
+from src.routers.api.v1.whatsapp_instance import router as whatsapp_instance_router
+from src.services.telegram_cli import TelegramCli
 
 
 def custom_openapi(app):
@@ -106,8 +107,9 @@ def create_app(create_custom_static_urls: bool = False) -> FastAPI:
     app.include_router(interview_common_question_router)
     app.include_router(interview_individual_question_router)
     app.include_router(subs_router)
-    app.include_router(promocode_router)
+    app.include_router(promo_code_router)
     app.include_router(bank_card_router)
+    app.include_router(whatsapp_instance_router)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["*"],

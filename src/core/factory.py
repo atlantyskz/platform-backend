@@ -14,8 +14,9 @@ from src.controllers.interview_individual_question import InterviewIndividualQue
 from src.controllers.organization import OrganizationController
 from src.controllers.organization_member import OrganizationMemberController
 from src.controllers.promocode import PromoCodeController
-from src.controllers.subs import SubsController
+from src.controllers.subscription_plan import SubscriptionPlanController
 from src.controllers.user_feedback import UserFeedbackController
+from src.controllers.whatsapp_instance import WhatsappInstanceController
 from src.core.backend import BackgroundTasksBackend
 from src.core.databases import get_session
 from src.services.extractor import AsyncTextExtractor, get_text_extractor
@@ -90,11 +91,14 @@ class Factory:
             session: AsyncSession = Depends(get_session)) -> InterviewIndividualQuestionController:
         return InterviewIndividualQuestionController(session)
 
-    def get_promocode_controller(session: AsyncSession = Depends(get_session)) -> PromoCodeController:
+    def get_promo_code_controller(session: AsyncSession = Depends(get_session)) -> PromoCodeController:
         return PromoCodeController(session)
 
-    def get_subs_controller(session: AsyncSession = Depends(get_session)) -> SubsController:
-        return SubsController(session)
+    def get_subscription_plan_controller(session: AsyncSession = Depends(get_session)) -> SubscriptionPlanController:
+        return SubscriptionPlanController(session)
 
     def get_bank_card_controller(session: AsyncSession = Depends(get_session)) -> BankCardController:
         return BankCardController(session)
+
+    def get_whatsapp_instance_controller(session: AsyncSession = Depends(get_session)) -> WhatsappInstanceController:
+        return WhatsappInstanceController(session)

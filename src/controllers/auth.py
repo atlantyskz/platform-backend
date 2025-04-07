@@ -1,4 +1,5 @@
 import os
+from dataclasses import dataclass
 from datetime import timedelta
 from uuid import uuid4
 
@@ -9,19 +10,12 @@ from googleapiclient.discovery import build
 from pydantic import EmailStr
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.core.exceptions import BadRequestException, UnauthorizedException, NotFoundException
-from src.core.password import PasswordHandler
-from src.core.security import JWTHandler
-from src.core.tasks import free_trial_tracker
-from src.models import User
-from src.models.role import RoleEnum
-from src.repositories.balance import BalanceRepository
-from src.repositories.organization import OrganizationRepository
-from src.repositories.organization_member import OrganizationMemberRepository
-from src.repositories.role import RoleRepository
-from src.repositories.user import UserRepository
-from src.repositories.user_cache_balance import UserCacheBalanceRepository
-from src.schemas.responses.auth import Token
+from src import models
+from src import repositories
+from src.core import exceptions as core_exceptions
+from src.core import password as core_password
+from src.core import security as core_security
+from src.core import tasks as core_tasks
 from src.services.email import EmailService
 
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
@@ -31,17 +25,23 @@ GOOGLE_REDIRECT_URI = "https://platform.atlantys.kz/google-auth"
 CLIENT_SECRETS_FILE = "client_secret.json"
 
 
+@dataclass
+class Token:
+    access_token: str
+    refresh_token: str
+
+
 class AuthController:
 
     def __init__(self, session: AsyncSession):
         self.session = session
-        self.user_repo = UserRepository(session)
-        self.role_repo = RoleRepository(session)
-        self.organization_repo = OrganizationRepository(session)
-        self.balance_repo = BalanceRepository(session)
-        self.organization_member_repo = OrganizationMemberRepository(session)
+        self.user_repo = repositories.UserRepository(session)
+        self.role_repo = repositories.RoleRepository(session)
+        self.organization_repo = repositories.OrganizationRepository(session)
+        self.balance_repo = repositories.BalanceRepository(session)
+        self.organization_member_repo = repositories.OrganizationMemberRepository(session)
         self.email_service = EmailService()
-        self.user_cache_balance_repo = UserCacheBalanceRepository(session)
+        self.user_cache_balance_repo = repositories.CashBalanceRepository(session)
 
     async def create_user(self, email: EmailStr, phone_number: str, password: str) -> Token:
         async with self.session.begin():
@@ -55,8 +55,8 @@ class AuthController:
                     raise HTTPException(status_code=400, detail="User with this phone number already exists")
 
                 # Получаем роль и создаем пользователя
-                role = await self.role_repo.get_role_by_name(RoleEnum.ADMIN)
-                password_hash = PasswordHandler.hash(password)
+                role = await self.role_repo.get_role_by_name(models.RoleEnum.ADMIN)
+                password_hash = core_password.PasswordHandler.hash(password)
                 user = await self.user_repo.create_user({
                     'email': email,
                     'phone_number': phone_number,
@@ -77,19 +77,26 @@ class AuthController:
                     'atl_tokens': 15,
                     'free_trial': True
                 })
-                await self.user_cache_balance_repo.create_cache_balance(
-                    {
-                        "user_id": user.id,
-                        "balance": 0,
-                    }
-                )
                 await self.session.flush()
-                # call cron job ...
-                free_trial_tracker.apply_async(kwargs={"balance_id": balance.id},
-                                               eta=balance.created_at + timedelta(days=1))
+
+                core_tasks.free_trial_tracker.apply_async(kwargs={"balance_id": balance.id},
+                                                          eta=balance.created_at + timedelta(days=1))
                 return Token(
-                    access_token=JWTHandler.encode_access_token(payload={"sub": user.id, "role": user.role.name}),
-                    refresh_token=JWTHandler.encode_refresh_token(payload={"sub": user.id, "role": user.role.name}),
+                    access_token=core_security
+                    .JWTHandler
+                    .encode_access_token(
+                        payload={
+                            "sub": user.id, "role": user.role.name
+                        }
+                    ),
+                    refresh_token=core_security
+                    .JWTHandler
+                    .encode_refresh_token(
+                        payload={
+                            "sub": user.id,
+                            "role": user.role.name
+                        }
+                    ),
                 )
             except Exception as e:
                 raise e
@@ -99,36 +106,40 @@ class AuthController:
             if email:
                 user = await self._get_user_by_email(email)
                 if not user:
-                    raise NotFoundException("User with this email does not exist")
+                    raise core_exceptions.NotFoundException("User with this email does not exist")
 
             elif phone_number:
                 user = await self.user_repo.get_by_phone_number(phone_number)
                 if not user:
-                    raise NotFoundException("User with this phone number does not exist")
+                    raise core_exceptions.NotFoundException("User with this phone number does not exist")
             else:
-                raise BadRequestException("Either email or phone_number must be provided")
+                raise core_exceptions.BadRequestException("Either email or phone_number must be provided")
 
-            if not PasswordHandler.verify(user.password, password):
-                raise UnauthorizedException(message='Incorrect Password')
+            if not core_password.PasswordHandler.verify(user.password, password):
+                raise core_exceptions.UnauthorizedException(message='Incorrect Password')
             return Token(
-                access_token=JWTHandler.encode_access_token(payload={"sub": user.id, "role": user.role.name}),
-                refresh_token=JWTHandler.encode_refresh_token(payload={"sub": user.id, "role": user.role.name}),
+                access_token=core_security.JWTHandler.encode_access_token(
+                    payload={"sub": user.id, "role": user.role.name}),
+                refresh_token=core_security.JWTHandler.encode_refresh_token(
+                    payload={"sub": user.id, "role": user.role.name}),
             )
         except Exception:
             raise
 
     async def refresh_token(self, refresh_token: str) -> Token:
         try:
-            user_payload = JWTHandler.decode(refresh_token)
+            user_payload = core_security.JWTHandler.decode(refresh_token)
             if user_payload.get('type') != 'refresh':
-                raise BadRequestException('Invalid refresh token')
+                raise core_exceptions.BadRequestException('Invalid refresh token')
             user_id = user_payload.get('sub')
             user = await self.user_repo.get_by_user_id(user_id)
             if user is None:
-                raise UnauthorizedException(message="User not found")
+                raise core_exceptions.UnauthorizedException(message="User not found")
             return Token(
-                access_token=JWTHandler.encode_access_token(payload={"sub": user.id, "role": user.role.name}),
-                refresh_token=JWTHandler.encode_refresh_token(payload={"sub": user.id, "role": user.role.name}),
+                access_token=core_security.JWTHandler.encode_access_token(
+                    payload={"sub": user.id, "role": user.role.name}),
+                refresh_token=core_security.JWTHandler.encode_refresh_token(
+                    payload={"sub": user.id, "role": user.role.name}),
             )
         except Exception:
             raise
@@ -136,7 +147,7 @@ class AuthController:
     async def request_to_reset_password(self, email: str):
         try:
             user = await self._get_user_by_email(email)
-            reset_token = JWTHandler.encode_email_token(
+            reset_token = core_security.JWTHandler.encode_email_token(
                 payload={"sub": user.id, "type": "password_reset"},
             )
 
@@ -156,22 +167,22 @@ class AuthController:
 
             return {"message": "Password reset instructions sent to your email"}
         except Exception as e:
-            raise BadRequestException(str(e))
+            raise core_exceptions.BadRequestException(str(e))
 
     async def reset_password(self, token: str, new_password: str) -> dict:
         async with self.session.begin():
             try:
-                payload = JWTHandler.decode(token)
+                payload = core_security.JWTHandler.decode(token)
                 if payload.get('type') != 'password_reset':
-                    raise BadRequestException('Invalid password reset token')
+                    raise core_exceptions.BadRequestException('Invalid password reset token')
 
                 user_id = payload.get('sub')
                 user = await self.user_repo.get_by_user_id(user_id)
 
                 if user is None:
-                    raise BadRequestException('User not found')
+                    raise core_exceptions.BadRequestException('User not found')
 
-                password_hash = PasswordHandler.hash(new_password)
+                password_hash = core_password.PasswordHandler.hash(new_password)
                 await self.user_repo.update_user(user.id, {'password': password_hash})
 
                 # Send confirmation email
@@ -189,21 +200,21 @@ class AuthController:
                 )
 
                 return {"message": "Password reset successfully"}
-            except BadRequestException as e:
+            except core_exceptions.BadRequestException as e:
                 raise e
             except Exception as e:
-                raise BadRequestException(str(e))
+                raise core_exceptions.BadRequestException(str(e))
 
-    async def _get_user_by_email(self, email: str) -> User:
+    async def _get_user_by_email(self, email: str) -> models.User:
         try:
             user = await self.user_repo.get_by_email(email)
             if user is None:
-                raise BadRequestException(message='User not found')
+                raise core_exceptions.BadRequestException(message='User not found')
             return user
         except Exception:
             raise
 
-    async def get_current_user(self, user_id: int) -> User:
+    async def get_current_user(self, user_id: int) -> models.User:
         try:
             user = await self.user_repo.get_current_user(user_id)
             return user
@@ -213,27 +224,29 @@ class AuthController:
     async def verify_email(self, token: str) -> dict:
         try:
             async with self.session.begin():
-                payload = JWTHandler.decode(token)
+                payload = core_security.JWTHandler.decode(token)
                 print(payload)
                 if payload.get('type') != 'verification':
-                    raise BadRequestException('Invalid verification token')
+                    raise core_exceptions.BadRequestException('Invalid verification token')
 
                 email = payload.get('sub')
                 user = await self.user_repo.get_by_email(email)
 
                 if user is None:
-                    raise BadRequestException('User not found')
+                    raise core_exceptions.BadRequestException('User not found')
                 if user.is_verified:
-                    raise BadRequestException('Email already verified')
+                    raise core_exceptions.BadRequestException('Email already verified')
 
                 await self.user_repo.update_user(user.id, {'is_verified': True})
                 return Token(
-                    access_token=JWTHandler.encode_access_token(payload={"sub": user.id, "role": user.role.name}),
-                    refresh_token=JWTHandler.encode_refresh_token(payload={"sub": user.id, "role": user.role.name}),
+                    access_token=core_security.JWTHandler.encode_access_token(
+                        payload={"sub": user.id, "role": user.role.name}),
+                    refresh_token=core_security.JWTHandler.encode_refresh_token(
+                        payload={"sub": user.id, "role": user.role.name}),
                 )
         except Exception as e:
             await self.session.rollback()
-            raise BadRequestException(str(e))
+            raise core_exceptions.BadRequestException(str(e))
 
     async def google_auth(self, request: Request):
         """
@@ -295,15 +308,20 @@ class AuthController:
         async with self.session.begin():
             user = await self.user_repo.get_by_email(user_info.get("email"))
             if user is None:
-                role = await self.role_repo.get_role_by_name(RoleEnum.ADMIN)
-                password_hash = PasswordHandler.hash(str(uuid4()))
-                user = await self.user_repo.create_user({
-                    'email': user_info.get("email"),
-                    'password': password_hash,
-                    'role_id': role.id
-                })
+                role = await self.role_repo.get_role_by_name(models.RoleEnum.ADMIN)
+                password_hash = core_password.PasswordHandler.hash(str(uuid4()))
+                user = await self.user_repo.create_user(
+                    {
+                        'email': user_info.get("email"),
+                        'password': password_hash,
+                        'role_id': role.id
+                    }
+                )
                 organization = await self.organization_repo.add(
-                    {'name': 'Top Company', 'email': user_info.get("email")})
+                    {
+                        'name': 'Top Company', 'email': user_info.get("email")
+                    }
+                )
                 await self.session.flush()
                 await self.organization_member_repo.add(
                     organization.id,
@@ -317,9 +335,12 @@ class AuthController:
                     'atl_tokens': 100,
                     'free_trial': True
                 })
-            user_role = user.role if user.role is not None else await self.role_repo.get_role_by_name(RoleEnum.ADMIN)
-            access_token = JWTHandler.encode_access_token(payload={"sub": user.id, "role": user_role.name})
-            refresh_token = JWTHandler.encode_refresh_token(payload={"sub": user.id, "role": user_role.name})
+            user_role = user.role if user.role is not None else await self.role_repo.get_role_by_name(
+                models.RoleEnum.ADMIN)
+            access_token = core_security.JWTHandler.encode_access_token(
+                payload={"sub": user.id, "role": user_role.name})
+            refresh_token = core_security.JWTHandler.encode_refresh_token(
+                payload={"sub": user.id, "role": user_role.name})
         return {
             'access_token': access_token,
             'refresh_token': refresh_token

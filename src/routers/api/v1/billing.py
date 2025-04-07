@@ -22,13 +22,14 @@ async def topup_balance(
 
 
 @billing_router.post('/buy-subscription')
+@require_roles([RoleEnum.ADMIN.value])
 async def buy_subscription(
         billing_request: BuySubscription,
         billing_controller: BillingController = Depends(Factory.get_billing_controller),
         current_user: dict = Depends(get_current_user)
 ) -> dict:
     user_id = current_user.get('sub')
-    return await billing_controller.buy_subscription(user_id, billing_request)
+    return await billing_controller.buy_subscription(user_id, billing_request.dict())
 
 
 @billing_router.post('/billing-status')

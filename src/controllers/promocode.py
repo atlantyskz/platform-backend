@@ -3,11 +3,9 @@ import string
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.core.exceptions import BadRequestException
-from src.core.telegram_cli import TelegramCli
-from src.repositories.promocode import PromoCodeRepository
-from src.repositories.user_cache_balance import UserCacheBalanceRepository
-from src.repositories.user_subs import UserSubsRepository
+from src import repositories
+from src.core import exceptions
+from src.services.telegram_cli import TelegramCli
 
 
 def generate_promo_code():
@@ -18,34 +16,39 @@ def generate_promo_code():
 class PromoCodeController:
     def __init__(self, session: AsyncSession):
         self.session = session
-        self.promocode_repo = PromoCodeRepository(session)
-        self.user_subs_repo = UserSubsRepository(session)
-        self.user_cache_balance_repo = UserCacheBalanceRepository(session)
+        self.promo_code_repository = repositories.PromoCodeRepository(session)
+        self.cash_balance_repository = repositories.CashBalanceRepository(session)
+        self.organization_subscription_repository = repositories.OrganizationSubscriptionRepository(session)
 
-    async def generate_promocode(self, user_id: int, data: dict):
-        db_promocode = await self.promocode_repo.get_user_promo_code(user_id)
-        if db_promocode is not None:
-            raise BadRequestException("Promocode already exists")
+    async def generate_promo_code(self, user_id: int, data: dict):
+        db_promo_code = await self.promo_code_repository.get_user_promo_code(user_id)
+        if db_promo_code is not None:
+            raise exceptions.BadRequestException("Promo code already exists")
 
-        generated_promocode = generate_promo_code()
-        while await self.promocode_repo.get_promo_code(generated_promocode) is not None:
-            generated_promocode = generate_promo_code()
+        generated_promo_code = generate_promo_code()
+        while await self.promo_code_repository.get_promo_code(generated_promo_code) is not None:
+            generated_promo_code = generate_promo_code()
 
         async with self.session:
-            await self.promocode_repo.create_promo_code({
-                "user_id": user_id,
-                "promo_code": generated_promocode,
-                **data,
-            })
-
-            cache_balance = await self.user_cache_balance_repo.get_cache_balance(user_id)
-            if cache_balance is None:
-                await self.user_cache_balance_repo.create_cache_balance({
+            await self.promo_code_repository.create_promo_code(
+                {
                     "user_id": user_id,
-                    "balance": 0
-                })
+                    "promo_code": generated_promo_code,
+                    **data,
+                }
+            )
+
+            cash_balance = await self.cash_balance_repository.cash_balance(user_id)
+            if cash_balance is None:
+                await self.cash_balance_repository.create_cash_balance(
+                    {
+                        "user_id": user_id,
+                        "balance": 0
+                    }
+                )
 
             await self.session.commit()
+
         name = data.get("name", "Неизвестно")
         phone = data.get("phone_number", "Неизвестно")
         email = data.get("email", "Неизвестно")
@@ -54,40 +57,38 @@ class PromoCodeController:
         await TelegramCli().send_message(message, "feature")
 
         return {
-            "promo_code": generated_promocode,
+            "promo_code": generated_promo_code,
             "detail": "Successfully created promo code"
         }
 
     async def get_user_promo_code(self, user_id: int):
-        db_promocode = await self.promocode_repo.get_user_promo_code(user_id)
-        if db_promocode is None:
-            raise BadRequestException("Promo code does not exist")
-        return db_promocode
+        promo_code = await self.promo_code_repository.get_user_promo_code(user_id)
+        if promo_code is None:
+            raise exceptions.BadRequestException("Promo code does not exist")
+        return promo_code
 
-    async def update_promocode(self, user_id: int, data: dict):
-        db_promocode = await self.promocode_repo.get_user_promo_code(user_id)
-        if db_promocode is None:
-            raise BadRequestException("Promo code does not exist")
+    async def update_promo_code(self, user_id: int, data: dict):
+        promo_code = await self.promo_code_repository.get_user_promo_code(user_id)
+        if promo_code is None:
+            raise exceptions.BadRequestException("Promo code does not exist")
         async with self.session:
-            await self.promocode_repo.update_promo_code(db_promocode.id, data)
+            await self.promo_code_repository.update_promo_code(promo_code.id, data)
             await self.session.commit()
         return {"detail": "Successfully updated promo code detail"}
 
-    async def analyze_promocode(self, user_id: int):
-        user_cache_balance = await self.user_cache_balance_repo.get_cache_balance(user_id)
+    async def analyze_promo_code(self, user_id: int):
+        user_cache_balance = await self.cash_balance_repository.cash_balance(user_id)
         if not user_cache_balance:
             return {"error": "No cache balance found"}
 
-        data = user_cache_balance.__dict__.copy()
-        data['analyze'] = await self.user_subs_repo.analyze_subscription(user_id)
-        if "id" in data:
-            data.pop("id")
-        if "user_id" in data:
-            data.pop("user_id")
-        return data
+        analyze = await self.organization_subscription_repository.analyze_subscription(user_id)
+        return {
+            "balance": user_cache_balance.balance,
+            "analyze": analyze
+        }
 
-    async def check_promocode(self, promo_code: str):
-        db_promocode = await self.promocode_repo.get_promo_code(promo_code)
-        if db_promocode is None:
-            raise BadRequestException("Promo code does not exist")
-        return db_promocode
+    async def check_promo_code(self, promo_code: str):
+        promo_code = await self.promo_code_repository.get_promo_code(promo_code)
+        if promo_code is None:
+            raise exceptions.BadRequestException("Promo code does not exist")
+        return promo_code

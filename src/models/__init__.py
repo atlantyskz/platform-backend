@@ -5,7 +5,6 @@ from sqlalchemy.ext.declarative import declared_attr
 from sqlalchemy.orm import declarative_base, mapped_column
 
 
-
 class TimestampMixin:
     @declared_attr
     def created_at(cls):
@@ -22,6 +21,9 @@ class TimestampMixin:
 
 
 Base = declarative_base()
+
+from .role import RoleEnum
+
 from .user import User
 from .permission import Permission, role_permissions
 from .role import Role, role_permissions
@@ -46,10 +48,13 @@ from .interview_common_question import InterviewCommonQuestion
 from .interview_individual_question import InterviewIndividualQuestion
 
 from .promocode import PromoCode
-from .subscription import Subscription
-from .user_subs import UserSubs
-from .user_cache_balance import UserCacheBalance
+from .subscription_plan import SubscriptionPlan
+from .organization_subscription import OrganizationSubscription
+from .cash_balance import CashBalance
 from .bank_cards import BankCard
+from .whatsapp_instance import WhatsappInstance
+from .current_whatsapp_instance import CurrentWhatsappInstance
+from .whatsapp_instance import user_instance_association
 
 sql_admin_models_list = [
     User,
@@ -73,8 +78,10 @@ sql_admin_models_list = [
     InterviewCommonQuestion,
     InterviewIndividualQuestion,
     PromoCode,
-    Subscription,
-    UserSubs,
-    UserCacheBalance,
-    BankCard
+    SubscriptionPlan,
+    OrganizationSubscription,
+    CashBalance,
+    BankCard,
+    WhatsappInstance,
+    CurrentWhatsappInstance,
 ]
