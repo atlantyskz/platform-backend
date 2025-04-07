@@ -116,9 +116,6 @@ class WhatsappInstanceController:
             db_instance.instance_id,
             db_instance.instance_token
         )
-        if not state_resp.get("success"):
-            raise exceptions.BadRequestException(f"Error fetching instance state: {state_resp.get('error')}")
-
         state = state_resp.get("state_instance")
         if state in ("notAuthorized", "sleepMode"):
             return await self.green_api.get_qr_code(db_instance.instance_id, db_instance.instance_token)

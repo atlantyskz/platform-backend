@@ -42,10 +42,6 @@ async def show_qr_code(
 ):
     user_id = current_user.get("sub")
     result = await whatsapp_instance.get_instance_qr_code(user_id=user_id)
-    print(result)
-    if not result["success"]:
-        return {"detail": "Something went wrong"}
-
     base64_img = result["message"]
     return {"detail;": f"data:image/png;base64,{base64_img}"}
 
