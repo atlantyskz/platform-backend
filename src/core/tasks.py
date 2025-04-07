@@ -288,7 +288,10 @@ async def _process_send_whatsapp_messages(
         return
     print(resumes)
     for resume_record in resumes:
-        phone_number = resume_record.phone_number
+        resume_data = resume_record.result_data.get("candidate_info", {})
+        phone_number = resume_data.get("contacts", {}).get("phone_number", "")
+        if not phone_number:
+            continue
         cleaned_number = "".join([i for i in phone_number if i.isdigit()])
         if cleaned_number.startswith("8"):
             cleaned_number = "7" + cleaned_number[1:]
