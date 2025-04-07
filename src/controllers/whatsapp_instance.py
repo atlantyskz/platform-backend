@@ -83,6 +83,7 @@ class WhatsappInstanceController:
                 whatsapp_instance_id=created.id
             )
         )
+        await self.current_instance_repo.set_current_instance(user_id, created.id)
         await self.session.commit()
 
         return {"detail": "WhatsApp instance created successfully"}
