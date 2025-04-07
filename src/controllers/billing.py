@@ -205,13 +205,13 @@ class BillingController:
                             await self.balance_repository.topup_balance(
                                 billing_transaction.organization_id, billing_transaction.atl_tokens
                             )
-                        await self.session.flush()
                         await self.billing_transaction_repository.update(
                             billing_transaction.id,
                             {
                                 "status": "charged"
                             }
                         )
+                        await self.session.flush()
                         return {"status": "charged"}
 
                     else:
@@ -458,7 +458,7 @@ class BillingController:
                 "promo_id": promo_code.id if promo_code else None,
             }
             billing_transaction = await self.billing_transaction_repository.create(billing_transaction_data)
-
+            await self.session.flush()
             if promo_code:
                 promo_owner_id = promo_code.user_id
 
@@ -470,6 +470,7 @@ class BillingController:
                             "balance": 0,
                         }
                     )
+                    await self.session.flush()
 
                 await self.cash_balance_repository.update_cache_balance(
                     user_id=promo_owner_id,
@@ -477,6 +478,7 @@ class BillingController:
                         "balance": promo_owner_cache_balance.balance + (subscription.price * 0.25),
                     }
                 )
+                await self.session.flush()
             return {
                 "id": billing_transaction.id,
                 "amount": billing_transaction.amount,
