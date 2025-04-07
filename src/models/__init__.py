@@ -55,6 +55,7 @@ from .bank_cards import BankCard
 from .whatsapp_instance import WhatsappInstance
 from .current_whatsapp_instance import CurrentWhatsappInstance
 from .whatsapp_instance import user_instance_association
+from .user_interaction import UserInteraction
 
 sql_admin_models_list = [
     User,
@@ -84,4 +85,5 @@ sql_admin_models_list = [
     BankCard,
     WhatsappInstance,
     CurrentWhatsappInstance,
+    UserInteraction,
 ]
