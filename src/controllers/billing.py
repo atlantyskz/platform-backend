@@ -478,7 +478,7 @@ class BillingController:
                     }
                 )
                 await self.session.flush()
-
+            await self.session.commit()
             return {
                 "id": billing_transaction.id,
                 "amount": billing_transaction.amount,

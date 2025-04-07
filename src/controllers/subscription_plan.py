@@ -14,7 +14,7 @@ class SubscriptionPlanController:
         return await self.subscription_plan_repository.get_subscription_plans()
 
     async def get_organization_active_subscription(self, user_id):
-        organization = await self.organization_repository.get_organization(user_id)
+        organization = await self.organization_repository.get_user_organization(user_id)
         if organization is None:
             raise exceptions.NotFoundException("Organization not found")
 
