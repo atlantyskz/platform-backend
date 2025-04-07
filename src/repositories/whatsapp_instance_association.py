@@ -10,7 +10,7 @@ from src import models
 @dataclass
 class WhatsappInstanceAssociation:
     user_id: int
-    organization_instance_id: int
+    whatsapp_instance_id: int
 
 
 class WhatsappInstanceAssociationRepository:

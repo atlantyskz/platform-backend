@@ -80,7 +80,7 @@ class WhatsappInstanceController:
         await self.association_repo.add_sub_instance(
             data=repositories.WhatsappInstanceAssociation(
                 user_id=user_id,
-                organization_instance_id=created.id
+                whatsapp_instance_id=created.id
             )
         )
         await self.session.commit()
