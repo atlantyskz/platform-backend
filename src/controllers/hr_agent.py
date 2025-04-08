@@ -406,7 +406,7 @@ class HRAgentController:
                 raise BadRequestException("You must upload a file or provide text")
             if len(resumes) == 0:
                 raise BadRequestException("You must upload resume files")
-            if len(resumes) > 100:
+            if len(resumes) > 5000:
                 raise BadRequestException("Too many resume files. Max number of resume files is 100")
 
             # Извлечение текста из вакансии

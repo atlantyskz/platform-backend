@@ -11,12 +11,13 @@ from src.core.celery_config import celery_app
 from src.core.databases import session_manager
 from src.core.redis_cli import redis_client
 from src.models.balance import Balance
-from src.repositories import WhatsappInstanceRepository, CurrentWhatsappInstanceRepository
+from src.repositories import WhatsappInstanceRepository, CurrentWhatsappInstanceRepository, OrganizationRepository
 from src.repositories.balance import BalanceRepository
 from src.repositories.balance_usage import BalanceUsageRepository
 from src.repositories.favorite_resume import FavoriteResumeRepository
 from src.repositories.interview_individual_question import InterviewIndividualQuestionRepository
 from src.repositories.user_interaction_repository import UserInteractionRepository
+from src.repositories.vacancy import VacancyRepository
 from src.services.green_api_instance_cli import GreenApiInstanceCli
 from src.services.request_sender import RequestSender
 
@@ -260,69 +261,85 @@ def bulk_send_whatsapp_message(session_id, user_id):
 
 
 async def _process_send_whatsapp_messages(
-        session_id,
-        user_id,
-):
+        session_id: str,
+        user_id: int
+) -> None:
     postgres = session_manager
 
     async with postgres.session() as session:
         favorite_repo = FavoriteResumeRepository(session)
         whatsapp_instance_repo = WhatsappInstanceRepository(session)
         current_instance_repo = CurrentWhatsappInstanceRepository(session)
-        user_interaction_repo = UserInteractionRepository(session)  # <-- добавим
+        user_interaction_repo = UserInteractionRepository(session)
+        organization_repo = OrganizationRepository(session)
+        vacancy_repo = VacancyRepository(session)
+
         green_api_instance_client = GreenApiInstanceCli()
 
-    current_instance_id = await current_instance_repo.get_current_instance_id(user_id)
-    if not current_instance_id:
-        logger.info("No current instance found for user_id=%s", user_id)
-        return
+        current_instance_id = await current_instance_repo.get_current_instance_id(user_id)
+        if not current_instance_id:
+            logger.info("Не найден текущий WhatsApp-инстанс для user_id=%s", user_id)
+            return
 
-    whatsapp_instance = await whatsapp_instance_repo.get_by_id(current_instance_id)
-    if not whatsapp_instance:
-        logger.info("WhatsApp instance not found by ID=%s", current_instance_id)
-        return
+        whatsapp_instance = await whatsapp_instance_repo.get_by_id(current_instance_id)
+        if not whatsapp_instance:
+            logger.info("WhatsApp-инстанс не найден по ID=%s", current_instance_id)
+            return
 
-    resumes = await favorite_repo.get_favorite_resumes_by_session_id(session_id)
-    if not resumes:
-        logger.info("No favorite resumes found for session_id=%s", session_id)
-        return
-    print(resumes)
-    for resume_record in resumes:
-        resume_data = resume_record.result_data.get("candidate_info", {})
-        phone_number = resume_data.get("contacts", {}).get("phone_number", "")
-        if not phone_number:
-            phone_number = "77762838451"
-        cleaned_number = "".join([i for i in phone_number if i.isdigit()])
-        if cleaned_number.startswith("8"):
-            cleaned_number = "7" + cleaned_number[1:]
-        chat_id = f"{cleaned_number}@c.us"
+        resumes = await favorite_repo.get_favorite_resumes_by_session_id(session_id)
+        if not resumes:
+            logger.info("Нет избранных резюме для session_id=%s", session_id)
+            return
 
-        existing_interaction = await user_interaction_repo.get_not_answered_by_chat(
-            chat_id, "RESUME_OFFER"
-        )
-        if existing_interaction:
-            logger.info(
-                "Skipping new message to %s, since there's an unanswered interaction id=%s",
-                chat_id, existing_interaction.id
+        organization = await organization_repo.get_user_organization(user_id)
+        vacancy = await vacancy_repo.get_by_session_id(session_id)
+
+        for resume_record in resumes:
+            resume_data = resume_record.result_data.get("candidate_info", {})
+            full_name = resume_data.get("fullname", "")
+            phone_number = resume_data.get("contacts", {}).get("phone_number", "")
+
+            if not phone_number:
+                phone_number = "77762838451"
+
+            cleaned_number = "".join([ch for ch in phone_number if ch.isdigit()])
+            if cleaned_number.startswith("8"):
+                cleaned_number = "7" + cleaned_number[1:]
+
+            chat_id = f"{cleaned_number}@c.us"
+
+            existing_interaction = await user_interaction_repo.get_not_answered_by_chat(
+                chat_id,
+                "RESUME_OFFER"
             )
-            continue
+            if existing_interaction:
+                logger.info(
+                    "Пропускаем отправку нового сообщения на %s, т.к. есть неотвеченное взаимодействие с id=%s",
+                    chat_id,
+                    existing_interaction.id
+                )
+                continue
 
-        await green_api_instance_client.send_poll(
-            data={
-                "chat_id": chat_id,
-                "message": "Добрый день! Мы рассмотрели ваше резюме. Хотите обсудить детали?",
-                "options": [
-                    {"optionName": "Продолжить"},
-                    {"optionName": "Не интересует"}
-                ]
-            },
-            instance_id=whatsapp_instance.instance_id,
-            instance_token=whatsapp_instance.instance_token
-        )
+            text_message = (
+                f"Добрый день, {full_name}! Я — AI-рекрутер компании {organization.name}.\n"
+                f"Вы откликались на нашу вакансию «{vacancy.title}». Мы внимательно изучили ваше резюме "
+                f"и хотели бы обсудить дальнейшие шаги. \n\n"
+                f"Нажмите 1, чтобы продолжить, или 2, если не хотите продолжать общение."
+            )
 
-        await user_interaction_repo.create_interaction(
-            chat_id=chat_id,
-            session_id=session_id,
-            message_type="RESUME_OFFER"
-        )
-        await session.commit()
+            await green_api_instance_client.send_message(
+                data={
+                    "chat_id": chat_id,
+                    "message": text_message
+                },
+                instance_id=whatsapp_instance.instance_id,
+                instance_token=whatsapp_instance.instance_token
+            )
+
+            await user_interaction_repo.create_interaction(
+                chat_id=chat_id,
+                session_id=session_id,
+                message_type="RESUME_OFFER"
+            )
+
+            await session.commit()
