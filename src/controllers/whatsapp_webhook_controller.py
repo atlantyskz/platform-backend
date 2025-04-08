@@ -19,7 +19,7 @@ class WhatsappWebhookController:
         instance_wid = data.get("instanceData", {}).get("wid")
         sender_chat_id = data.get("senderData", {}).get("chatId")
 
-        whatsapp_instance = await self.whatsapp_instance_repo.get_by_instance_id(instance_id)
+        whatsapp_instance = await self.whatsapp_instance_repo.get_by_instance_id(str(instance_id))
 
         if webhook_type == "pollAnswer":
             return await self._handle_poll_answer(data, whatsapp_instance)
