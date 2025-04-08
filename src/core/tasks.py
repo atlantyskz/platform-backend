@@ -256,8 +256,12 @@ async def _update_redis_task_status(user_id, session_id, status):
 
 @celery_app.task
 def bulk_send_whatsapp_message(session_id, user_id):
-    logger.info("bulk_send_whatsapp_message called for session_id=%s.", session_id)
-    asyncio.run(_process_send_whatsapp_messages(session_id, user_id))
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        loop.run_until_complete(_process_send_whatsapp_messages(session_id, user_id))
+    finally:
+        loop.close()
 
 
 async def _process_send_whatsapp_messages(
