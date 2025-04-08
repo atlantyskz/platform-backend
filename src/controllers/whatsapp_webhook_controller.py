@@ -20,12 +20,9 @@ class WhatsappWebhookController:
         sender_chat_id = data.get("senderData", {}).get("chatId")
 
         whatsapp_instance = await self.whatsapp_instance_repo.get_by_instance_id(str(instance_id))
-
-        if webhook_type == "pollAnswer":
-            return await self._handle_poll_answer(data, whatsapp_instance)
-
+        print(whatsapp_instance)
         if webhook_type == "incomingMessageReceived":
-            return {"status": "text_message_ignored"}
+            return await self._handle_poll_answer(data, whatsapp_instance)
 
         return {"status": "ignored"}
 
