@@ -1,11 +1,7 @@
-import logging
-
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src import repositories
 from src.services.green_api_instance_cli import GreenApiInstanceCli
-
-logger = logging.getLogger(__name__)
 
 
 class WhatsappWebhookController:
@@ -42,23 +38,31 @@ class WhatsappWebhookController:
             return {"error": "Invalid poll answer data"}
 
         interaction = await self.user_interaction_repo.get_not_answered_by_chat(
-            chat_id, "RESUME_OFFER"
+            chat_id,
+            "RESUME_OFFER"
         )
         if interaction:
             await self.user_interaction_repo.mark_answered(interaction.id, answer)
+        if answer == "1":
+            reply = (
+                "Отлично! Давайте обсудим детали. "
+                "Расскажите немного о себе, чтобы мы могли двигаться дальше."
+            )
+        elif answer == "2":
+            reply = (
+                "Спасибо за честный ответ. Если в будущем захотите продолжить общение, "
+                "мы будем рады с вами связаться."
+            )
+        else:
+            reply = (
+                "Пожалуйста, отправьте «1» или «2», чтобы выбрать один из вариантов."
+            )
 
-        reply = None
-        if answer == "Продолжить":
-            reply = "Отлично! Давайте обсудим детали. Расскажите немного о себе."
-        elif answer == "Не интересует":
-            reply = "Спасибо за честный ответ. Если что — будем на связи."
-
-        if reply:
-            if instance:
-                await self.green_api_instance_client.send_message(
-                    data={"chat_id": chat_id, "message": reply},
-                    instance_id=instance.instance_id,
-                    instance_token=instance.instance_token
-                )
+        if instance and reply:
+            await self.green_api_instance_client.send_message(
+                data={"chat_id": chat_id, "message": reply},
+                instance_id=instance.instance_id,
+                instance_token=instance.instance_token
+            )
 
         return {"status": f"poll_answer_received: {answer}"}
