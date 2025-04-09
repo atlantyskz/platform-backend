@@ -16,9 +16,9 @@ dramatiq.set_broker(redis_broker)
 
 class DramatiqWorker:
 
+    @staticmethod
     @dramatiq.actor(max_retries=3, min_backoff=1000)
     async def process_resume(
-            self,
             task_id: str,
             vacancy_text: str,
             resume_text: str,
