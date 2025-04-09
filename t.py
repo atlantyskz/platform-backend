@@ -23,7 +23,10 @@ def format_experience(experiences: List[Dict[str, Any]]) -> str:
 def format_education(education: Dict[str, Any]) -> str:
     if not education:
         return "Образование не указано."
-    level = education.get("level", {}).get("name", "не указан")
+    print(education)
+    level = education.get("level", {})
+    if level:
+        level = level.get("name", "не указан")
     primary = education.get("primary", [])
     lines = [f"Уровень: {level}."]
     if primary:
