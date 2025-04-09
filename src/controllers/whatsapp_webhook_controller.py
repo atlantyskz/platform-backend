@@ -27,10 +27,12 @@ class WhatsappWebhookController:
         whatsapp_instance = await self.whatsapp_instance_repo.get_by_instance_id(instance_id)
 
         sender = await self.user_interaction_repo.get_interaction_by_chat_id(sender_chat_id, whatsapp_instance.id)
+        print(sender)
         if not sender:
             return {}
 
         if webhook_type == "incomingMessageReceived":
+            print(data)
             return await self._handle_incoming_message(data, whatsapp_instance)
 
         if webhook_type == "pollAnswer":
@@ -52,10 +54,12 @@ class WhatsappWebhookController:
         )
         if not interaction:
             return {"status": "no_interaction"}
+        print(interaction)
         if interaction.is_answered:
             return {"status": "already_answered"}
 
         if interaction.created_at + timedelta(hours=24) < datetime.utcnow():
+            print("HELLLLLOOOOO")
             return {"status": "time expired"}
 
         user_answer = message_text.strip()
