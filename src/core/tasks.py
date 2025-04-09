@@ -315,7 +315,7 @@ async def _process_send_whatsapp_messages(
 
             existing_interaction = await user_interaction_repo.get_not_answered_by_chat(
                 chat_id,
-                whatsapp_instance.instance_id,
+                whatsapp_instance.id,
                 "RESUME_OFFER"
             )
 
@@ -337,7 +337,7 @@ async def _process_send_whatsapp_messages(
                     )
                     await user_interaction_repo.update_interaction(
                         chat_id,
-                        whatsapp_instance.instance_id,
+                        whatsapp_instance.id,
                         {"is_answered": False}
                     )
             else:
@@ -359,7 +359,7 @@ async def _process_send_whatsapp_messages(
 
             await user_interaction_repo.create_interaction(
                 chat_id=chat_id,
-                instance_id=whatsapp_instance.instance_id,
+                instance_id=whatsapp_instance.id,
                 message_type="RESUME_OFFER"
             )
 
