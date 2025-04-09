@@ -37,7 +37,7 @@ class UserInteractionRepository:
         result = await self.session.execute(stmt)
         return result.scalars().first()
 
-    async def mark_answered(self, interaction_id: int):
+    async def mark_answered(self, interaction_id: int, is_answered: bool):
         stmt = (
             update(
                 UserInteraction)
@@ -45,7 +45,7 @@ class UserInteractionRepository:
                 UserInteraction.id == interaction_id
             )
             .values(
-                is_answered=True
+                is_answered=is_answered
             )
         )
         await self.session.execute(stmt)

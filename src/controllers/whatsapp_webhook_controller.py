@@ -1,3 +1,5 @@
+from datetime import datetime, timedelta
+
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src import repositories
@@ -16,81 +18,66 @@ class WhatsappWebhookController:
         self.green_api_instance_client = GreenApiInstanceCli()
         self.session_repository = repositories.AssistantSessionRepository(session)
 
-        print("[INIT] Репозитории и GreenApiInstanceCli инициализированы")
-
     async def handle_incoming_webhook(self, data: dict) -> dict:
-        print("[handle_incoming_webhook] Получены данные вебхука:", data)
         webhook_type = data.get("typeWebhook")
 
-        instance_id = data.get("instanceData", {}).get("idInstance")
+        instance_id = str(data.get("instanceData", {}).get("idInstance"))
         instance_wid = data.get("instanceData", {}).get("wid")
         sender_chat_id = data.get("senderData", {}).get("chatId")
+        whatsapp_instance = await self.whatsapp_instance_repo.get_by_instance_id(instance_id)
 
-        print("[handle_incoming_webhook] webhook_type:", webhook_type)
-        print("[handle_incoming_webhook] instance_id:", instance_id)
-        print("[handle_incoming_webhook] instance_wid:", instance_wid)
-        print("[handle_incoming_webhook] sender_chat_id:", sender_chat_id)
-        whatsapp_instance = await self.whatsapp_instance_repo.get_by_instance_id(str(instance_id))
-
-        print("[handle_incoming_webhook] WhatsApp Instance:", whatsapp_instance)
-        sender = await self.user_interaction_repo.get_interaction_by_chat_id(sender_chat_id)
+        sender = await self.user_interaction_repo.get_interaction_by_chat_id(sender_chat_id, whatsapp_instance.id)
         if not sender:
             return {}
 
         if webhook_type == "incomingMessageReceived":
-            print("[handle_incoming_webhook] Обнаружено входящее сообщение, обрабатываем")
             return await self._handle_incoming_message(data, whatsapp_instance)
 
         if webhook_type == "pollAnswer":
-            print("[handle_incoming_webhook] Обнаружен pollAnswer")
             return await self._handle_poll_answer(data, whatsapp_instance)
 
-        print("[handle_incoming_webhook] Другой тип вебхука, игнорируем")
         return {"status": "ignored"}
 
     async def _handle_incoming_message(self, data: dict, instance) -> dict:
-        print("[_handle_incoming_message] Старт обработки входящего сообщения:", data)
-
         chat_id = data["senderData"].get("chatId")
         message_text = data.get("messageData", {}).get("textMessageData", {}).get("textMessage", "")
-        print("[_handle_incoming_message] chat_id:", chat_id)
-        print("[_handle_incoming_message] message_text:", message_text)
 
         if not chat_id or not message_text:
-            print("[_handle_incoming_message] Нет chat_id или пустое сообщение — выходим.")
             return {"status": "no_chat_id_or_text"}
 
         interaction = await self.user_interaction_repo.get_not_answered_by_chat(
             chat_id,
+            instance.id,
             "RESUME_OFFER"
         )
-        print("[_handle_incoming_message] Найдено взаимодействие:", interaction)
-
         if not interaction:
-            print("[_handle_incoming_message] Нет незавершённого взаимодействия — игнорируем.")
             return {"status": "no_interaction"}
+        if interaction.is_answered:
+            return {"status": "already_answered"}
+
+        if interaction.created_at + timedelta(hours=24) < datetime.utcnow():
+            return {"status": "time expired"}
 
         user_answer = message_text.strip()
+
         if user_answer == "1":
             reply = (
-                "Отлично! Давайте обсудим детали. "
-                "Расскажите немного о себе, чтобы мы могли двигаться дальше."
+                "Отлично! Давайте обсудим детали онлайн. "
+                "Пожалуйста выберите удобное вам время для звонка"
+                "https://calendly.com/main-atlantys/30min"
             )
-            await self.user_interaction_repo.mark_answered(interaction.id, "1")
+            await self.user_interaction_repo.mark_answered(interaction.id, True)
 
         elif user_answer == "2":
             reply = (
                 "Спасибо за честный ответ. Если в будущем захотите продолжить общение, "
                 "мы будем рады с вами связаться."
             )
-            await self.user_interaction_repo.mark_answered(interaction.id, "2")
+            await self.user_interaction_repo.mark_answered(interaction.id, False)
 
         else:
             reply = "Пожалуйста, отправьте «1» или «2», чтобы выбрать один из вариантов."
-
-        print("[_handle_incoming_message] Итоговый ответ боту:", reply)
         if instance:
-            print("[_handle_incoming_message] Отправляем сообщение через Green API")
             await self.green_api_instance_client.send_message(
                 data={"chat_id": chat_id, "message": reply},
                 instance_id=instance.instance_id,
@@ -101,6 +88,4 @@ class WhatsappWebhookController:
         return {"status": "message_received", "reply": reply}
 
     async def _handle_poll_answer(self, data: dict, instance) -> dict:
-        print("[_handle_poll_answer] Обработка ответа на опрос. Исходные данные:", data)
-        # ...
         return {"status": "poll_answer_handled"}
