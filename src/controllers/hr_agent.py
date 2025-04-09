@@ -392,7 +392,7 @@ class HRAgentController:
             vacancy_text: Optional[str],
             resumes: List[UploadFile],
     ):
-        async with self.session.begin() as session:
+        async with self.session.begin():
             user_organization = await self.organization_repo.get_user_organization(user_id)
             if user_organization is None:
                 raise BadRequestException("You don't have an organization")
@@ -409,30 +409,34 @@ class HRAgentController:
             if len(resumes) > 5000:
                 raise BadRequestException("Too many resume files. Max number of resume files is 100")
 
-            # Извлечение текста из вакансии
             if vacancy_file:
                 vacancy_text = await self.text_extractor.extract_text(vacancy_file)
             elif vacancy_text:
                 vacancy_text = vacancy_text.strip()
             vacancy_hash = self.get_text_hash(vacancy_text)
 
-            # Работа с текстом вакансии
             existing_vacancy = await self.requirement_repo.get_text_by_hash(vacancy_hash)
             if existing_vacancy:
                 vacancy_text = existing_vacancy.requirement_text
             else:
-                await self.requirement_repo.create({
-                    "session_id": session_id,
-                    "requirement_hash": vacancy_hash,
-                    "requirement_text": vacancy_text
-                })
+                await self.requirement_repo.create(
+                    {
+                        "session_id": session_id,
+                        "requirement_hash": vacancy_hash,
+                        "requirement_text": vacancy_text
+                    }
+                )
 
-            # Извлечение текста из резюме
-            resume_texts = await asyncio.gather(*[self.text_extractor.extract_text(resume) for resume in resumes])
+            resume_texts = await asyncio.gather(
+                *[
+                    self.text_extractor.extract_text(
+                        resume
+                    ) for resume in resumes
+                ]
+            )
             for resume in resumes:
                 resume.file.seek(0)
 
-                # Уникализация текстов
             unique_hashes = set()
             unique_batch = []
 
@@ -451,11 +455,13 @@ class HRAgentController:
             minio_uploader = self.minio_service
 
             try:
-                file_info = await minio_uploader.save_files_in_minio(unique_resumes, session_id)
+                file_info = await minio_uploader.save_files_in_minio(
+                    unique_resumes,
+                    session_id
+                )
             except BadRequestException as e:
                 raise e
 
-            # Сохранение уникальных текстов и файлов
             total_files = len(unique_batch)
             processed_count = 0
             all_task_ids = []
@@ -474,10 +480,21 @@ class HRAgentController:
                     "file_key": str(file_key),
                 })
 
-                DramatiqWorker.process_resume.send(task_id, vacancy_text, resume_text, user_id, user_organization.id,
-                                                   balance.id, vacancy_text, )
+                DramatiqWorker.process_resume.send(
+                    task_id,
+                    vacancy_text,
+                    resume_text,
+                    user_id,
+                    user_organization.id,
+                    balance.id,
+                    vacancy_text
+                )
                 processed_count += 1
-                await self.send_progress(user_id, processed_count=processed_count, total_files=total_files)
+                await self.send_progress(
+                    user_id,
+                    processed_count=processed_count,
+                    total_files=total_files
+                )
                 all_task_ids.append(task_id)
 
             return {"session_id": session_id, "tasks": all_task_ids, "tasks_count": len(all_task_ids)}
@@ -623,7 +640,7 @@ class HRAgentController:
     async def get_cv_analyzer_result_by_session_id(self, session_id: str, user_id: int, offset: Optional[int],
                                                    limit: Optional[int]):
         results, total_results = await self.bg_backend.get_results_by_session_id(session_id, user_id, offset, limit)
-
+        is_completed = all([res[0].result_data is not None for res in results])
         return {
             "session_id": session_id,
             "results": [
@@ -640,7 +657,8 @@ class HRAgentController:
                 "offset": offset,
                 "limit": limit,
                 "total_pages": (total_results + limit - 1) // limit if limit else 1
-            }
+            },
+            "is_completed": is_completed
         }
 
     async def add_resume_to_favorites(self, user_id: int, resume_id: int):

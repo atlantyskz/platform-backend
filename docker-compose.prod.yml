@@ -47,7 +47,7 @@ services:
   worker:
     build: .
     container_name: worker
-    command: python -m dramatiq src.core.dramatiq_worker --processes 3 --threads 4
+    command: python -m dramatiq src.core.dramatiq_worker  --processes 2 --threads 20
     env_file:
       - .env
     networks:
@@ -58,6 +58,7 @@ services:
       - redis
       - postgres
     deploy:
+      replicas: 10
       resources:
         limits:
           memory: "3GB"

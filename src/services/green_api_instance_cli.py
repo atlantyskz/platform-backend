@@ -88,3 +88,14 @@ class GreenApiInstanceCli:
         except Exception as e:
             print(f"Error sending buttons to {data['chat_id']}: {str(e)}")
             return {"success": False, "error": str(e)}
+
+    async def get_chat_history(self, chat_id: str, instance_id: str, instance_token: str) -> dict:
+        url = f"{self.__api_url}/waInstance{instance_id}/getChatHistory{instance_token}?chatId={chat_id}"
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url, headers={"Content-Type": "application/json"}) as response:
+                    response.raise_for_status()
+                    return await response.json()
+        except Exception as e:
+            print(f"Error getting chat history: {str(e)}")
+            return {"success": False, "error": str(e)}

@@ -298,6 +298,7 @@ async def _process_send_whatsapp_messages(
         organization = await organization_repo.get_user_organization(user_id)
         vacancy = await vacancy_repo.get_by_session_id(session_id)
 
+        ignored = []
         for resume_record in resumes:
             resume_data = resume_record.result_data.get("candidate_info", {})
             full_name = resume_data.get("fullname", "")
@@ -314,22 +315,38 @@ async def _process_send_whatsapp_messages(
 
             existing_interaction = await user_interaction_repo.get_not_answered_by_chat(
                 chat_id,
+                whatsapp_instance.instance_id,
                 "RESUME_OFFER"
             )
-            if existing_interaction:
-                logger.info(
-                    "Пропускаем отправку нового сообщения на %s, т.к. есть неотвеченное взаимодействие с id=%s",
-                    chat_id,
-                    existing_interaction.id
-                )
-                continue
 
-            text_message = (
-                f"Добрый день, {full_name}! Я — AI-рекрутер компании {organization.name}.\n"
-                f"Вы откликались на нашу вакансию «{vacancy.title}». Мы внимательно изучили ваше резюме "
-                f"и хотели бы обсудить дальнейшие шаги. \n\n"
-                f"Нажмите 1, чтобы продолжить, или 2, если не хотите продолжать общение."
-            )
+            if existing_interaction:
+                if not existing_interaction.is_answered and datetime.utcnow() < existing_interaction.created_at + timedelta(
+                        hours=24):
+                    logger.info(
+                        "Пропускаем отправку нового сообщения на %s, т.к. есть неотвеченное взаимодействие с id=%s",
+                        chat_id,
+                        existing_interaction.id
+                    )
+                    ignored.append(existing_interaction.id)
+                    continue
+                else:
+                    text_message = (
+                        f"Здравствуйте, {full_name}! Это AI рекрутер из компании {organization.name}. "
+                        f"Рады снова с Вами связаться. Вы откликнулись на нашу вакансию «{vacancy.title}», "
+                        f"и мы были бы рады обсудить дальнейшие шаги лично. Напишите, пожалуйста, если у Вас возникли вопросы."
+                    )
+                    await user_interaction_repo.update_interaction(
+                        chat_id,
+                        whatsapp_instance.instance_id,
+                        {"is_answered": False}
+                    )
+            else:
+                text_message = (
+                    f"Добрый день, {full_name}! Я — AI-рекрутер компании {organization.name}.\n"
+                    f"Вы откликались на нашу вакансию «{vacancy.title}». Мы внимательно изучили ваше резюме "
+                    f"и хотели бы обсудить дальнейшие шаги. \n\n"
+                    f"Нажмите 1, чтобы продолжить, или 2, если не хотите продолжать общение."
+                )
 
             await green_api_instance_client.send_message(
                 data={
@@ -342,7 +359,7 @@ async def _process_send_whatsapp_messages(
 
             await user_interaction_repo.create_interaction(
                 chat_id=chat_id,
-                session_id=session_id,
+                instance_id=whatsapp_instance.instance_id,
                 message_type="RESUME_OFFER"
             )
 

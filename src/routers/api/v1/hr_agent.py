@@ -9,7 +9,6 @@ from httpx import AsyncClient, Timeout
 from src.controllers.hr_agent import HRAgentController
 from src.core.factory import Factory
 from src.core.middlewares.auth_middleware import get_current_user, get_current_user_ws
-from src.core.redis_cli import get_redis_client
 from src.schemas.requests.assistant import RenameRequest
 from src.schemas.requests.vacancy import VacancyTextUpdate
 from src.services.websocket import manager as ws_manager
@@ -122,6 +121,7 @@ async def generate_questions(
     task_id = await hr_agent_controller.generate_questions_for_candidate(session_id, current_user.get('sub'))
     return {"task_id": task_id}
 
+
 @hr_agent_router.post('/resume_analyze/add_to_favorites/{resume_id}', tags=["HR FAVORITE CANDIDATES"])
 async def add_resume_to_favorites(
         resume_id: int,
@@ -175,7 +175,9 @@ async def websocket_progress(websocket: WebSocket, user_id: int):
 async def session_creator(
         current_user: dict = Depends(get_current_user),
         title: str = Form(...),
-        hr_agent_controller: HRAgentController = Depends(Factory.get_hr_agent_controller)
+        hr_agent_controller: HRAgentController = Depends(
+            Factory.get_hr_agent_controller
+        )
 
 ):
     return await hr_agent_controller.session_creator(current_user.get('sub'), title)
@@ -184,7 +186,9 @@ async def session_creator(
 @hr_agent_router.get("/tasks/{task_id}/preview", tags=["HR RESUME ANALYZER"])
 async def preview_candidate_cv(
         task_id: str,
-        hr_agent_controller: HRAgentController = Depends(Factory.get_hr_agent_controller),
+        hr_agent_controller: HRAgentController = Depends(
+            Factory.get_hr_agent_controller
+        ),
 ):
     return await hr_agent_controller.preview_cv(task_id)
 
@@ -196,7 +200,9 @@ async def cv_analyzer(
         vacancy_requirement: UploadFile = File(None),
         vacancy_requirement_text: Optional[str] = Form(None),
         cv_files: List[UploadFile] = File(...),
-        hr_agent_controller: HRAgentController = Depends(Factory.get_hr_agent_controller),
+        hr_agent_controller: HRAgentController = Depends(
+            Factory.get_hr_agent_controller
+        ),
 ):
     if not session_id:
         session_id = None
@@ -205,7 +211,6 @@ async def cv_analyzer(
     total_files = len(cv_files)
     manager = ws_manager
 
-    # Отправляем начальное сообщение о старте загрузки
     if manager:
         await manager.send_json(user_id, {
             "type": "start",
@@ -228,11 +233,14 @@ async def cv_analyzer(
             "message": "Все файлы успешно обработаны"
         })
 
-    return await hr_agent_controller.cv_analyzer(current_user.get('sub'), session_id, vacancy_requirement,
-                                                 vacancy_requirement_text, cv_files, )
+    return await hr_agent_controller.cv_analyzer(
+        current_user.get('sub'),
+        session_id,
+        vacancy_requirement,
+        vacancy_requirement_text,
+        cv_files
+    )
 
-
-# return await hr_agent_controller.cv_analyzer(current_user.get('sub'), session_id, vacancy_requirement,vacancy_requirement_text, cv_files, title)
 
 @hr_agent_router.delete('/resume_analyze/{session_id}', tags=["HR RESUME ANALYZER"])
 async def delete_resume(
@@ -240,7 +248,10 @@ async def delete_resume(
         current_user: dict = Depends(get_current_user),
         hr_agent_controller: HRAgentController = Depends(Factory.get_hr_agent_controller)
 ):
-    return await hr_agent_controller.delete_resume_by_session_id(current_user.get('sub'), session_id)
+    return await hr_agent_controller.delete_resume_by_session_id(
+        current_user.get('sub'),
+        session_id
+    )
 
 
 @hr_agent_router.get('/resume_analyze/results/{session_id}', tags=["HR RESUME ANALYZER"])
@@ -251,8 +262,12 @@ async def get_session_results(
         hr_agent_controller: HRAgentController = Depends(Factory.get_hr_agent_controller),
         current_user: dict = Depends(get_current_user),
 ):
-    return await hr_agent_controller.get_cv_analyzer_result_by_session_id(session_id, current_user.get('sub'), offset,
-                                                                          limit)
+    return await hr_agent_controller.get_cv_analyzer_result_by_session_id(
+        session_id,
+        current_user.get('sub'),
+        offset,
+        limit
+    )
 
 
 @hr_agent_router.get('/resume_analyze/export_to_csv/{session_id}', tags=["HR RESUME ANALYZER"])
@@ -261,7 +276,9 @@ async def export_session_results(
         hr_agent_controller: HRAgentController = Depends(Factory.get_hr_agent_controller),
         current_user: dict = Depends(get_current_user),
 ):
-    return await hr_agent_controller.export_to_csv(session_id)
+    return await hr_agent_controller.export_to_csv(
+        session_id
+    )
 
 
 @hr_agent_router.get('/cv')
@@ -283,7 +300,10 @@ async def vacancy_ai_update(
         websocket: WebSocket,
         hr_agent_controller: HRAgentController = Depends(Factory.get_hr_agent_controller),
 ):
-    return await hr_agent_controller.ws_update_vacancy_by_ai(session_id, websocket)
+    return await hr_agent_controller.ws_update_vacancy_by_ai(
+        session_id,
+        websocket
+    )
 
 
 @hr_agent_router.websocket('/ws/resume_analyze/{session_id}')
@@ -293,7 +313,11 @@ async def resume_analyzer_chat(
         hr_agent_controller: HRAgentController = Depends(Factory.get_hr_agent_controller),
         current_user: dict = Depends(get_current_user_ws),
 ):
-    return await hr_agent_controller.ws_review_results_by_ai(session_id, websocket, current_user.get('sub'))
+    return await hr_agent_controller.ws_review_results_by_ai(
+        session_id,
+        websocket,
+        current_user.get('sub')
+    )
 
 
 @hr_agent_router.post("/generate-pdf/{session_id}", tags=["VACANCY PDF GENERATOR"])
@@ -301,7 +325,9 @@ async def generate_pdf(
         session_id: UUID,
         hr_agent_controller: HRAgentController = Depends(Factory.get_hr_agent_controller),
 ):
-    return await hr_agent_controller.generate_pdf(session_id)
+    return await hr_agent_controller.generate_pdf(
+        session_id
+    )
 
 
 @hr_agent_router.websocket("/ws/progress/{user_id}")
@@ -310,7 +336,10 @@ async def websocket_endpoint(
         user_id: int,
         hr_agent_controller: HRAgentController = Depends(Factory.get_hr_agent_controller),
 ):
-    await hr_agent_controller.ws_progress(websocket, user_id)
+    await hr_agent_controller.ws_progress(
+        websocket,
+        user_id
+    )
 
 
 @hr_agent_router.websocket("/ws/upload_progress/{user_id}")
@@ -321,50 +350,7 @@ async def upload_progress_websocket(
     await websocket.accept()
     try:
         while True:
-            # Здесь сервер может отправлять обновления прогресса загрузки
             progress_data = hr_agent_controller.get_upload_progress(user_id)
             await websocket.send_json(progress_data)
     except WebSocketDisconnect:
         print(f"User {user_id} disconnected from upload progress tracking")
-
-
-@hr_agent_router.websocket("/ws/task_status/{task_id}")
-async def websocket_task_status(
-        websocket: WebSocket,
-        task_id: str,
-        redis=Depends(get_redis_client)):
-    await websocket.accept()
-    try:
-        while True:
-            status = await redis.get(task_id)
-            if status is None:
-                await websocket.send_json({
-                    "task_id": task_id,
-                    "status": "failed",
-                })
-                await redis.delete(task_id)
-                break
-
-            await websocket.send_json({
-                "task_id": task_id,
-                "status": status,
-            })
-
-            if status in ["failed", "success"]:
-                break
-
-            await asyncio.sleep(2)
-
-    except WebSocketDisconnect:
-        print(f"Client disconnected from task_id={task_id}")
-    finally:
-        await websocket.close()
-
-
-@hr_agent_router.get("/preview/session/tasks/{session_id}")
-async def get_session_task(
-        session_id: str,
-        redis=Depends(get_redis_client),
-        user=Depends(get_current_user),
-):
-    return await redis.get(f"task:{user.get('sub')}:{session_id}")
