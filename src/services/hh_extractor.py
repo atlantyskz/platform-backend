@@ -1,6 +1,7 @@
 import re
 from typing import Dict, Any, List
 
+
 def format_experience(experiences: List[Dict[str, Any]]) -> str:
     if not experiences:
         return "Опыт работы не указан."
@@ -21,10 +22,13 @@ def format_experience(experiences: List[Dict[str, Any]]) -> str:
         exp_lines.append(line)
     return "\n".join(exp_lines)
 
+
 def format_education(education: Dict[str, Any]) -> str:
     if not education:
         return "Образование не указано."
-    level = education.get("level", {}).get("name", "не указан")
+    level = education.get("level", {})
+    if level:
+        level = level.get("name", "не указан")
     primary = education.get("primary", [])
     lines = [f"Уровень: {level}."]
     if primary:
@@ -53,6 +57,7 @@ def format_education(education: Dict[str, Any]) -> str:
             lines.append(line)
     return "\n".join(lines)
 
+
 def format_languages(languages: List[Dict[str, Any]]) -> str:
     if not languages:
         return "Языковые навыки не указаны."
@@ -62,6 +67,7 @@ def format_languages(languages: List[Dict[str, Any]]) -> str:
         level = lang.get("level", {}).get("name", "не указан")
         lang_lines.append(f"{name} ({level})")
     return ", ".join(lang_lines)
+
 
 def format_portfolio(portfolio: List[Dict[str, Any]]) -> str:
     if not portfolio:
@@ -76,6 +82,7 @@ def format_portfolio(portfolio: List[Dict[str, Any]]) -> str:
         lines.append(line)
     return "\n".join(lines)
 
+
 def format_recommendations(recommendations: List[Dict[str, Any]]) -> str:
     if not recommendations:
         return "Рекомендации не указаны."
@@ -87,41 +94,41 @@ def format_recommendations(recommendations: List[Dict[str, Any]]) -> str:
         rec_lines.append(f"{name} из {organization} - {position}")
     return ", ".join(rec_lines)
 
+
 def assemble_candidate_summary(candidate: Dict[str, Any]) -> str:
     # Полное имя
     first = candidate.get("first_name", "")
     middle = candidate.get("middle_name") or ""
     last = candidate.get("last_name", "")
     full_name = " ".join(filter(None, [first, middle, last])) or "Не указано"
-    
+
     title = candidate.get("title", "Не указано")
     area = candidate.get("area", {}).get("name", "Не указано")
     age = candidate.get("age", "Не указано")
     gender = candidate.get("gender", {}).get("name", "Не указано")
     salary = candidate.get("salary")
     salary_text = f"{salary.get('amount')} {salary.get('currency')}" if salary else "Не указана"
-    
-    
+
     experience_text = format_experience(candidate.get("experience", []))
     education_text = format_education(candidate.get("education", {}))
-    
+
     # Если навыки хранятся в fields "skills" (текст) или "skill_set" (список)
     skills = candidate.get("skill_set")
     if not skills:
         skills = ", ".join(candidate.get("skill_set", []))
-    
+
     contacts = candidate.get("contact", [])
     contacts_text = ", ".join(f"{c.get('type', {}).get('name')}: {c.get('value')}" for c in contacts) or "Не указаны"
-    
+
     languages = format_languages(candidate.get("language", []))
     portfolio = format_portfolio(candidate.get("portfolio", []))
     recommendations = format_recommendations(candidate.get("recommendation", []))
-    
+
     # Готовность к переезду и командировкам
     relocation = candidate.get("relocation", {})
     relocation_type = relocation.get("type", {}).get("name", "Не указано")
     business_trip = candidate.get("business_trip_readiness", {}).get("name", "Не указано")
-    
+
     summary = (
         f"ФИО: {full_name}\n"
         f"Должность: {title}\n"
@@ -141,6 +148,7 @@ def assemble_candidate_summary(candidate: Dict[str, Any]) -> str:
     )
     return summary
 
+
 # Пример извлечения кандидата из полного JSON-резюме (resume)
 def extract_full_candidate_info(resume: Dict[str, Any]) -> Dict[str, Any]:
     candidate_info = resume.copy()
@@ -150,6 +158,7 @@ def extract_full_candidate_info(resume: Dict[str, Any]) -> Dict[str, Any]:
     last = resume.get("last_name", "")
     candidate_info["full_name"] = " ".join(filter(None, [first, middle, last])) or "Не указано"
     return candidate_info
+
 
 def extract_candidates_from_response(response_data: Dict[str, Any]) -> List[Dict[str, Any]]:
     items = response_data.get("items", [])
@@ -161,11 +170,11 @@ def extract_candidates_from_response(response_data: Dict[str, Any]) -> List[Dict
     return candidates
 
 
-
 def strip_html_tags(text: str) -> str:
     """Удаляет HTML-теги из текста."""
     clean = re.compile('<.*?>')
     return re.sub(clean, '', text).strip()
+
 
 def extract_vacancy_summary(vacancy: Dict[str, Any]) -> str:
     """
@@ -194,13 +203,13 @@ def extract_vacancy_summary(vacancy: Dict[str, Any]) -> str:
 
     raw_description = vacancy.get("description", "")
     description = strip_html_tags(raw_description)
-    
+
     key_skills_list = vacancy.get("key_skills", [])
     key_skills = ", ".join(skill.get("name", "") for skill in key_skills_list) if key_skills_list else "Не указаны"
-    
+
     schedule = vacancy.get("schedule", {}).get("name", "Не указано")
     employment = vacancy.get("employment", {}).get("name", "Не указано")
-    
+
     summary = (
         f"Название вакансии: {name}\n"
         f"Местоположение: {area}\n"
