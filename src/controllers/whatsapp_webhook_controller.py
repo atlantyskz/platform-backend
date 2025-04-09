@@ -67,7 +67,7 @@ class WhatsappWebhookController:
         if user_answer == "1":
             reply = (
                 "Отлично! Давайте обсудим детали онлайн. "
-                "Пожалуйста выберите удобное вам время для звонка"
+                "Пожалуйста выберите удобное вам время для звонка "
                 "https://calendly.com/main-atlantys/30min"
             )
             await self.user_interaction_repo.mark_answered(interaction.id, True)
