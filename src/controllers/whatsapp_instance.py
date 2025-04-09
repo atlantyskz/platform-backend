@@ -34,7 +34,7 @@ class WhatsappInstanceController:
         async def create_instance():
             return await self.green_api.create_instance({"email": user.email})
 
-        if user.role.name == models.RoleEnum.ADMIN.value:
+        if user.role.name == models.RoleEnum.ADMIN.value or user.role.name == models.RoleEnum.SUPER_ADMIN.value:
             existing_primary = await self.instance_repo.get_by_organization_id(organization.id)
             if existing_primary:
                 raise exceptions.BadRequestException("Organization already has a shared WhatsApp instance")
