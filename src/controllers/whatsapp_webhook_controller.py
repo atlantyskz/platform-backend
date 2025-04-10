@@ -26,7 +26,7 @@ class WhatsappWebhookController:
         sender_chat_id = data.get("senderData", {}).get("chatId")
         whatsapp_instance = await self.whatsapp_instance_repo.get_by_instance_id(instance_id)
 
-        sender = await self.user_interaction_repo.get_interaction_by_chat_id(sender_chat_id, whatsapp_instance.id)
+        sender = await self.user_interaction_repo.get_interaction_by_chat_id(str(sender_chat_id), whatsapp_instance.id)
         print(sender)
         if not sender:
             return {}
@@ -70,14 +70,14 @@ class WhatsappWebhookController:
                 "Пожалуйста выберите удобное вам время для звонка "
                 "https://calendly.com/main-atlantys/30min"
             )
-            await self.user_interaction_repo.mark_answered(interaction.id, True)
+            await self.user_interaction_repo.mark_answered(interaction.id, chat_id, True)
 
         elif user_answer == "2":
             reply = (
                 "Спасибо за честный ответ. Если в будущем захотите продолжить общение, "
                 "мы будем рады с вами связаться."
             )
-            await self.user_interaction_repo.mark_answered(interaction.id, False)
+            await self.user_interaction_repo.mark_answered(interaction.id, chat_id, False)
 
         else:
             reply = "Пожалуйста, отправьте «1» или «2», чтобы выбрать один из вариантов."

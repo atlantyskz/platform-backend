@@ -1,4 +1,5 @@
 import asyncio
+import json
 import logging
 from datetime import datetime, timedelta
 
@@ -256,12 +257,7 @@ async def _update_redis_task_status(user_id, session_id, status):
 
 @celery_app.task
 def bulk_send_whatsapp_message(session_id, user_id):
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    try:
-        loop.run_until_complete(_process_send_whatsapp_messages(session_id, user_id))
-    finally:
-        loop.close()
+    asyncio.run(_process_send_whatsapp_messages(session_id, user_id))
 
 
 async def _process_send_whatsapp_messages(
@@ -307,27 +303,37 @@ async def _process_send_whatsapp_messages(
             if not phone_number:
                 phone_number = "77762838451"
 
-            cleaned_number = "".join([ch for ch in phone_number if ch.isdigit()])
+            cleaned_number = "".join(ch for ch in phone_number if ch.isdigit())
             if cleaned_number.startswith("8"):
                 cleaned_number = "7" + cleaned_number[1:]
-
             chat_id = f"{cleaned_number}@c.us"
 
-            existing_interaction = await user_interaction_repo.get_not_answered_by_chat(
+            session_interaction = await user_interaction_repo.get_interaction_by_session_id(chat_id, session_id)
+            if session_interaction:
+                continue
+
+            existing_interaction = await user_interaction_repo.get_interaction_by_chat_id(
                 chat_id,
-                whatsapp_instance.id,
-                "RESUME_OFFER"
+                whatsapp_instance.id
             )
 
             if existing_interaction:
-                if not existing_interaction.is_answered and datetime.utcnow() < existing_interaction.created_at + timedelta(
-                        hours=24):
+                if (
+                        not existing_interaction.is_answered
+                        and
+                        datetime.utcnow() < existing_interaction.created_at + timedelta(hours=24)
+                ):
                     logger.info(
                         "Пропускаем отправку нового сообщения на %s, т.к. есть неотвеченное взаимодействие с id=%s",
                         chat_id,
                         existing_interaction.id
                     )
                     ignored.append(existing_interaction.id)
+                    await redis_client.set(
+                        f"session-ignored-chats:{session_id}",
+                        json.dumps(ignored),
+                        ex=86400
+                    )
                     continue
                 else:
                     text_message = (
@@ -335,17 +341,12 @@ async def _process_send_whatsapp_messages(
                         f"Рады снова с Вами связаться. Вы откликнулись на нашу вакансию «{vacancy.title}», "
                         f"и мы были бы рады обсудить дальнейшие шаги лично. Напишите, пожалуйста, если у Вас возникли вопросы."
                     )
-                    await user_interaction_repo.update_interaction(
-                        chat_id,
-                        whatsapp_instance.id,
-                        {"is_answered": False}
-                    )
             else:
                 text_message = (
                     f"Добрый день, {full_name}! Я — AI-рекрутер компании {organization.name}.\n"
                     f"Вы откликались на нашу вакансию «{vacancy.title}». Мы внимательно изучили ваше резюме "
                     f"и хотели бы обсудить дальнейшие шаги. \n\n"
-                    f"Нажмите 1, чтобы продолжить, или 2, если не хотите продолжать общение."
+                    f"Напишите 1, чтобы продолжить, или 2, если не хотите продолжать общение."
                 )
 
             await green_api_instance_client.send_message(
@@ -360,7 +361,89 @@ async def _process_send_whatsapp_messages(
             await user_interaction_repo.create_interaction(
                 chat_id=chat_id,
                 instance_id=whatsapp_instance.id,
+                session_id=session_id,
                 message_type="RESUME_OFFER"
             )
 
             await session.commit()
+
+
+@celery_app.task
+def bulk_resend_whatsapp_message(session_id, user_id):
+    asyncio.run(_process_resend_whatsapp_messages(session_id, user_id))
+
+
+async def _process_resend_whatsapp_messages(session_id: str, user_id: int) -> None:
+    postgres = session_manager
+
+    async with postgres.session() as session:
+        whatsapp_instance_repo = WhatsappInstanceRepository(session)
+        current_instance_repo = CurrentWhatsappInstanceRepository(session)
+        user_interaction_repo = UserInteractionRepository(session)
+        vacancy_repo = VacancyRepository(session)
+        organization_repo = OrganizationRepository(session)
+
+        green_api_instance_client = GreenApiInstanceCli()
+        current_instance_id = await current_instance_repo.get_current_instance_id(user_id)
+        if not current_instance_id:
+            logger.info("Не найден текущий WhatsApp-инстанс для user_id=%s", user_id)
+            return
+
+        whatsapp_instance = await whatsapp_instance_repo.get_by_id(current_instance_id)
+        if not whatsapp_instance:
+            logger.info("WhatsApp-инстанс не найден по ID=%s", current_instance_id)
+            return
+
+        vacancy = await vacancy_repo.get_by_session_id(session_id)
+        organization = await organization_repo.get_user_organization(user_id)
+
+        redis_key = f"session-ignored-chats:{session_id}"
+        ignored_data = await redis_client.get(redis_key)
+        if not ignored_data:
+            logger.info("Нет игнорируемых чатов для сессии %s", session_id)
+            return
+
+        try:
+            ignored_chats = json.loads(ignored_data)
+        except Exception as e:
+            logger.error("Ошибка загрузки игнорируемых чатов: %s", str(e))
+            return
+        resend_message = (
+            f"Здравствуйте! Вы откликались на вакансию «{vacancy.title}» "
+            f"в компании {organization.name}. Если у вас есть вопросы или вы хотите обсудить дальнейшие шаги, "
+            "пожалуйста, напишите «1». Если не хотите продолжать общение — напишите «2»."
+        )
+        for chat_id in ignored_chats:
+            try:
+                existing_interaction = await user_interaction_repo.get_interaction_by_chat_id(
+                    chat_id,
+                    whatsapp_instance.id
+                )
+
+                await user_interaction_repo.update_interaction(
+                    existing_interaction.chat_id,
+                    existing_interaction.instance_id,
+                    {
+                        "is_last": False
+                    }
+                )
+
+                await green_api_instance_client.send_message(
+                    data={
+                        "chat_id": chat_id,
+                        "message": resend_message
+                    },
+                    instance_id=whatsapp_instance.instance_id,
+                    instance_token=whatsapp_instance.instance_token
+                )
+                await user_interaction_repo.create_interaction(
+                    chat_id=chat_id,
+                    instance_id=whatsapp_instance.id,
+                    session_id=session_id,
+                    message_type="RESUME_OFFER"
+                )
+                logger.info("Повторное сообщение отправлено на %s", chat_id)
+            except Exception as e:
+                logger.error("Ошибка при повторной отправке сообщения для %s: %s", chat_id, str(e))
+        await redis_client.delete(redis_key)
+        await session.commit()

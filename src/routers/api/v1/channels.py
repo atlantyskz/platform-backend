@@ -1,13 +1,29 @@
+import json
+
 from fastapi import APIRouter, Depends
 
 from src import repositories
 from src.core.databases import session_manager
 from src.core.middlewares.auth_middleware import get_current_user
-from src.core.tasks import bulk_send_whatsapp_message
+from src.core.redis_cli import redis_client
+from src.core.tasks import bulk_send_whatsapp_message, bulk_resend_whatsapp_message
 from src.schemas.responses.channels import ChannelBulkMessageSchema, SendWhatsMessageSchema
 from src.services.green_api_instance_cli import GreenApiInstanceCli
 
 router = APIRouter(prefix="/api/v1/channels", tags=["CHANNELS"])
+
+
+@router.get("/get-ignored-chats/{session_id}")
+async def get_ignored(session_id: str):
+    ignored_chats = json.loads(await redis_client.get(f"session-ignored-chats:{session_id}"))
+    return ignored_chats
+
+
+@router.post("/resend-ignored-chats/{session_id}")
+async def resend_ignored_chats(session_id: str, current_user=Depends(get_current_user)):
+    user_id = current_user.get("sub")
+    bulk_resend_whatsapp_message.delay(session_id, user_id)
+    return {"success": True}
 
 
 @router.post("/bulk-message")
@@ -19,10 +35,11 @@ async def bulk_message(
     bulk_send_whatsapp_message.delay(data.session_id, user_id)
     return {"success": True}
 
+
 @router.post("/send-whatsapp-message")
 async def send_whatsapp_message(
-    data: SendWhatsMessageSchema,
-    current_user=Depends(get_current_user)
+        data: SendWhatsMessageSchema,
+        current_user=Depends(get_current_user)
 ):
     user_id = current_user.get("sub")
 
