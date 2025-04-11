@@ -236,6 +236,7 @@ async def _generate_questions_for_resume(
                 "resume_id": resume_record.resume_id,
                 "question_text": question.get("question_text", "")
             })
+            await session.flush()
 
         atl_tokens_spent = round(tokens_spent / 3000, 2)
         await balance_usage_repo.create({
@@ -251,7 +252,7 @@ async def _generate_questions_for_resume(
             "file_size": None,
             "atl_token_spent": atl_tokens_spent
         })
-        await session.commit()
+        await session.flush()
     except Exception as exc:
         logger.error("Error processing interview questions: %s", str(exc))
 
