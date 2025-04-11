@@ -147,7 +147,6 @@ async def _process_generate_questions(
         balance_id
 ):
     postgres = session_manager
-    request_sender = RequestSender()
     question_generate_session_repo = None
 
     try:
@@ -171,7 +170,6 @@ async def _process_generate_questions(
                     user_organization_id,
                     balance_id,
                     resume_record,
-                    request_sender,
                     question_repo,
                     balance_repo,
                     balance_usage_repo
@@ -184,6 +182,7 @@ async def _process_generate_questions(
                     "total": len(resumes),
                     "percentage": round((index + 1) / len(resumes) * 100)
                 })
+                await session.flush()
 
             await question_generate_session_repo.update_status(session_id, GenerateStatus.SUCCESS)
             await session.commit()
@@ -204,7 +203,6 @@ async def _generate_questions_for_resume(
         user_organization_id,
         balance_id,
         resume_record,
-        request_sender,
         question_repo,
         balance_repo,
         balance_usage_repo
@@ -224,7 +222,6 @@ async def _generate_questions_for_resume(
 
         messages = [{"role": "user", "content": f"Candidate Resume:\n{candidate_info}"}]
         response_data = await _attempt_llm_request(
-            request_sender,
             messages,
             max_attempts=3
         )
@@ -266,9 +263,9 @@ async def _generate_questions_for_resume(
         logger.error("Error processing interview questions: %s", str(exc))
 
 
-async def _attempt_llm_request(request_sender, messages, max_attempts=3):
+async def _attempt_llm_request(messages, max_attempts=3):
     for attempt in range(max_attempts):
-        llm_response = await request_sender._send_request(
+        llm_response = await RequestSender()._send_request(
             llm_url='http://llm_service:8001/hr/generate_questions_for_candidate',
             data={"messages": messages}
         )
