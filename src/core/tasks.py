@@ -163,6 +163,7 @@ async def _process_generate_questions(
                 logger.info("No favorite resumes found for session_id=%s", session_id)
 
             for index, resume_record in enumerate(resumes):
+                print(resume_record)
                 await _generate_questions_for_resume(
                     session_id,
                     user_id,
@@ -210,6 +211,7 @@ async def _generate_questions_for_resume(
 ):
     try:
         resume_data = resume_record.result_data.get("candidate_info", {})
+        print(resume_data)
         candidate_info = "\n".join(f"{k}: {v}" for k, v in resume_data.items())
 
         balance = await balance_repo.get_balance(user_organization_id)
