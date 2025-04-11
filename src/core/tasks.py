@@ -146,16 +146,18 @@ async def _process_generate_questions(
         user_organization_id,
         balance_id
 ):
-    try:
-        postgres = session_manager
-        request_sender = RequestSender()
+    postgres = session_manager
+    request_sender = RequestSender()
+    question_generate_session_repo = None
 
+    try:
         async with postgres.session() as session:
             favorite_repo = FavoriteResumeRepository(session)
             question_repo = InterviewIndividualQuestionRepository(session)
             balance_repo = BalanceRepository(session)
             balance_usage_repo = BalanceUsageRepository(session)
             question_generate_session_repo = QuestionGenerateSessionRepository(session)
+
             resumes = await favorite_repo.get_favorite_resumes_by_session_id(session_id)
             if not resumes:
                 logger.info("No favorite resumes found for session_id=%s", session_id)
@@ -169,25 +171,28 @@ async def _process_generate_questions(
                     balance_id,
                     resume_record,
                     request_sender,
-                    favorite_repo,
                     question_repo,
                     balance_repo,
                     balance_usage_repo
                 )
 
                 await manager.notify_progress(session_id, {
-                    "resume_id": resume_record.resume_id,
+                    "resume_id": resume_record.id,
                     "status": "done",
                     "current": index + 1,
                     "total": len(resumes),
                     "percentage": round((index + 1) / len(resumes) * 100)
                 })
+
             await question_generate_session_repo.update_status(session_id, GenerateStatus.SUCCESS)
             await session.commit()
 
     except Exception as exc:
-        logger.error("Error processing generate questions: %s", str(exc))
-        await question_generate_session_repo.update_status(session_id, GenerateStatus.FAILURE)
+        logger.error("Error processing generate questions for session_id=%s: %s", session_id, str(exc))
+        if question_generate_session_repo:
+            async with postgres.session() as session:
+                repo = QuestionGenerateSessionRepository(session)
+                await repo.update_status(session_id, GenerateStatus.FAILURE)
         raise
 
 
@@ -199,57 +204,59 @@ async def _generate_questions_for_resume(
         balance_id,
         resume_record,
         request_sender,
-        favorite_repo,
         question_repo,
         balance_repo,
         balance_usage_repo
 ):
-    resume_data = await favorite_repo.get_result_data_by_resume_id(resume_record.resume_id)
-    candidate_info = "\n".join(f"{k}: {v}" for k, v in resume_data.items())
+    try:
+        resume_data = resume_record.result_data.get("candidate_info", {})
+        candidate_info = "\n".join(f"{k}: {v}" for k, v in resume_data.items())
 
-    balance = await balance_repo.get_balance(user_organization_id)
-    if balance.atl_tokens < 5:
-        error_msg = f"Недостаточно средств: имеется {balance.atl_tokens} токенов, требуется минимум 5."
-        logger.error(error_msg)
-        await _update_redis_task_status(user_id, session_id, status="failed")
-        raise ValueError(error_msg)
+        balance = await balance_repo.get_balance(user_organization_id)
+        if balance.atl_tokens < 5:
+            error_msg = f"Недостаточно средств: имеется {balance.atl_tokens} токенов, требуется минимум 5."
+            logger.error(error_msg)
+            await _update_redis_task_status(user_id, session_id, status="failed")
+            raise ValueError(error_msg)
 
-    messages = [{"role": "user", "content": f"Candidate Resume:\n{candidate_info}"}]
-    response_data = await _attempt_llm_request(
-        request_sender,
-        messages,
-        max_attempts=3
-    )
+        messages = [{"role": "user", "content": f"Candidate Resume:\n{candidate_info}"}]
+        response_data = await _attempt_llm_request(
+            request_sender,
+            messages,
+            max_attempts=3
+        )
 
-    if not response_data or "llm_response" not in response_data:
-        error_msg = "Не удалось получить валидный ответ от LLM сервиса."
-        logger.error(error_msg)
-        return
+        if not response_data or "llm_response" not in response_data:
+            error_msg = "Не удалось получить валидный ответ от LLM сервиса."
+            logger.error(error_msg)
+            return
 
-    tokens_spent = response_data.get("tokens_spent", 0)
-    llm_response_data = response_data["llm_response"]
-    interview_questions = llm_response_data.get("interview_questions", [])
+        tokens_spent = response_data.get("tokens_spent", 0)
+        llm_response_data = response_data["llm_response"]
+        interview_questions = llm_response_data.get("interview_questions", [])
 
-    for question in interview_questions:
-        await question_repo.create_question({
-            "resume_id": resume_record.resume_id,
-            "question_text": question.get("question_text", "")
+        for question in interview_questions:
+            await question_repo.create_question({
+                "resume_id": resume_record.resume_id,
+                "question_text": question.get("question_text", "")
+            })
+
+        atl_tokens_spent = round(tokens_spent / 3000, 2)
+        await balance_usage_repo.create({
+            "user_id": user_id,
+            "assistant_id": assistant_id,
+            "type": "generate individual questions",
+            "organization_id": user_organization_id,
+            "balance_id": balance_id,
+            "input_text_count": len(candidate_info),
+            "gpt_token_spent": tokens_spent,
+            "input_token_count": tokens_spent,
+            "file_count": 0,
+            "file_size": None,
+            "atl_token_spent": atl_tokens_spent
         })
-
-    atl_tokens_spent = round(tokens_spent / 3000, 2)
-    await balance_usage_repo.create({
-        "user_id": user_id,
-        "assistant_id": assistant_id,
-        "type": "generate individual questions",
-        "organization_id": user_organization_id,
-        "balance_id": balance_id,
-        "input_text_count": len(candidate_info),
-        "gpt_token_spent": tokens_spent,
-        "input_token_count": tokens_spent,
-        "file_count": 0,
-        "file_size": None,
-        "atl_token_spent": atl_tokens_spent
-    })
+    except Exception as exc:
+        logger.error("Error processing interview questions: %s", str(exc))
 
 
 async def _attempt_llm_request(request_sender, messages, max_attempts=3):
