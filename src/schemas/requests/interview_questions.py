@@ -27,7 +27,6 @@ class InterviewCommonQuestionsUpdate(BaseModel):
 
 
 class InterviewIndividualQuestions(BaseModel):
-    session_id: uuid.UUID
     question_text: str
     resume_id: int
 

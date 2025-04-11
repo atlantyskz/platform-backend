@@ -11,16 +11,19 @@ from sqlalchemy.future import select
 from src.core.celery_config import celery_app
 from src.core.databases import session_manager
 from src.core.redis_cli import redis_client
+from src.models import GenerateStatus
 from src.models.balance import Balance
 from src.repositories import WhatsappInstanceRepository, CurrentWhatsappInstanceRepository, OrganizationRepository
 from src.repositories.balance import BalanceRepository
 from src.repositories.balance_usage import BalanceUsageRepository
 from src.repositories.favorite_resume import FavoriteResumeRepository
 from src.repositories.interview_individual_question import InterviewIndividualQuestionRepository
+from src.repositories.question_generate_session import QuestionGenerateSessionRepository
 from src.repositories.user_interaction_repository import UserInteractionRepository
 from src.repositories.vacancy import VacancyRepository
 from src.services.green_api_instance_cli import GreenApiInstanceCli
 from src.services.request_sender import RequestSender
+from src.services.websocket import manager
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -118,7 +121,13 @@ async def _apply_expired_trial_logic(balance_repo: BalanceRepository, balance: B
 
 
 @celery_app.task
-def generate_questions_task(session_id, user_id, assistant_id, user_organization_id, balance_id):
+def generate_questions_task(
+        session_id,
+        user_id,
+        assistant_id,
+        user_organization_id,
+        balance_id
+):
     return asyncio.run(
         _process_generate_questions(
             session_id=session_id,
@@ -130,7 +139,13 @@ def generate_questions_task(session_id, user_id, assistant_id, user_organization
     )
 
 
-async def _process_generate_questions(session_id, user_id, assistant_id, user_organization_id, balance_id):
+async def _process_generate_questions(
+        session_id,
+        user_id,
+        assistant_id,
+        user_organization_id,
+        balance_id
+):
     try:
         postgres = session_manager
         request_sender = RequestSender()
@@ -140,12 +155,12 @@ async def _process_generate_questions(session_id, user_id, assistant_id, user_or
             question_repo = InterviewIndividualQuestionRepository(session)
             balance_repo = BalanceRepository(session)
             balance_usage_repo = BalanceUsageRepository(session)
-
+            question_generate_session_repo = QuestionGenerateSessionRepository(session)
             resumes = await favorite_repo.get_favorite_resumes_by_session_id(session_id)
             if not resumes:
                 logger.info("No favorite resumes found for session_id=%s", session_id)
 
-            for resume_record in resumes:
+            for index, resume_record in enumerate(resumes):
                 await _generate_questions_for_resume(
                     session_id,
                     user_id,
@@ -160,13 +175,19 @@ async def _process_generate_questions(session_id, user_id, assistant_id, user_or
                     balance_usage_repo
                 )
 
+                await manager.notify_progress(session_id, {
+                    "resume_id": resume_record.resume_id,
+                    "status": "done",
+                    "current": index + 1,
+                    "total": len(resumes),
+                    "percentage": round((index + 1) / len(resumes) * 100)
+                })
+            await question_generate_session_repo.update_status(session_id, GenerateStatus.SUCCESS)
             await session.commit()
-
-        await _update_redis_task_status(user_id, session_id, status="success")
 
     except Exception as exc:
         logger.error("Error processing generate questions: %s", str(exc))
-        await _update_redis_task_status(user_id, session_id, status="failed")
+        await question_generate_session_repo.update_status(session_id, GenerateStatus.FAILURE)
         raise
 
 
@@ -211,7 +232,6 @@ async def _generate_questions_for_resume(
 
     for question in interview_questions:
         await question_repo.create_question({
-            "session_id": session_id,
             "resume_id": resume_record.resume_id,
             "question_text": question.get("question_text", "")
         })

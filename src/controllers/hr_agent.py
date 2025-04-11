@@ -32,9 +32,7 @@ from src.core.backend import BackgroundTasksBackend
 from src.core.dramatiq_worker import DramatiqWorker
 from src.core.exceptions import BadRequestException
 from src.core.exceptions import NotFoundException
-from src.core.redis_cli import redis_client
 from src.core.settings import settings
-from src.core.tasks import generate_questions_task
 from src.repositories.assistant import AssistantRepository
 from src.repositories.assistant_session import AssistantSessionRepository
 from src.repositories.balance import BalanceRepository
@@ -708,59 +706,6 @@ class HRAgentController:
             return favorite_resume
         except Exception as e:
             raise e
-
-    async def generate_questions_for_candidate(self, session_id: str, user_id: int):
-        task_key = f"task:{user_id}:{session_id}"
-        existing_task = await redis_client.get(task_key)
-        if existing_task:
-            status = await redis_client.get(existing_task)
-            if status is None or status in ['success', 'failed']:
-                await redis_client.delete(task_key)
-            else:
-                raise BadRequestException(f"Task already exists: {existing_task}")
-
-        assistant = await self.assistant_repo.get_assistant_by_name('ИИ Рекрутер')
-
-        user_organization = await self.organization_repo.get_user_organization(user_id)
-
-        if not user_organization:
-            return {
-                "error": "You don't have an organization",
-                "success": False
-            }
-
-        balance = await self.balance_repo.get_balance(user_organization.id)
-        if not balance:
-            return {
-                "error": "Balance not found",
-                "success": False
-            }
-
-        if balance.atl_tokens < 5:
-            return {
-                "error": "Not enough tokens",
-                "success": False
-            }
-
-        task_id = generate_questions_task.apply_async(
-            kwargs={
-                "session_id": session_id,
-                "user_id": user_id,
-                "assistant_id": assistant.id,
-                "user_organization_id": user_organization.id,
-                "balance_id": balance.id,
-            },
-        )
-
-        await redis_client.set(
-            name=task_key,
-            value=str(task_id)
-        )
-        await redis_client.set(
-            name=str(task_id),
-            value="pending"
-        )
-        return await redis_client.get(task_key)
 
     async def delete_from_favorites(self, user_id: int, resume_id: int):
         try:

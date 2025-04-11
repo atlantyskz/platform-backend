@@ -37,16 +37,13 @@ class InterviewIndividualQuestionRepository(BaseRepository):
         result = await self.session.execute(stmt)
         return result.rowcount
 
-    async def get_questions_by_resume(self, resume_id: int, session_id: str) -> \
-            List[
-                InterviewIndividualQuestion
-            ]:
+    async def get_questions_by_resume(self, resume_id: int) -> List[InterviewIndividualQuestion]:
         stmt = (
             select(
                 InterviewIndividualQuestion
             )
             .where(
-                InterviewIndividualQuestion.resume_id == resume_id, InterviewIndividualQuestion.session_id == session_id
+                InterviewIndividualQuestion.resume_id == resume_id
             )
         )
         result = await self.session.execute(stmt)
