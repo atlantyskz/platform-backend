@@ -223,18 +223,13 @@ async def _generate_questions_for_resume(
             messages,
             max_attempts=3
         )
-        print(response_data, "\n\n\n\n\n")
-        if not response_data or "llm_response" not in response_data:
-            error_msg = "Не удалось получить валидный ответ от LLM сервиса."
-            logger.error(error_msg)
-            return
-
+        print(response_data, "\n\n\n\n")
         tokens_spent = response_data.get("tokens_spent", 0)
         llm_response_data = response_data["llm_response"]
         interview_questions = llm_response_data.get("interview_questions", [])
-        print(interview_questions)
 
         for question in interview_questions:
+            print(question, "\n\n\n")
             await question_repo.create_question({
                 "resume_id": resume_record.resume_id,
                 "question_text": question.get("question_text", "")
@@ -260,16 +255,14 @@ async def _generate_questions_for_resume(
 
 async def _attempt_llm_request(messages, max_attempts=3):
     for attempt in range(max_attempts):
-        llm_response = await RequestSender()._send_request(
+        response_data = await RequestSender()._send_request(
             llm_url='http://llm_service:8001/hr/generate_questions_for_candidate',
             data={"messages": messages}
         )
-        if (
-                "llm_response" in llm_response
-                and not llm_response.get("error")
-        ):
-            return llm_response if isinstance(llm_response, dict) else json.loads(str(llm_response))
-        logger.warning("Attempt %d to get LLM response failed.", attempt + 1)
+        if not response_data or "llm_response" not in response_data or response_data.get("error"):
+            raise ValueError("Некорректный ответ от LLM")
+
+        return response_data
     return None
 
 
