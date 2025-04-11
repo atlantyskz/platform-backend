@@ -171,8 +171,7 @@ async def _process_generate_questions(
                         resume_record,
                         question_repo,
                         balance_repo,
-                        balance_usage_repo,
-                        session
+                        balance_usage_repo
                     )
 
                     await manager.notify_progress(session_id, {
