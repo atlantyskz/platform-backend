@@ -215,6 +215,7 @@ async def _generate_questions_for_resume(
         candidate_info = "\n".join(f"{k}: {v}" for k, v in resume_data.items())
 
         balance = await balance_repo.get_balance(user_organization_id)
+        print(balance)
         if balance.atl_tokens < 5:
             error_msg = f"Недостаточно средств: имеется {balance.atl_tokens} токенов, требуется минимум 5."
             logger.error(error_msg)
@@ -228,6 +229,9 @@ async def _generate_questions_for_resume(
             max_attempts=3
         )
 
+        print(resume_data)
+
+
         if not response_data or "llm_response" not in response_data:
             error_msg = "Не удалось получить валидный ответ от LLM сервиса."
             logger.error(error_msg)
@@ -236,6 +240,7 @@ async def _generate_questions_for_resume(
         tokens_spent = response_data.get("tokens_spent", 0)
         llm_response_data = response_data["llm_response"]
         interview_questions = llm_response_data.get("interview_questions", [])
+        print(interview_questions)
 
         for question in interview_questions:
             await question_repo.create_question({
@@ -267,6 +272,7 @@ async def _attempt_llm_request(request_sender, messages, max_attempts=3):
             llm_url='http://llm_service:8001/hr/generate_questions_for_candidate',
             data={"messages": messages}
         )
+        print(llm_response)
         if (
                 isinstance(llm_response, dict)
                 and "llm_response" in llm_response
