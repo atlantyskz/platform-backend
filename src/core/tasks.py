@@ -238,10 +238,10 @@ async def _generate_questions_for_resume(
 
         for question in interview_questions:
             print(question, "\n\n\n")
-            print("Resume id", resume_record.id)
+            print("Resume id", resume_record.resume_id)
             print("Question Text", question.get("question_text", ""))
             await question_repo.create_question({
-                "resume_id": resume_record.id,
+                "resume_id": resume_record.resume_id,
                 "question_text": question.get("question_text", "")
             })
 
