@@ -172,7 +172,8 @@ async def _process_generate_questions(
                     resume_record,
                     question_repo,
                     balance_repo,
-                    balance_usage_repo
+                    balance_usage_repo,
+                    session
                 )
 
                 await manager.notify_progress(session_id, {
@@ -205,7 +206,8 @@ async def _generate_questions_for_resume(
         resume_record,
         question_repo,
         balance_repo,
-        balance_usage_repo
+        balance_usage_repo,
+        session
 ):
     try:
         resume_data = resume_record.result_data.get("candidate_info", {})
@@ -249,6 +251,7 @@ async def _generate_questions_for_resume(
             "file_size": None,
             "atl_token_spent": atl_tokens_spent
         })
+        await session.commit()
     except Exception as exc:
         logger.error("Error processing interview questions: %s", str(exc))
 
