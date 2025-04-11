@@ -73,28 +73,35 @@ class InterviewIndividualQuestionController:
             raise BadRequestException(f"Failed to update question: {e}")
 
     async def generate_question(self, session_id: str, user_id: int) -> Dict[str, Any]:
-        db_session = await  self.session_repository.get_by_session_id(session_id, user_id)
+        db_session = await self.session_repository.get_by_session_id(session_id, user_id)
         if not db_session:
             raise NotFoundException("Session not found")
 
         db_session = await self.question_generate_session_repository.get_by_session_id(session_id)
         if db_session and (db_session.status in (GenerateStatus.PENDING, GenerateStatus.SUCCESS)):
             raise BadRequestException("Session already exists")
+
         assistant = await self.assistant_repo.get_assistant_by_name("ИИ Рекрутер")
         organization = await self.organization_repo.get_user_organization(user_id)
         if not organization:
             raise NotFoundException("Organization not found")
+
         user_balance = await self.balance_repo.get_balance(organization.id)
 
-        await self.question_generate_session_repository.create(session_id)
-        generate_questions_task.delay(
-            session_id,
-            user_id,
-            assistant.id,
-            organization.id,
-            user_balance.id
-        )
-        return {"success": True}
+        try:
+            await self.question_generate_session_repository.create(session_id)
+            await self.session.commit()
+            generate_questions_task.delay(
+                session_id,
+                user_id,
+                assistant.id,
+                organization.id,
+                user_balance.id
+            )
+            return {"success": True}
+        except Exception as e:
+            await self.session.rollback()
+            raise BadRequestException(f"Failed to initiate generation: {e}")
 
     async def get_progress_from_db(self, session_id: str, user_id) -> Dict[str, Any]:
         db_session = await self.session_repository.get_by_session_id(session_id, user_id)
