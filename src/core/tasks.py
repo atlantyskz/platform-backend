@@ -147,7 +147,6 @@ async def _process_generate_questions(
         balance_id
 ):
     postgres = session_manager
-    question_generate_session_repo = None
 
     try:
         async with postgres.session() as session:
@@ -162,38 +161,47 @@ async def _process_generate_questions(
                 logger.info("No favorite resumes found for session_id=%s", session_id)
 
             for index, resume_record in enumerate(resumes):
-                print(resume_record)
-                await _generate_questions_for_resume(
-                    session_id,
-                    user_id,
-                    assistant_id,
-                    user_organization_id,
-                    balance_id,
-                    resume_record,
-                    question_repo,
-                    balance_repo,
-                    balance_usage_repo,
-                    session
-                )
+                try:
+                    await _generate_questions_for_resume(
+                        session_id,
+                        user_id,
+                        assistant_id,
+                        user_organization_id,
+                        balance_id,
+                        resume_record,
+                        question_repo,
+                        balance_repo,
+                        balance_usage_repo,
+                        session
+                    )
 
-                await manager.notify_progress(session_id, {
-                    "resume_id": resume_record.id,
-                    "status": "done",
-                    "current": index + 1,
-                    "total": len(resumes),
-                    "percentage": round((index + 1) / len(resumes) * 100)
-                })
-                await session.flush()
+                    await manager.notify_progress(session_id, {
+                        "resume_id": resume_record.id,
+                        "status": "done",
+                        "current": index + 1,
+                        "total": len(resumes),
+                        "percentage": round((index + 1) / len(resumes) * 100)
+                    })
+
+                    await session.flush()
+                except Exception as resume_exc:
+                    logger.error("Error generating questions for resume_id=%s: %s", resume_record.id, str(resume_exc))
+                    await session.rollback()
+                    continue
 
             await question_generate_session_repo.update_status(session_id, GenerateStatus.SUCCESS)
             await session.commit()
 
     except Exception as exc:
         logger.error("Error processing generate questions for session_id=%s: %s", session_id, str(exc))
-        if question_generate_session_repo:
+        try:
             async with postgres.session() as session:
                 repo = QuestionGenerateSessionRepository(session)
-                await repo.update_status(session_id, GenerateStatus.FAILURE)
+                await repo.update_status(session_id, GenerateStatus.FAILURE, str(exc))
+                await session.commit()
+        except Exception as update_exc:
+            logger.error("Failed to update session status to FAILURE: %s", update_exc)
+
         raise
 
 
@@ -206,8 +214,7 @@ async def _generate_questions_for_resume(
         resume_record,
         question_repo,
         balance_repo,
-        balance_usage_repo,
-        session
+        balance_usage_repo
 ):
     try:
         resume_data = resume_record.result_data.get("candidate_info", {})
@@ -232,12 +239,12 @@ async def _generate_questions_for_resume(
 
         for question in interview_questions:
             print(question, "\n\n\n")
-            print("Question Text",question.get("question_text", ""))
+            print("Resume id", resume_record.id)
+            print("Question Text", question.get("question_text", ""))
             await question_repo.create_question({
                 "resume_id": resume_record.id,
                 "question_text": question.get("question_text", "")
             })
-            await session.flush()
 
         atl_tokens_spent = round(tokens_spent / 3000, 2)
         await balance_usage_repo.create({
@@ -253,7 +260,6 @@ async def _generate_questions_for_resume(
             "file_size": None,
             "atl_token_spent": atl_tokens_spent
         })
-        await session.flush()
     except Exception as exc:
         logger.error("Error processing interview questions: %s", str(exc))
 

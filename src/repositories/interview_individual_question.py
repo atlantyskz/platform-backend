@@ -15,7 +15,6 @@ class InterviewIndividualQuestionRepository(BaseRepository):
     async def create_question(self, data: dict) -> InterviewIndividualQuestion:
         stmt = insert(InterviewIndividualQuestion).values(**data).returning(InterviewIndividualQuestion.id)
         result = await self.session.execute(stmt)
-        await self.session.flush()
         return result.scalars().first()
 
     async def get_question_by_id(self, question_id: int) -> InterviewIndividualQuestion:
