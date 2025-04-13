@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 
 from celery import shared_task
 from celery.schedules import crontab
+from dramatiq.asyncio import async_to_sync
 from sqlalchemy import and_
 from sqlalchemy.future import select
 
@@ -128,7 +129,7 @@ def generate_questions_task(
         user_organization_id,
         balance_id
 ):
-    return asyncio.run(
+    return async_to_sync(
         _process_generate_questions(
             session_id=session_id,
             user_id=user_id,
@@ -237,10 +238,6 @@ async def _generate_questions_for_resume(
         interview_questions = llm_response_data.get("interview_questions", [])
 
         for question in interview_questions:
-            print(question, "\n\n\n")
-            print("resume data:", resume_record, "\n\n\n")
-            print("Resume id", resume_record.id)
-            print("Question Text", question.get("question_text", ""))
             await question_repo.create_question({
                 "resume_id": resume_record.id,
                 "question_text": question.get("question_text", "")
