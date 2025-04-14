@@ -64,7 +64,7 @@ class InterviewIndividualQuestionController:
 
         try:
             updated_question = await self.interview_question_repo.update_question(
-                question_id, {"question": question_text}
+                question_id, {"question_text": question_text}
             )
             await self.session.commit()
             return {"question": updated_question, "success": True}
