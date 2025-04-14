@@ -1,17 +1,14 @@
 import asyncio
-import json
 import logging
 from datetime import datetime, timedelta
 
 from celery import shared_task
 from celery.schedules import crontab
-from dramatiq.asyncio import async_to_sync
 from sqlalchemy import and_
 from sqlalchemy.future import select
 
 from src.core.celery_config import celery_app
 from src.core.databases import session_manager
-from src.core.redis_cli import redis_client
 from src.models import GenerateStatus
 from src.models.balance import Balance
 from src.repositories import WhatsappInstanceRepository, CurrentWhatsappInstanceRepository, OrganizationRepository
@@ -129,7 +126,7 @@ def generate_questions_task(
         user_organization_id,
         balance_id
 ):
-    return async_to_sync(
+    return asyncio.run(
         _process_generate_questions(
             session_id=session_id,
             user_id=user_id,
@@ -224,7 +221,6 @@ async def _generate_questions_for_resume(
         if balance.atl_tokens < 5:
             error_msg = f"Недостаточно средств: имеется {balance.atl_tokens} токенов, требуется минимум 5."
             logger.error(error_msg)
-            await _update_redis_task_status(user_id, session_id, status="failed")
             raise ValueError(error_msg)
 
         messages = [{"role": "user", "content": f"Candidate Resume:\n{candidate_info}"}]
@@ -272,13 +268,6 @@ async def _attempt_llm_request(messages, max_attempts=3):
 
         return response_data
     return None
-
-
-async def _update_redis_task_status(user_id, session_id, status):
-    task_key = f"task:{user_id}:{session_id}"
-    redis_task_id = await redis_client.get(task_key)
-    if redis_task_id is not None:
-        await redis_client.set(redis_task_id, status)
 
 
 @celery_app.task
@@ -354,12 +343,7 @@ async def _process_send_whatsapp_messages(
                         chat_id,
                         existing_interaction.id
                     )
-                    ignored.append(existing_interaction.id)
-                    await redis_client.set(
-                        f"session-ignored-chats:{session_id}",
-                        json.dumps(ignored),
-                        ex=86400
-                    )
+                    await user_interaction_repo.update_interaction(chat_id, existing_interaction, {"is_ignored": True})
                     continue
                 else:
                     text_message = (
@@ -423,17 +407,13 @@ async def _process_resend_whatsapp_messages(session_id: str, user_id: int) -> No
         vacancy = await vacancy_repo.get_by_session_id(session_id)
         organization = await organization_repo.get_user_organization(user_id)
 
-        redis_key = f"session-ignored-chats:{session_id}"
-        ignored_data = await redis_client.get(redis_key)
-        if not ignored_data:
+        ignored_chats = await user_interaction_repo.get_ignored_interactions(
+            session_id=session_id
+        )
+        if not ignored_chats:
             logger.info("Нет игнорируемых чатов для сессии %s", session_id)
             return
 
-        try:
-            ignored_chats = json.loads(ignored_data)
-        except Exception as e:
-            logger.error("Ошибка загрузки игнорируемых чатов: %s", str(e))
-            return
         resend_message = (
             f"Здравствуйте! Вы откликались на вакансию «{vacancy.title}» "
             f"в компании {organization.name}. Если у вас есть вопросы или вы хотите обсудить дальнейшие шаги, "
@@ -471,5 +451,4 @@ async def _process_resend_whatsapp_messages(session_id: str, user_id: int) -> No
                 logger.info("Повторное сообщение отправлено на %s", chat_id)
             except Exception as e:
                 logger.error("Ошибка при повторной отправке сообщения для %s: %s", chat_id, str(e))
-        await redis_client.delete(redis_key)
         await session.commit()

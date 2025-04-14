@@ -17,3 +17,4 @@ class UserInteraction(Base):
     created_at = sa.Column(sa.DateTime, default=datetime.datetime.utcnow)
     session_id = sa.Column(sa.ForeignKey("assistant_sessions.id"), nullable=True)
     is_last = sa.Column(sa.Boolean, default=True, nullable=False)
+    is_ignored = sa.Column(sa.Boolean, default=False, nullable=True)

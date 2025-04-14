@@ -114,3 +114,18 @@ class UserInteractionRepository:
         )
         result = await self.session.execute(stmt)
         return result.scalars().first()
+
+    async def get_ignored_interactions(
+            self,
+            session_id: str
+    ):
+        stmt = (
+            select(UserInteraction)
+            .where(
+                UserInteraction.session_id == session_id,
+                UserInteraction.is_ignored == True,
+                UserInteraction.is_last == True
+            )
+        )
+        result = await self.session.execute(stmt)
+        return result.scalars().all()

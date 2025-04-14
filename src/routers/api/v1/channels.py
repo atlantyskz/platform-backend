@@ -1,11 +1,9 @@
-import json
-
 from fastapi import APIRouter, Depends
 
 from src import repositories
 from src.core.databases import session_manager
+from src.core.exceptions import NotFoundException
 from src.core.middlewares.auth_middleware import get_current_user
-from src.core.redis_cli import redis_client
 from src.core.tasks import bulk_send_whatsapp_message, bulk_resend_whatsapp_message
 from src.schemas.responses.channels import ChannelBulkMessageSchema, SendWhatsMessageSchema
 from src.services.green_api_instance_cli import GreenApiInstanceCli
@@ -14,8 +12,18 @@ router = APIRouter(prefix="/api/v1/channels", tags=["CHANNELS"])
 
 
 @router.get("/get-ignored-chats/{session_id}")
-async def get_ignored(session_id: str):
-    ignored_chats = json.loads(await redis_client.get(f"session-ignored-chats:{session_id}"))
+async def get_ignored(session_id: str, user=Depends(get_current_user)):
+    async with session_manager.session() as session:
+        interaction_repo = repositories.UserInteractionRepository(session)
+        assistant_session_repo = repositories.AssistantSessionRepository(session)
+
+        db_session = assistant_session_repo.get_by_session_id(session_id, user.get("sub"))
+        if not db_session:
+            raise NotFoundException("Session not found")
+        ignored_chats = await interaction_repo.get_ignored_interactions(
+            session_id=session_id,
+        )
+
     return ignored_chats
 
 
