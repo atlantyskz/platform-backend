@@ -103,9 +103,9 @@ class DramatiqWorker:
                 )
             raise
 
+    @staticmethod
     @dramatiq.actor(max_retries=1)
     async def generate_questions_task(
-            self,
             session_id,
             user_id,
             assistant_id,
@@ -144,7 +144,7 @@ class DramatiqWorker:
                             if balance.atl_tokens < 5:
                                 raise ValueError(f"Недостаточно средств: {balance.atl_tokens} токенов < 5")
 
-                            response_data = await self._attempt_llm_request(
+                            response_data = await DramatiqWorker._attempt_llm_request(
                                 [{"role": "user", "content": f"Candidate Resume:\n{candidate_info}"}]
                             )
                             tokens_spent = response_data.get("tokens_spent", 0)
@@ -198,9 +198,9 @@ class DramatiqWorker:
                 await repo.update_status(session_id, GenerateStatus.FAILURE, str(exc))
                 await session.commit()
 
+    @staticmethod
     @dramatiq.actor
     async def bulk_send_whatsapp_message(
-            self,
             session_id,
             user_id
     ):
@@ -309,8 +309,9 @@ class DramatiqWorker:
 
                 await session.commit()
 
+    @staticmethod
     @dramatiq.actor
-    async def bulk_resend_whatsapp_message(self, session_id, user_id):
+    async def bulk_resend_whatsapp_message(session_id, user_id):
         from src.repositories import CurrentWhatsappInstanceRepository
         from src.repositories import UserInteractionRepository
         from src.repositories import WhatsappInstanceRepository
@@ -385,7 +386,8 @@ class DramatiqWorker:
                     logger.error("Ошибка при повторной отправке сообщения для %s: %s", chat_id, str(e))
             await session.commit()
 
-    async def _attempt_llm_request(self, messages, max_attempts=3):
+    @classmethod
+    async def _attempt_llm_request(cls, messages, max_attempts=3):
         last_error = None
         for attempt in range(max_attempts):
             response_data = await RequestSender()._send_request(
