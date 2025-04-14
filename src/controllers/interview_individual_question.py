@@ -23,7 +23,7 @@ class InterviewIndividualQuestionController:
         self.balance_repo = BalanceRepository(session)
 
     async def get_questions_by_resume(self, resume_id: int) -> list[InterviewIndividualQuestion]:
-        resume =  await self.favorite_resume_repo.get_favorite_resumes_by_resume_id(resume_id)
+        resume = await self.favorite_resume_repo.get_favorite_resumes_by_resume_id(resume_id)
         if not resume:
             raise NotFoundException("Resume not found")
         return await self.interview_question_repo.get_questions_by_resume(resume.id)
@@ -119,7 +119,11 @@ class InterviewIndividualQuestionController:
 
         completed = 0
         for resume in resumes:
-            questions = await self.interview_question_repo.get_questions_by_resume(resume.resume_id)
+            db_resume = await self.favorite_resume_repo.get_favorite_resumes_by_resume_id(resume.id)
+            if not db_resume:
+                continue
+            print("Resume id",db_resume.id)
+            questions = await self.interview_question_repo.get_questions_by_resume(db_resume.id)
             if questions:
                 completed += 1
 

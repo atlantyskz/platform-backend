@@ -40,7 +40,9 @@ celery_app.conf.beat_schedule = {
 @celery_app.task
 def process_expired_free_trials():
     logger.info("Starting expired free trial processing for all balances...")
-    return asyncio.run(_process_expired_free_trials())
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    return loop.run_until_complete(_process_expired_free_trials())
 
 
 async def _process_expired_free_trials():
@@ -82,7 +84,9 @@ async def _process_expired_free_trials():
 @shared_task
 def free_trial_tracker(balance_id):
     logger.info("Starting expired free trial processing for balance_id=%s", balance_id)
-    return asyncio.run(_process_single_free_trial(balance_id))
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    return loop.run_until_complete(_process_single_free_trial(balance_id))
 
 
 async def _process_single_free_trial(balance_id):
@@ -126,7 +130,9 @@ def generate_questions_task(
         user_organization_id,
         balance_id
 ):
-    return asyncio.run(
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    return loop.run_until_complete(
         _process_generate_questions(
             session_id=session_id,
             user_id=user_id,
@@ -276,7 +282,9 @@ async def _attempt_llm_request(messages, max_attempts=3):
 
 @celery_app.task
 def bulk_send_whatsapp_message(session_id, user_id):
-    asyncio.run(_process_send_whatsapp_messages(session_id, user_id))
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    loop.run_until_complete(_process_send_whatsapp_messages(session_id, user_id))
 
 
 async def _process_send_whatsapp_messages(
@@ -384,7 +392,9 @@ async def _process_send_whatsapp_messages(
 
 @celery_app.task
 def bulk_resend_whatsapp_message(session_id, user_id):
-    asyncio.run(_process_resend_whatsapp_messages(session_id, user_id))
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    loop.run_until_complete(_process_resend_whatsapp_messages(session_id, user_id))
 
 
 async def _process_resend_whatsapp_messages(session_id: str, user_id: int) -> None:
