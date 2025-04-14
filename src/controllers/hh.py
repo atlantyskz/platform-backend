@@ -476,7 +476,7 @@ class HHController:
                 })
                 candidate_info = await self.candidate_info_repo.create_candidate_info(
                     {
-                        "hh_file_url": resume_data.get("download", {}).get("pdf", {}).get("url", None),
+                        "hh_resume_url": resume_data.get("download", {}).get("pdf", {}).get("url", None),
                     }
                 )
                 logging.info(f"Отправка задачи {task_id} на обработку через DramatiqWorker")
