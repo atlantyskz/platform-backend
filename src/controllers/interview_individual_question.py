@@ -81,6 +81,8 @@ class InterviewIndividualQuestionController:
         if db_session and (db_session.status in (GenerateStatus.PENDING, GenerateStatus.SUCCESS)):
             raise BadRequestException("Session already exists")
 
+        if db_session:
+            await self.question_generate_session_repository.delete(session_id)
         assistant = await self.assistant_repo.get_assistant_by_name("ИИ Рекрутер")
         organization = await self.organization_repo.get_user_organization(user_id)
         if not organization:
@@ -122,7 +124,7 @@ class InterviewIndividualQuestionController:
             db_resume = await self.favorite_resume_repo.get_favorite_resumes_by_resume_id(resume.id)
             if not db_resume:
                 continue
-            print("Resume id",db_resume.id)
+            print("Resume id", db_resume.id)
             questions = await self.interview_question_repo.get_questions_by_resume(db_resume.id)
             if questions:
                 completed += 1

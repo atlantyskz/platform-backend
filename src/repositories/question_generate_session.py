@@ -1,6 +1,6 @@
 from typing import Optional
 
-from sqlalchemy import select, update
+from sqlalchemy import select, update, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src import models
@@ -12,7 +12,8 @@ class QuestionGenerateSessionRepository:
 
     async def get_by_session_id(self, session_id: str) -> Optional[models.QuestionGenerateSession]:
         result = await self.session.execute(
-            select(models.QuestionGenerateSession).where(models.QuestionGenerateSession.session_id == session_id).order_by("created_at")
+            select(models.QuestionGenerateSession).where(
+                models.QuestionGenerateSession.session_id == session_id).order_by("created_at")
         )
         return result.scalars().first()
 
@@ -37,3 +38,12 @@ class QuestionGenerateSessionRepository:
             .values(status=status, error=error)
         )
         await self.session.execute(stmt)
+
+    async def delete(self, session_id: str):
+        stmt = (
+            delete(models.QuestionGenerateSession)
+            .where(models.QuestionGenerateSession.session_id == session_id)
+            .where(models.QuestionGenerateSession.status == models.GenerateStatus.FAILURE)
+        )
+        result = await self.session.execute(stmt)
+        return result.rowcount > 0
