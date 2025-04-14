@@ -48,3 +48,7 @@ class InterviewIndividualQuestionRepository(BaseRepository):
         )
         result = await self.session.execute(stmt)
         return result.scalars().all()
+
+    async def bulk_insert_questions(self, questions: list[dict]):
+        stmt = insert(InterviewIndividualQuestion).values(questions)
+        await self.session.execute(stmt)

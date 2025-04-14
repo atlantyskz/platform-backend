@@ -37,7 +37,8 @@ from .whatsapp_instance_association import WhatsappInstanceAssociation
 from .whatsapp_instance import InstanceTypeEnum
 from .current_whatsapp_instance import CurrentWhatsappInstanceRepository
 from .user_interaction_repository import UserInteractionRepository
-
+from .question_generate_session import QuestionGenerateSessionRepository
+from .vacancy import VacancyRepository
 __all__ = [
     "WhatsappInstanceRepository",
     "CashBalanceRepository",

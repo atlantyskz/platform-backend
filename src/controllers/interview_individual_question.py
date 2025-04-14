@@ -2,8 +2,8 @@ from typing import Dict, Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.core.dramatiq_worker import DramatiqWorker
 from src.core.exceptions import NotFoundException, BadRequestException
-from src.core.tasks import generate_questions_task
 from src.models import InterviewIndividualQuestion, GenerateStatus
 from src.repositories import AssistantSessionRepository, AssistantRepository, OrganizationRepository, BalanceRepository
 from src.repositories.favorite_resume import FavoriteResumeRepository
@@ -93,7 +93,7 @@ class InterviewIndividualQuestionController:
         try:
             await self.question_generate_session_repository.create(session_id)
             await self.session.commit()
-            generate_questions_task.delay(
+            DramatiqWorker.generate_questions_task.send(
                 session_id,
                 user_id,
                 assistant.id,

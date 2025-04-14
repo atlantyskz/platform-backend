@@ -2,9 +2,9 @@ from fastapi import APIRouter, Depends
 
 from src import repositories
 from src.core.databases import session_manager
+from src.core.dramatiq_worker import DramatiqWorker
 from src.core.exceptions import NotFoundException
 from src.core.middlewares.auth_middleware import get_current_user
-from src.core.tasks import bulk_send_whatsapp_message, bulk_resend_whatsapp_message
 from src.schemas.responses.channels import ChannelBulkMessageSchema, SendWhatsMessageSchema
 from src.services.green_api_instance_cli import GreenApiInstanceCli
 
@@ -30,7 +30,7 @@ async def get_ignored(session_id: str, user=Depends(get_current_user)):
 @router.post("/resend-ignored-chats/{session_id}")
 async def resend_ignored_chats(session_id: str, current_user=Depends(get_current_user)):
     user_id = current_user.get("sub")
-    bulk_resend_whatsapp_message.delay(session_id, user_id)
+    DramatiqWorker.bulk_resend_whatsapp_message.send(session_id, user_id)
     return {"success": True}
 
 
@@ -40,7 +40,7 @@ async def bulk_message(
         current_user=Depends(get_current_user)
 ):
     user_id = current_user.get("sub")
-    bulk_send_whatsapp_message.delay(data.session_id, user_id)
+    DramatiqWorker.bulk_send_whatsapp_message.send(data.session_id, user_id)
     return {"success": True}
 
 
