@@ -26,7 +26,7 @@ class InterviewIndividualQuestionController:
         resume =  await self.favorite_resume_repo.get_favorite_resumes_by_resume_id(resume_id)
         if not resume:
             raise NotFoundException("Resume not found")
-        return await self.interview_question_repo.get_questions_by_resume(resume_id)
+        return await self.interview_question_repo.get_questions_by_resume(resume.id)
 
     async def create_individual_question(self, question_text: str, resume_id: int) -> Dict[str, Any]:
         resume = await self.favorite_resume_repo.get_resume(resume_id)
