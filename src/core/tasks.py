@@ -169,7 +169,8 @@ async def _process_generate_questions(
                         resume_record,
                         question_repo,
                         balance_repo,
-                        balance_usage_repo
+                        balance_usage_repo,
+                        favorite_repo
                     )
 
                     await manager.notify_progress(session_id, {
@@ -211,7 +212,8 @@ async def _generate_questions_for_resume(
         resume_record,
         question_repo,
         balance_repo,
-        balance_usage_repo
+        balance_usage_repo,
+        favorite_repo
 ):
     try:
         resume_data = resume_record.result_data.get("candidate_info", {})
@@ -232,10 +234,12 @@ async def _generate_questions_for_resume(
         tokens_spent = response_data.get("tokens_spent", 0)
         llm_response_data = response_data["llm_response"]
         interview_questions = llm_response_data.get("interview_questions", [])
-
+        resume = await favorite_repo.get_favorite_resumes_by_resume_id(resume_record.id)
+        if not resume:
+            return
         for question in interview_questions:
             await question_repo.create_question({
-                "resume_id": resume_record.id,
+                "resume_id": resume.id,
                 "question_text": question.get("question_text", "")
             })
 

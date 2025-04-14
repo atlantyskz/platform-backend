@@ -11,7 +11,7 @@ class InterviewIndividualQuestion(Base, TimestampMixin):
     resume_id = sa.Column(
         sa.Integer,
         sa.ForeignKey(
-            'hr_assistant_tasks.id',
+            'favorite_resumes.id',
             ondelete='CASCADE'
         )
     )
