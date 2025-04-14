@@ -120,12 +120,8 @@ class InterviewIndividualQuestionController:
             raise BadRequestException("No resumes found for this session")
 
         completed = 0
-        for resume in resumes:
-            db_resume = await self.favorite_resume_repo.get_favorite_resumes_by_resume_id(resume.id)
-            if not db_resume:
-                continue
-            print("Resume id", db_resume.id)
-            questions = await self.interview_question_repo.get_questions_by_resume(db_resume.id)
+        for resume_id, _ in resumes:
+            questions = await self.interview_question_repo.get_questions_by_resume(resume_id)
             if questions:
                 completed += 1
 
