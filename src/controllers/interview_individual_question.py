@@ -23,7 +23,7 @@ class InterviewIndividualQuestionController:
         self.balance_repo = BalanceRepository(session)
 
     async def get_questions_by_resume(self, resume_id: int) -> list[InterviewIndividualQuestion]:
-        resume = await self.favorite_resume_repo.get_resume(resume_id)
+        resume =  await self.favorite_resume_repo.get_favorite_resumes_by_resume_id(resume_id)
         if not resume:
             raise NotFoundException("Resume not found")
         return await self.interview_question_repo.get_questions_by_resume(resume_id)
