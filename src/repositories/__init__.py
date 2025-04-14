@@ -39,6 +39,8 @@ from .current_whatsapp_instance import CurrentWhatsappInstanceRepository
 from .user_interaction_repository import UserInteractionRepository
 from .question_generate_session import QuestionGenerateSessionRepository
 from .vacancy import VacancyRepository
+from .candidate_info import CandidateInfo
+
 __all__ = [
     "WhatsappInstanceRepository",
     "CashBalanceRepository",

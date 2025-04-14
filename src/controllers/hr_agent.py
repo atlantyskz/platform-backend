@@ -37,6 +37,7 @@ from src.repositories.assistant import AssistantRepository
 from src.repositories.assistant_session import AssistantSessionRepository
 from src.repositories.balance import BalanceRepository
 from src.repositories.balance_usage import BalanceUsageRepository
+from src.repositories.candidate_info import CandidateInfoRepository
 from src.repositories.chat_message_history import ChatHistoryMessageRepository
 from src.repositories.favorite_resume import FavoriteResumeRepository
 from src.repositories.hh import HHAccountRepository
@@ -69,6 +70,7 @@ class HRAgentController:
         self.assistant_session_repo = AssistantSessionRepository(session)
         self.assistant_repo = AssistantRepository(session)
         self.bg_backend = BackgroundTasksBackend(session)
+        self.candidate_info_repo = CandidateInfoRepository(session)
         self.history_repo = ChatHistoryMessageRepository(session)
         self.organization_repo = OrganizationRepository(session)
         self.requirement_repo = VacancyRequirementRepository(session)
@@ -477,7 +479,12 @@ class HRAgentController:
                     "task_status": "pending",
                     "file_key": str(file_key),
                 })
-
+                candidate_info = await self.candidate_info_repo.create_candidate_info(
+                    {
+                        "is_hh": True,
+                        "resume_url": str(file_url),
+                    }
+                )
                 DramatiqWorker.process_resume.send(
                     task_id,
                     vacancy_text,
@@ -485,7 +492,8 @@ class HRAgentController:
                     user_id,
                     user_organization.id,
                     balance.id,
-                    vacancy_text
+                    vacancy_text,
+                    candidate_info.id
                 )
                 processed_count += 1
                 await self.send_progress(

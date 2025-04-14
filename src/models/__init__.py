@@ -58,6 +58,7 @@ from .whatsapp_instance import user_instance_association
 from .user_interaction import UserInteraction
 from .question_generate_session import QuestionGenerateSession
 from .question_generate_session import GenerateStatus
+from .candidate_info import CandidateInfo
 
 sql_admin_models_list = [
     User,
@@ -88,5 +89,6 @@ sql_admin_models_list = [
     WhatsappInstance,
     CurrentWhatsappInstance,
     UserInteraction,
-    QuestionGenerateSession
+    QuestionGenerateSession,
+    CandidateInfo
 ]

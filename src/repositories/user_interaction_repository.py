@@ -1,4 +1,4 @@
-from sqlalchemy import select, update
+from sqlalchemy import select, update, insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.models.user_interaction import UserInteraction
@@ -8,22 +8,20 @@ class UserInteractionRepository:
     def __init__(self, session: AsyncSession):
         self.session = session
 
-    async def create_interaction(
-            self,
-            chat_id: str,
-            instance_id: int,
-            message_type: str,
-            session_id: str,
-    ) -> UserInteraction:
-        interaction = UserInteraction(
-            chat_id=chat_id,
-            instance_id=instance_id,
-            message_type=message_type,
-            session_id=session_id
+    async def create_interaction(self, data) -> UserInteraction:
+        stmt = (
+            insert(
+                UserInteraction
+            )
+            .values(
+                **data
+            )
+            .returning(
+                UserInteraction
+            )
         )
-        self.session.add(interaction)
-        await self.session.flush()
-        return interaction
+        interaction = await self.session.execute(stmt)
+        return interaction.scalars().first()
 
     async def get_not_answered_by_chat(
             self,

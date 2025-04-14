@@ -1,34 +1,34 @@
 import asyncio
-import time
-import httpx
 import logging
+import math
+import time
 import uuid
 from datetime import datetime, timedelta
-from typing import AsyncGenerator, Dict, List
+from typing import Dict
 from urllib.parse import urlencode
 
+import httpx
 from fastapi import WebSocket
 from fastapi.responses import RedirectResponse
+from sqlalchemy.ext.asyncio import AsyncSession
 
-import math
-
-from src.repositories.balance import BalanceRepository
-from src.repositories.balance_usage import BalanceUsageRepository
-from src.repositories.organization import OrganizationRepository
-from src.repositories.vacancy_requirement import VacancyRequirementRepository
 from src.core.backend import BackgroundTasksBackend
 from src.core.dramatiq_worker import DramatiqWorker
-from src.repositories.favorite_resume import FavoriteResumeRepository
-from src.repositories.vacancy import VacancyRepository
-from src.repositories.assistant_session import AssistantSessionRepository
-from src.repositories.assistant import AssistantRepository
-from src.services.request_sender import RequestSender
-from src.services.hh_extractor import assemble_candidate_summary, extract_full_candidate_info, extract_vacancy_summary
 from src.core.exceptions import NotFoundException, BadRequestException
-from src.repositories.user import UserRepository
-from src.repositories.hh import HHAccountRepository
 from src.core.settings import settings
-from sqlalchemy.ext.asyncio import AsyncSession
+from src.repositories.assistant import AssistantRepository
+from src.repositories.assistant_session import AssistantSessionRepository
+from src.repositories.balance import BalanceRepository
+from src.repositories.balance_usage import BalanceUsageRepository
+from src.repositories.candidate_info import CandidateInfoRepository
+from src.repositories.favorite_resume import FavoriteResumeRepository
+from src.repositories.hh import HHAccountRepository
+from src.repositories.organization import OrganizationRepository
+from src.repositories.user import UserRepository
+from src.repositories.vacancy import VacancyRepository
+from src.repositories.vacancy_requirement import VacancyRequirementRepository
+from src.services.hh_extractor import assemble_candidate_summary, extract_full_candidate_info, extract_vacancy_summary
+from src.services.request_sender import RequestSender
 
 _resume_cache: Dict[str, dict] = {}
 
@@ -55,6 +55,7 @@ class HHController:
         self.requirement_repo = VacancyRequirementRepository(session)
         self.balance_repo = BalanceRepository(session)
         self.balance_usage_repo = BalanceUsageRepository(session)
+        self.candidate_info_repo = CandidateInfoRepository(session)
 
     async def get_auth_url(self):
         params = {
@@ -86,7 +87,7 @@ class HHController:
         async with httpx.AsyncClient() as client:
             try:
                 response = await client.post(
-                    "https://api.hh.ru/token", 
+                    "https://api.hh.ru/token",
                     data=data,
                     headers={"Content-Type": "application/x-www-form-urlencoded"},
                     timeout=10.0,
@@ -123,7 +124,7 @@ class HHController:
         return {
             "message": "Authorization successful",
         }
-    
+
     async def get_user_vacancies(self, user_id: int, status: str, page_from: int) -> dict:
         """
         Получение списка вакансий пользователя на HH.
@@ -138,7 +139,7 @@ class HHController:
         headers = {"Authorization": f"Bearer {hh_account.access_token}"}
         employer_data = await self.get_hh_account_info(user_id)
         emp_id = employer_data.get("employer", {}).get("id")
-        
+
         # Получаем список менеджеров
         async with httpx.AsyncClient() as client:
             try:
@@ -156,7 +157,7 @@ class HHController:
             for manager in managers:
                 manager_id = manager.get("id")
                 page_number = 0  # Начинаем с первой страницы для каждого менеджера
-                
+
                 while True:
                     try:
                         # Получаем вакансии для текущей страницы менеджера"
@@ -172,7 +173,7 @@ class HHController:
                         print(vacancies_response.json())
                         vacancies_data = vacancies_response.json()
                         vacancies = vacancies_data.get("items", [])
-                        
+
                         # Если вакансий нет, выходим из цикла
                         if not vacancies:
                             break
@@ -187,7 +188,8 @@ class HHController:
                         # Переходим на следующую страницу
                         page_number += 1
                     except httpx.RequestError as exc:
-                        raise BadRequestException(f"HTTP error during vacancies retrieval for manager {manager_id}: {exc}") from exc
+                        raise BadRequestException(
+                            f"HTTP error during vacancies retrieval for manager {manager_id}: {exc}") from exc
 
         # Пагинация для всех вакансий
         items_per_page = 10
@@ -206,7 +208,7 @@ class HHController:
             "total_items": total_items,
             "total_pages": total_pages,
             "current_page": page_from,
-            'items_per_page':len(paginated_vacancies)
+            'items_per_page': len(paginated_vacancies)
         }
         return result
 
@@ -308,7 +310,7 @@ class HHController:
         async with httpx.AsyncClient() as client:
             try:
                 response = await client.get(f"https://api.hh.ru/vacancies/{vacancy_id}",
-                                              headers=headers, timeout=10.0)
+                                            headers=headers, timeout=10.0)
             except httpx.RequestError as exc:
                 raise BadRequestException(f"HTTP error during vacancy retrieval: {exc}") from exc
         return response.json()
@@ -347,7 +349,7 @@ class HHController:
                 data = response.json()
                 items = data.get("items", [])
                 if not items:
-                    break 
+                    break
                 resume_ids = [item.get("resume", {}).get("id") for item in items if item.get("resume", {}).get("id")]
                 all_resume_ids.extend(resume_ids)
                 page += 1
@@ -384,7 +386,8 @@ class HHController:
             elif response.status_code == 429:
                 retry_after = response.headers.get("Retry-After")
                 delay = int(retry_after) if retry_after and retry_after.isdigit() else (2 ** retry_count)
-                logging.warning(f"Ошибка 429 для resume_id {resume_id}. Ретрай через {delay} секунд (попытка {retry_count+1}/{max_retries})")
+                logging.warning(
+                    f"Ошибка 429 для resume_id {resume_id}. Ретрай через {delay} секунд (попытка {retry_count + 1}/{max_retries})")
                 await asyncio.sleep(delay)
                 retry_count += 1
             else:
@@ -464,14 +467,18 @@ class HHController:
                 logging.info(f"Создание фоновой задачи с id={task_id} для resume_id={resume_id}")
                 await self.bg_backend.create_task({
                     "task_id": task_id,
-                    "resume_id":resume_id,
-                    "vacancy_id":vacancy_id,
+                    "resume_id": resume_id,
+                    "vacancy_id": vacancy_id,
                     "session_id": session_id,
                     "task_type": "hh cv analyze",
                     "task_status": "pending",
                     "hh_file_url": resume_data.get("download", {}).get("pdf", {}).get("url", None),
                 })
-
+                candidate_info = await self.candidate_info_repo.create_candidate_info(
+                    {
+                        "hh_file_url": resume_data.get("download", {}).get("pdf", {}).get("url", None),
+                    }
+                )
                 logging.info(f"Отправка задачи {task_id} на обработку через DramatiqWorker")
                 DramatiqWorker.process_resume.send(
                     task_id,
@@ -480,12 +487,14 @@ class HHController:
                     user_id,
                     user_organization.id,
                     balance.id,
-                    candidate_resume_text  # Здесь передается текст резюме (можно заменить на другой параметр)
+                    candidate_resume_text,  # Здесь передается текст резюме (можно заменить на другой параметр)
+                    candidate_info.id
                 )
                 all_task_ids.append(task_id)
                 logging.info(f"Обработка резюме {resume_id} для user_id={user_id}")
 
-            logging.info(f"Завершено создание задач: создано {len(all_task_ids)} задач, пропущено {len(skipped_resumes)} резюме")
+            logging.info(
+                f"Завершено создание задач: создано {len(all_task_ids)} задач, пропущено {len(skipped_resumes)} резюме")
             finish_time = time.time()
             print("TIME DIFF: ", finish_time - start_time)
             return {

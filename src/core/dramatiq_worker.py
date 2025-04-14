@@ -8,8 +8,9 @@ from dramatiq.middleware.asyncio import AsyncIO
 
 from src.core.databases import session_manager
 from src.models import GenerateStatus
-from src.repositories.balance import BalanceRepository
-from src.repositories.balance_usage import BalanceUsageRepository
+from src.repositories import HHAccountRepository
+from src.repositories.candidate_info import CandidateInfoRepository
+from src.services.head_hunter_cli import HeadHunterCLI
 from src.services.request_sender import RequestSender
 from src.services.websocket import manager
 
@@ -33,13 +34,15 @@ class DramatiqWorker:
             organization_id: int,
             balance_id: int,
             user_message: str,
-            file=None
+            candidate_info_id: int,
+            file=None,
     ):
         from src.core.backend import BackgroundTasksBackend
-        from src.repositories.assistant import AssistantRepository
+        from src.repositories import AssistantRepository
+        from src.repositories import BalanceRepository
+        from src.repositories import BalanceUsageRepository
         from src.services.request_sender import RequestSender
         from src.core.databases import session_manager
-
         logging.info(f"Начало задачи {task_id} для user_id={user_id}")
 
         try:
@@ -50,6 +53,7 @@ class DramatiqWorker:
                     assistant_repo = AssistantRepository(session)
                     usage_repo = BalanceUsageRepository(session)
                     llm_service = RequestSender()
+                    candidate_info = CandidateInfoRepository(session)
 
                     balance = await balance_repo.get_balance(organization_id)
                     if balance.atl_tokens < 5:
@@ -88,6 +92,12 @@ class DramatiqWorker:
                         result_data=response_data["llm_response"],
                         tokens_spent=llm_tokens,
                         status="completed"
+                    )
+                    await candidate_info.update_candidate_info(
+                        candidate_id=candidate_info_id,
+                        data={
+                            "candidate_info": response_data["llm_response"]
+                        }
                     )
                     logging.info(f"Задача {task_id} завершена успешно")
 
@@ -134,12 +144,11 @@ class DramatiqWorker:
                     logger.info("No favorite resumes found for session_id=%s", session_id)
                     return
 
-                for index, resume_record in enumerate(resumes):
+                for index, (fav_resume_id, resume_record) in enumerate(resumes):
                     try:
                         async with session.begin_nested():
                             resume_data = resume_record.result_data.get("candidate_info", {})
                             candidate_info = "\n".join(f"{k}: {v}" for k, v in resume_data.items())
-
                             balance = await balance_repo.get_balance(user_organization_id)
                             if balance.atl_tokens < 5:
                                 raise ValueError(f"Недостаточно средств: {balance.atl_tokens} токенов < 5")
@@ -151,16 +160,11 @@ class DramatiqWorker:
                             llm_response_data = response_data["llm_response"]
                             interview_questions = llm_response_data.get("interview_questions", [])
 
-                            resume_obj = await favorite_repo.get_favorite_resumes_by_resume_id(resume_record.id)
-                            if not resume_obj:
-                                continue
-
                             questions_to_insert = [
-                                {"resume_id": resume_obj.id, "question_text": q.get("question_text", "")}
+                                {"resume_id": fav_resume_id, "question_text": q.get("question_text", "")}
                                 for q in interview_questions
                             ]
                             await question_repo.bulk_insert_questions(questions_to_insert)
-
                             atl_tokens_spent = round(tokens_spent / 3000, 2)
                             await balance_usage_repo.create({
                                 "user_id": user_id,
@@ -183,6 +187,7 @@ class DramatiqWorker:
                                 "total": len(resumes),
                                 "percentage": round((index + 1) / len(resumes) * 100)
                             })
+                            await session.flush()
 
                     except Exception as e:
                         logger.error("Error processing resume %s: %s", resume_record.id, str(e))
@@ -240,14 +245,13 @@ class DramatiqWorker:
             organization = await organization_repo.get_user_organization(user_id)
             vacancy = await vacancy_repo.get_by_session_id(session_id)
 
-            ignored = []
-            for resume_record in resumes:
+            for _, resume_record in resumes:
                 resume_data = resume_record.result_data.get("candidate_info", {})
                 full_name = resume_data.get("fullname", "")
                 phone_number = resume_data.get("contacts", {}).get("phone_number", "")
 
                 if not phone_number:
-                    phone_number = "77762838451"
+                    continue
 
                 cleaned_number = "".join(ch for ch in phone_number if ch.isdigit())
                 if cleaned_number.startswith("8"):
@@ -274,10 +278,22 @@ class DramatiqWorker:
                             chat_id,
                             existing_interaction.id
                         )
-                        await user_interaction_repo.update_interaction(chat_id, existing_interaction,
-                                                                       {"is_ignored": True})
+                        await user_interaction_repo.update_interaction(
+                            chat_id,
+                            existing_interaction,
+                            {
+                                "is_ignored": True
+                            }
+                        )
                         continue
                     else:
+                        await user_interaction_repo.update_interaction(
+                            chat_id,
+                            existing_interaction,
+                            {
+                                "is_last": False
+                            }
+                        )
                         text_message = (
                             f"Здравствуйте, {full_name}! Это AI рекрутер из компании {organization.name}. "
                             f"Рады снова с Вами связаться. Вы откликнулись на нашу вакансию «{vacancy.title}», "
@@ -299,14 +315,13 @@ class DramatiqWorker:
                     instance_id=whatsapp_instance.instance_id,
                     instance_token=whatsapp_instance.instance_token
                 )
-
-                await user_interaction_repo.create_interaction(
-                    chat_id=chat_id,
-                    instance_id=whatsapp_instance.id,
-                    session_id=session_id,
-                    message_type="RESUME_OFFER"
-                )
-
+                data = {
+                    "chat_id": chat_id,
+                    "instance_id": whatsapp_instance.instance_id,
+                    "session_id": session_id,
+                    "is_whatsapp": True
+                }
+                await user_interaction_repo.create_interaction(data)
                 await session.commit()
 
     @staticmethod
@@ -375,16 +390,54 @@ class DramatiqWorker:
                         instance_id=whatsapp_instance.instance_id,
                         instance_token=whatsapp_instance.instance_token
                     )
+                    data = {
+                        "chat_id": chat_id,
+                        "instance_id": whatsapp_instance.instance_id,
+                        "session_id": session_id,
+                        "is_whatsapp": True
+                    }
                     await user_interaction_repo.create_interaction(
-                        chat_id=chat_id,
-                        instance_id=whatsapp_instance.id,
-                        session_id=session_id,
-                        message_type="RESUME_OFFER"
+                        **data
                     )
                     logger.info("Повторное сообщение отправлено на %s", chat_id)
                 except Exception as e:
                     logger.error("Ошибка при повторной отправке сообщения для %s: %s", chat_id, str(e))
             await session.commit()
+
+    @dramatiq.actor
+    async def bulk_send_head_hunter_message(self, session_id, user_id):
+        from src.repositories import AssistantSessionRepository
+        from src.repositories import VacancyRepository
+        from src.repositories import FavoriteResumeRepository
+
+        head_hunter_service = HeadHunterCLI()
+
+        async with session_manager.session() as session:
+            assistant_session = AssistantSessionRepository(session)
+            vacancy_repo = VacancyRepository(session)
+            head_hunter_repo = HHAccountRepository(session)
+            favorite_resume_repo = FavoriteResumeRepository(session)
+
+            async with session.begin_nested():
+                db_session = await assistant_session.get_by_session_id(session_id, user_id)
+                if not db_session:
+                    logger.warning("Session is not found session_id=%s", session_id)
+                    raise
+
+                vacancy = await vacancy_repo.get_by_session_id(session_id)
+                if not vacancy:
+                    logger.warning("The session is not have vacancy=%s ", session_id)
+                    raise
+
+                user_hh_account = await head_hunter_repo.get_hh_account_by_user_id(user_id)
+                if not user_hh_account:
+                    logger.warning("The session is not have user_hh_account=%s ", session_id)
+                    return
+
+                # favorite_resumes : Tuple[int, HRTask] = await favorite_resume_repo.get_favorite_resumes_by_session_id(session_id, user_id)
+                # for fav_resume_id, hr_task in favorite_resumes:
+                #
+                #     await head_hunter_service.send_hh_message()
 
     @classmethod
     async def _attempt_llm_request(cls, messages, max_attempts=3):
