@@ -13,7 +13,7 @@ class CandidateInfoRepository:
         return candidate_info.scalars().first()
 
     async def create_candidate_info(self, data: dict):
-        stmt = insert(CandidateInfo).values(**data)
+        stmt = insert(CandidateInfo).values(**data).returning(CandidateInfo)
         candidate_info = await self.session.execute(stmt)
         return candidate_info
 
