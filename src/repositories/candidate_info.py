@@ -15,12 +15,12 @@ class CandidateInfoRepository:
     async def create_candidate_info(self, data: dict):
         stmt = insert(CandidateInfo).values(**data).returning(CandidateInfo)
         candidate_info = await self.session.execute(stmt)
-        return candidate_info
+        return candidate_info.scalars().first()
 
     async def update_candidate_info(self, candidate_id, data):
-        stmt = update(CandidateInfo).values(**data).where(CandidateInfo.id == candidate_id)
+        stmt = update(CandidateInfo).values(**data).where(CandidateInfo.id == candidate_id).returning(CandidateInfo)
         candidate_info = await self.session.execute(stmt)
-        return candidate_info
+        return candidate_info.scalars().first()
 
     async def delete_candidate_info(self, candidate_id):
         stmt = delete(CandidateInfo).where(CandidateInfo.id == candidate_id)
