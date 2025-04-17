@@ -35,7 +35,7 @@ class InterviewIndividualQuestionController:
 
         try:
             created_question = await self.interview_question_repo.create_question({
-                "question": question_text,
+                "question_text": question_text,
                 "resume_id": resume_id
             })
             await self.session.commit()
